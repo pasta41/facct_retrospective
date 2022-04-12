@@ -1,0 +1,2146 @@
+Corporate Social Responsibility via Multi-Armed Bandits
+Tom Ron
+∗
+ront@campus.technion.ac.il
+Technion - Israel Institute of
+Technology
+Omer Ben-Porat
+∗
+omerbenporat@mail.tau.ac.il
+Tel-Aviv University
+Uri Shalit
+urishalit@technion.ac.il
+Technion - Israel Institute of
+Technology
+ABSTRACT
+We propose a multi-armed bandit setting where each arm corre-
+sponds to a subpopulation, and pulling an arm is equivalent to
+granting an opportunity to this subpopulation. In this setting the
+decision-maker’s fairness policy governs the number of opportuni-
+ties each subpopulation should receive, which typically depends
+on the (unknown) reward from granting an opportunity to this
+subpopulation. The decision-maker can decide whether to provide
+these opportunities, or pay a pre-defined monetary value for every
+withheld opportunity. The decision-maker’s objective is to maxi-
+mize her utility, which is the sum of rewards minus the cost paid for
+withheld opportunities. We provide a no-regret algorithm that max-
+imizes the decision-maker’s utility and complement our analysis
+with an almost-tight lower bound. Finally, we discuss the fairness
+policy and demonstrate its downstream implications on the utility
+and opportunities via simulations.
+ACM Reference Format:
+Tom Ron, Omer Ben-Porat, and Uri Shalit. 2021. Corporate Social Responsi-
+bility via Multi-Armed Bandits. In ACM Conference on Fairness, Accountabil-
+ity, and Transparency (FAccT ’21), March 3–10, 2021, Virtual Event, Canada.
+ACM,NewYork, NY, USA, 15 pages. https://doi.org/10.1145/3442188.3445868
+1 INTRODUCTION
+Algorithmic decision making plays a fundamental role in many
+facets of our lives; criminal justice [10, 11, 29], banking [3, 18, 32, 40],
+online-advertisement [28, 30], hiring [1, 2, 4, 7] , and college ad-
+mission [5, 26, 36] are just a few examples. With the abundance
+of applications in which algorithms operate, concerns about their
+ethics, fairness, and privacy have emerged. For instance, classifi-
+cation algorithms that were deemed to be unfair and discriminate
+based on factors like gender, race, and more [16, 20, 38, 41]. Algo-
+rithmic fairness is a framework that, among other means, is aimed
+at ensuring the long-term welfare of such subpopulations when
+subject to algorithmic decision making.
+Consider the following online advertisement use-case. A com-
+pany wants to publish a job ad online and optimizes its campaign
+based on the cost-per-click. As witnessed by Lambrecht and Tucker
+[24], women are less likely to see job ads for STEM positions since
+∗
+Both authors contributed equally to this research.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+© 2021 Association for Computing Machinery.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+https://doi.org/10.1145/3442188.3445868
+they have higher cost-per-click than men. If women are not exposed
+to information about STEM career opportunities, they may never
+apply to such jobs [15]. In order to act fairly and display ads to
+all the subpopulations the company will need to sacrifice part of
+its short-term utility and pay a higher cost-per-click. This is an
+example of a cost of fairness. Our goal in this paper is to better
+understand the trade-offs facing companies who wish to ensure
+their algorithms are more equitable.
+We focus on exploring the cost of fairness versus the cost of
+alternatives such as Corporate Social Responsibility [13] (CSR here-
+inafter). CSR is a self-regulation act of philanthropic responsibility
+in response to the rising concerns on ethical issues in businesses.
+For example, in 2019, Microsoft spent more than three billion dollars
+with minority, disabled, veteran, LGBTQ, and woman-owned busi-
+nesses
+1
+. Starbucks focuses on creating meaningful opportunities
+for their employees. As of June 2020, more than 4,500 employees
+have earned first-time bachelor’s degrees since Starbucks’ College
+Achievement Plan was announced in 2014
+2
+.
+In this paper, we suggest an algorithmic approach to CSR in
+the setting of sequential decision making. Sequential decision mak-
+ing is often modeled as Multi-armed bandit problems (hereinafter
+MAB; see Auer et al. [8] for a brief introduction). MABs enjoy mas-
+sive commercial success and have myriad real-world applications
+[14, 17, 37, 39]. Here, we treat arms as subpopulations, and require
+that subpopulations would not starve from lack of opportunities.
+Opportunities can be granted to a subpopulations either explicitly,
+i.e., by pulling the subpopulation’s arm, or implicitly via CSR chan-
+nels. Given the example above, companies have the choice whether
+to display ads to subpopulations with higher cost-per-click, or al-
+ternatively to invest money in organizations that promote the long
+term well-being of those subpopulations.
+We highlight the tension between the decision-maker that wants
+to maximize her reward and the cost of CSR. We consider the bandit
+reward to be the direct benefit derived from granting the opportu-
+nity to the subpopulation represented by the arm. For simplicity we
+use the term expected reward from here on. The amount of opportu-
+nities depends on how fairness is perceived by the decision-maker
+and the expected rewards. Unfortunately, information about the
+expected rewards is not known in advance and has to be explored
+by the decision-maker. We take a utilitarian approach: The utility
+of the decision-maker is composed of the rewards (e.g. clicks on
+displayed ads), and a transfer cost. The transfer cost is the amount
+the decision-maker invests in CSR for every deferred opportunity.
+Knowing the transfer cost in advance, the decision-maker can make
+an informed decision on how to allocate its resources. Our model
+casts light on the trade-off between the cost of directly granting
+1
+https://aka.ms/2019CSRReport
+2
+https://stories.starbucks.com/uploads/2020/06/2019-Starbucks-Global-Social-
+Impact-Report.pdf
+26
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Tom Ron, Omer Ben-Porat, and Uri Shalit
+an opportunity and the cost of granting the opportunity via an
+external route such as CSR.
+1.1 Our Contribution
+Our contribution is two-fold: technical and conceptual. On the con-
+ceptual side, our framework reflects the trade-off betweenmonetary
+rewards and subpopulation opportunities, which can be viewed as
+a means of providing long-term welfare. This perspective follows,
+e.g., self-regulation in revenue-driven commercial companies (as
+decision-makers) contributing to societal goals, or a policy maker
+that ensures that the decision-maker is fairness aware. In the for-
+mer, sufficient opportunities are a CSR [19] that is integrated in the
+company’s objective by design. In the latter, the decision-maker
+provides opportunities explicitly by arm pulls, or implicitly by
+payments that are invested in that subpopulation by the policy
+maker (for, e.g., better computer labs in public schools). Crucially,
+the number of required opportunities depends on the expected
+rewards, which are only known in hindsight.
+Technically, we consider the typicalMAB settingwith𝐾 Bernoulli
+arms with horizon 𝑇 and expectation vector 𝝁, which is unknown.
+In addition, we introduce a fairness function 𝑓 , 𝑓 : [0, 1]𝐾 → [0, 1]𝐾 ,
+which determines the minimal number of pulls for each arm given
+the expected reward vector 𝝁. The term 𝑇 · 𝑓 (𝝁)𝑖 quantifies the
+amount of opportunities subpopulation 𝑖 deserves, which, impor-
+tantly, is a function of its own expected reward and the expected
+rewards of the other subpopulations. The decision-maker gains
+rewards, but pays a transfer cost of _ for every round of unmet
+opportunity; namely, _
+∑𝐾
+𝑖=1max{0,𝑇 · 𝑓 (𝝁)𝑖 −𝑁𝑖 } where 𝑁𝑖 is the
+number of pulls of arm 𝑖 . We assume that both 𝑓 and _ are known
+in advance. We characterize the optimal algorithm that achieves a
+sub-linear regret of ?̃? (𝑇 2/3), and show a matching lower bound. We
+augment our theoretical analysis with experimental one, examining
+the implications of different fairness functions 𝑓 and values of _.
+1.2 Related Work
+Multi-armed bandits have been the subject of many fairness-related
+research [21, 22, 25, 31, 33]. Joseph et al. [21, 22] study fairness in
+MABs from the eyes of the decision-maker. In their work, a learning
+process is considered unfair if an arm with a lower expected reward
+is favored over an arm with a higher expected reward. We study
+fairness from the perspective of the arms and view arm pulling as
+granting an opportunity. This view was also adopted by Liu et al.
+[25]. The authors define a calibrated fair policy to be a policy that
+selects action 𝑖 with probability equal to the probability that the
+reward realization of arm 𝑖 is the highest. By measuring only the
+number of rounds the algorithm is miscalibrated, Liu et al. [25]
+neglect the decrease in reward incurred by the fairness require-
+ment. In contrast to these works, we explicitly suggest a utilitarian
+approach that penalizes for lack of pulls (in our terminology, op-
+portunities). A penalty of similar flavor was suggested recently in
+other work on fair ML [9, 23], but in different settings. Schumann
+et al. [33] studied group fairness in MAB where several arms can
+belong to the same protected group and the reward can be biased.
+The work most related to ours is Patil et al. [31]. The authors de-
+fine fairness as pulling each arm at least a minimal number of times
+according to a predefined vector (where each entry corresponds
+to a subpopulation). The predefined vector is given by the policy
+maker and is independent of the subpopulation properties. How-
+ever, our work differs from Patil et al. [31] in two crucial aspects.
+First, while Patil et al. [31] model fairness as a hard constraint, we
+better address real-world applications and treat it as a soft one. Our
+utilitarian approach, which is well-studied in economic contexts
+[27, 35], accounts for trading rewards with opportunities. If pro-
+viding opportunities explicitly by pulling the arms is financially
+unbearable, the decision-maker can do that implicitly by monetary
+transfers. Second, Patil et al. [31] construct the fairness constraint
+by a predefined vector, while in our work the opportunity require-
+ments depend on each arm’s expected rewards, a quantity which
+is uncertain during the decision making process, and is only fully
+known in hindsight. This uncertainty makes the problem we ad-
+dress markedly harder. These differences and others lead to a lower
+bound of ?̃? (𝑇 2/3) compared to a ?̃? (
+√
+𝑇 ) in theirs.
+2 MODEL
+We consider a stochastic bandit problem; a decision-maker is given
+𝐾 arms, and pulls one at each time step 𝑡 = 1, 2, . . . ,𝑇 . We denote
+by 𝑖𝑡 the arm pulled at time 𝑡 . When arm 𝑖 is pulled at time 𝑡 , the
+decision-maker receives a random reward, 𝑟𝑡 ∼ D𝑖 . We assume
+that for every 𝑖 ∈ [𝐾], the reward distribution D𝑖 is a Bernoulli
+distribution with expected value `𝑖 . This is without loss of general-
+ity, since we can reduce any instance with general [0, 1]-supported
+distribution to an instance with Bernoulli arms using the technique
+of Agrawal and Goyal [6]. We use 𝝁 to denote the vector of expected
+rewards, i.e., 𝝁 = (`1, . . . , `𝐾 ). We denote by 𝑁𝑖,𝑡 the number of
+times arm 𝑖 is pulled by the end of round 𝑡 , and let Δ𝑖 = `
+∗ − `𝑖 be
+the gap between the expected reward of the optimal arm and the
+expected reward of arm 𝑖 .
+We now present the Reward-Opportunity MAB (R-OMAB) model.
+An instance of R-O MAB is represented by a tuple ⟨𝐾,𝑇 , 𝝁, 𝑓 , _⟩.
+The tuple ⟨𝐾,𝑇 , 𝝁⟩ is an instance of standard stochastic bandit as
+described above. The combination of 𝑓 and _ creates what we call
+the “fairness policy”.
+The fairness requirements are expressed by a function 𝑓 , 𝑓 :
+[0, 1]𝐾 → [0, 1]𝐾 . 𝑓 receives as input a vector of expected re-
+wards and outputs a vector of minimal fraction of times each arm
+has to be pulled in order not to be penalized. We let 𝑓 (𝝁)𝑖 de-
+note the 𝑖’th entry of 𝑓 (𝝁). We assume that
+∑𝐾
+𝑖=1 𝑓 (𝝁)𝑖 ≤ 1 and
+that 𝑓 is Lipschitz continuous with a Lipschitz constant 𝐿 with
+respect to the 𝑙1 norm. That is, for all 𝝁, 𝝁 ′ ∈ [0, 1]𝑘 it holds that
+∥ 𝑓 (𝝁) − 𝑓 (𝝁 ′)∥
+1
+≤ 𝐿 ∥𝝁 − 𝝁 ′∥
+1
+. Intuitively, satisfying the Lips-
+chitz condition implies that two similar expected reward vectors
+get similar fairness requirements. For simplicity, from here on we
+call 𝑓 the fairness function.
+The difference between the fairness requirement and the number
+of times an arm was pulled,𝑇 𝑓 (𝝁)𝑖 −𝑁𝑖,𝑇 , represents the deviation
+from the fairness constraint. If the deviation is positive, it means
+the arm was not pulled enough times, i.e. the subpopulation did not
+receive enough opportunities according to the fairness function.
+In such a case, the decision-maker pays a cost. The paid cost for a
+single arm pull’s deviation from the fairness requirement is given
+by _𝑖 , the transfer cost for arm 𝑖 . If arm 𝑖 was pulled less than
+𝑇 𝑓 (𝝁)𝑖 times, the reward will be deducted by _𝑖 (𝑇 𝑓 (𝝁)𝑖−𝑁𝑖,𝑇 ). The
+27
+Corporate Social Responsibility via Multi-Armed Bandits FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+transfer cost is known to the decision-maker in advance. To account
+for all cases, the possible cost which stems from the deviation
+is _𝑖 max{𝑇 𝑓 (𝝁)𝑖 − 𝑁𝑖,𝑇 , 0}. For simplicity, we use _𝑖 = _ for all
+𝑖 ∈ [𝐾], but stress that our results hold with minor modifications
+in the general case as well.
+The utility of the decision-maker is denoted by U_,𝑓 . It is an
+additive utility of the reward minus the total deviation from the
+fairness requirement. Notice that 𝑖𝑡 and consequently 𝑁𝑖,𝑇 depend
+on the algorithm playing the arms. Formally, given an algorithm
+𝐴𝐿𝐺 ,
+U_,𝑓 (𝐴𝐿𝐺 ;𝑇 )
+def
+=
+𝑇∑
+𝑡=1
+𝑟𝑖𝑡 − _
+𝑘∑
+𝑖=1
+max{𝑇 𝑓 (𝝁)𝑖 − 𝑁𝑖,𝑇 , 0}. (1)
+As is customary in the MAB literature, we focus on the regret of
+the decision-maker, which we denote R_,𝑓 (𝐴𝐿𝐺 ;𝑇 ). Let𝑂𝑃𝑇 be an
+algorithm maximizing the utilityU_,𝑓 (𝑂𝑃𝑇 ) (we discuss 𝑂𝑃𝑇 in
+Subsection 2.1). The regret is the gap between the expected utility
+of 𝑂𝑃𝑇 and 𝐴𝐿𝐺 :
+R_,𝑓 (𝐴𝐿𝐺 ;𝑇 )
+def
+= E(U_,𝑓 (𝑂𝑃𝑇 ;𝑇 )) − E(U_,𝑓 (𝐴𝐿𝐺 ;𝑇 )) . (2)
+When _ and 𝑓 are arbitrary or clear from the context, we omit
+the subscript and simply denote U and R. Full proofs appear in
+Section A.
+2.1 Optimal Algorithm
+The structure of the optimal algorithm in classic MABs is straight-
+forward: In every round, pick the arm with the highest expectation.
+However, in our case, the transfer cost makes the optimal algorithm
+a bit more complex, as we now elucidate. Let 𝑖 denote an arbitrary
+index of a sub-optimal arm, i.e., an arm such that `𝑖 < max𝑖′∈[𝐾 ] `𝑖′ .
+The decision-maker has to decide whether to support the subpopula-
+tion associated with that arm explicitly (by pulling it𝑇 𝑓 (𝝁)𝑖 times)
+or implicitly (by paying _𝑇 𝑓 (𝝁)𝑖 ). Note that 𝑇 𝑓 (𝝁)𝑖 can be non-
+integer, in this case, we assume𝑇 𝑓 (𝝁)𝑖 is rounded to the preceding
+integer. In each one of those 𝑇 𝑓 (𝝁)𝑖 rounds, the decision-maker
+losses Δ𝑖 if she pulls arm 𝑖 (as she could pick the optimal arm) but
+saves _ (as she does not need the pay the transfer cost). Therefore,
+if the reward gap of arm 𝑖 is greater than the transfer cost, Δ𝑖 > _,
+the decision-maker does not pull arm 𝑖 at all and pays the transfer
+cost. Otherwise, if Δ𝑖 < _, the decision-maker would have greater
+utility by pulling arm 𝑖 exactly 𝑇 𝑓 (𝝁)𝑖 times and not incurring the
+transfer cost. If Δ𝑖 = _, the decision-maker is indifferent between
+the two options. More formally,
+Lemma 1. Fix an arbitrary instance ⟨𝐾,𝑇 , 𝝁, 𝑓 , _⟩ and let 𝑂𝑃𝑇 be
+an optimal algorithm for that instance. For every sub-optimal arm 𝑖 ,
+if Δ𝑖 < _ then𝑂𝑃𝑇 pulls 𝑖 exactly𝑇 𝑓 (𝝁)𝑖 times; if Δ𝑖 > _,𝑂𝑃𝑇 does
+not pull 𝑖 at all. If Δ𝑖 = _, 𝑂𝑃𝑇 pulls arm 𝑖 between zero and 𝑇 𝑓 (𝝁)𝑖
+times.
+Proof. Notice that the utility (Equation 1) is order insensitive;
+hence,𝑂𝑃𝑇 is not unique. Therefore, we only care about the vector
+𝑵 = (𝑁1, . . . , 𝑁𝐾 ). We prove that any vector 𝑵 that violates the
+structure described above is sub-optimal.
+Denote by 𝑵 ∗ = (𝑁 ∗
+1
+, . . . , 𝑁 ∗
+𝐾
+) a vector of counts where for
+every sub-optimal arm 𝑖 , if Δ𝑖 < _, 𝑁 ∗
+𝑖
+= 𝑇 (𝝁)𝑖 and if Δ𝑖 > _,
+𝑁 ∗
+𝑖
+= 0. If Δ𝑖 = _, 0 ≤ 𝑁 ∗𝑖 ≤ 𝑇 𝑓 (𝝁)𝑖 . Note that 𝑵
+∗
+is not unique.
+Let 𝑵 = (𝑁1, . . . , 𝑁𝐾 ) be a vector that violates the structure of 𝑵 ∗
+.
+Since 𝑵 violates the structure of 𝑵 ∗
+, there exists 𝑖, 𝑗 ∈ [𝐾], 𝑖 ≠ 𝑗
+such that 𝑁𝑖 < 𝑁 ∗
+𝑖
+and 𝑁 𝑗 > 𝑁 ∗
+𝑗
+. We prove that by moving pulls
+from 𝑗 to 𝑖 in a way specified below the expected utility increases.
+Let 𝑵 ′ = (𝑁 ′
+1
+, . . . , 𝑁 ′
+𝐾
+) be the modified vector after moving pulls
+from 𝑗 to 𝑖 . That is, for all 𝑙 ∈ [𝐾], 𝑙 ≠ 𝑖, 𝑗 , 𝑁𝑙 = 𝑁 ′𝑙 . Additionally,
+we show that either 𝑁 ′
+𝑖
+= 𝑁 ∗
+𝑖
+or 𝑁 ′
+𝑗
+= 𝑁 ∗
+𝑗
+.
+If 0 ≤ 𝑁𝑖 < 𝑁 ∗
+𝑖
+it implies that Δ𝑖 ≤ _. Otherwise 𝑁 ∗𝑖 = 0. If Δ 𝑗 <
+_ it implies that 𝑁 𝑗 > 𝑇 𝑓 (𝝁)𝑗 . In this case moving𝑚 = min{𝑁 𝑗 −
+𝑇 𝑓 (𝝁)𝑗 ,𝑇 𝑓 (𝝁)𝑖 − 𝑁𝑖 } pulls from 𝑗 to 𝑖 changes the expected utility
+by𝑚(_ + `𝑖 − ` 𝑗 ) =𝑚(_ − Δ𝑖 + Δ 𝑗 ). Since Δ𝑖 < _ and Δ 𝑗 ≥ 0 the
+expected utility increases. By the definition of𝑚 either 𝑁 ′
+𝑖
+= 𝑁 ∗
+𝑖
+or
+𝑁 ′
+𝑗
+= 𝑁 ∗
+𝑗
+. Otherwise, if Δ 𝑗 > _, it implies that `𝑖 > ` 𝑗 . By moving
+𝑚 = min{𝑁 𝑗 ,𝑇 𝑓 (𝝁)𝑖 −𝑁𝑖 }, the expected utility changes by at least
+-𝑚(`𝑖 − ` 𝑗 ). Since `𝑖 > ` 𝑗 the expected utility increases. By the
+definition of𝑚 either 𝑁 ′
+𝑖
+= 𝑁 ∗
+𝑖
+or 𝑁 ′
+𝑗
+= 𝑁 ∗
+𝑗
+.
+We showed that every vector that violates the structure of 𝑵 ∗
+can be modified such that the expected utility increases and at least
+one more entry does not violate the structure of 𝑵 ∗
+. Repeating this
+process at most 𝐾 − 1 times yields 𝑵 ∗
+and increases the utility. □
+2.2 About the Fairness Policy
+The fairness policy is comprised of the fairness function 𝑓 and the
+transfer cost _. The function 𝑓 represents the decision-maker’s
+view on how opportunities should be distributed. For example, the
+zero function 𝑓 0 (𝝁)𝑖
+def
+= 0 corresponds to standard Multi-Armed
+bandit problem without any constraints. Generalizing this case
+for any constant function, e.g., 𝑓 uni (𝝁)𝑖
+def
+= 1
+𝐾
+, alludes that the
+decision-maker believes that all subpopulations are entitled to the
+same share of opportunities irrespective of their expected rewards.
+The fairness function can also grow linearly with each expected
+reward, for instance 𝑓 lin (𝝁)𝑖
+def
+=
+`𝑖
+𝐾
+. In the most general case, the
+number of required opportunities to a subpopulation can also de-
+pend on its expected reward relative to the expected rewards of
+other subpopulations. For example, 𝑓 sft (𝝁; 𝑐)𝑖
+def
+=
+exp
+𝑐`𝑖∑𝐾
+𝑗=1 exp
+𝑐`𝑗
+. Our
+modelling and results support these special cases and many other
+natural candidates for the fairness function.
+Selecting _ complements the decision-maker’s view on revenue
+and opportunities. As described in Section 2.1, if the transfer cost
+is high the decision-maker will tend to grant the opportunities
+explicitly, and would not grant opportunities explicitly only when
+the subpopulations’ expected rewards have big differences. If the
+transfer cost is low the decision-maker would derive a higher utility
+by supporting subpopulations via CSR and not by directly granting
+opportunities. As pointed out earlier, _ can vary between different
+subpopulations but for simplicity is assumed equal.
+3 NO-REGRET ALGORITHMS
+In this section, we present our main algorithmic contribution. We
+devise Self-regulated Utility Maximization, which incurs a regret
+of ?̃? (𝑇 2/3). Before we discuss it, we first demonstrate that classical
+MAB algorithms fail miserably on our setting. This is expected
+given that such algorithms were not devised for a setting like ours,
+28
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Tom Ron, Omer Ben-Porat, and Uri Shalit
+but it will serve us later on. Classical MAB algorithms are tuned to
+pull sub-optimal arms as little as possible. As shown in Subsection
+2.1, it is not always optimal for R-O MAB. If the cost of opportunity
+(Δ𝑖 ) is lower than the transfer cost (_), the optimal algorithm pulls
+arm 𝑖 according to the fairness function.
+To better illustrate, consider the famous Explore-Then-Commit
+(ETC) algorithm. ETC explores all arms for a predetermined number
+of rounds (𝑁 ), and then follows the best preforming arm for the
+remaining rounds. We focus on a R-O MAB instance with 2 arms,
+𝝁 = (1, 1
+2
+), transfer cost _ = 0.6 and constant fairness function
+𝑓 (𝝁)𝑖 = 1
+2
+. The optimal algorithm from Subsection 2.1 pulls each
+arm
+𝑇
+2
+times and obtains an expected utility of 0.75𝑇 . ETC with
+optimized exploration parameter will discover that arm 1 is the
+better one relatively fast, and will pick that arm forever; hence, its
+utility is𝑇 −_𝑇
+2
+−𝑜 (1) ≈ 0.7𝑇 . The regret is therefore 0.05𝑇 , which
+is linear in the number of rounds 𝑇 .
+In R-OMAB, we face a unique challenge comparing to the classic
+MAB problem. Classical MAB algorithms are aimed at identifying
+the optimal arm but do not estimate accurately the expected re-
+wards 𝝁 and consequently do not approximate well the reward
+gaps (Δ𝑖 )𝑖∈[𝐾 ] . As discussed in Section 2.1, the optimal algorithm
+depends on the relation between the reward gaps and the transfer
+cost; hence, unlike classic MAB, accurate approximation of the re-
+ward gaps (Δ𝑖 )𝑖∈[𝐾 ] is crucial for our problem. Additionally, 𝑓 (𝝁)
+should also be approximated correctly for arms 𝑖 with Δ𝑖 < _, to
+align with the optimal algorithm. These two challenges are singular
+to our settings and are reflected in the lower bound.
+Algorithm 1, which we term Fairness-Aware-ETC, is a modified
+version of ETC, which is aware of the fairness function and the
+transfer cost. Fairness-Aware-ETC pulls each arm 𝑁 times, where
+𝑁 is received as an input. After the 𝐾𝑁 exploration rounds, it
+constructs estimates for 𝝁 and 𝑓 (𝝁), which we denote using the
+hat notation, i.e., 𝝁 and 𝑓 (𝝁). It then continues optimally with
+respect to these estimates (similarly to the optimal algorithm for
+the estimated quantities). The number of exploration rounds per
+arm 𝑁 balances the tension between exploration and exploitation.
+Setting 𝑁 very high ensures that the estimates 𝝁 and 𝑓 (𝝁) are close
+to their actual counterparts with high probability, but can allow
+little exploitation and hence high regret. Picking 𝑁 too low can
+result in wrong estimation of 𝝁 and as a consequence also wrongly
+evaluate 𝑓 .
+Theorem 1. Fix any arbitrary instance of R-O MAB, and let 𝑁 =
+8𝐿
+2/3𝑇 2/3
+log
+1/3𝑇 . Algorithm 1 has a regret of 𝑂 (𝐾𝐿2/3𝑇 2/3
+log
+1/3𝑇 ).
+Proof. Wedefine the clean event to be the event that
+
+ˆ̀𝑖,𝑡 − `𝑖
+ ≤
+𝑟𝑡 (𝑖) holds for all arms simultaneously. Where 𝑟𝑡 (𝑖) =
+√
+2 log𝑇
+𝑁𝑖,𝑡
+. We
+will argue separately the clean event, and the “bad event” – the
+complement of the clean event. The regret is -
+R(𝑇 ) = R(𝑇 |clean event)P(clean event)+R(𝑇 |bad event)P(bad event).
+We now bound the probabilities for the clean event and for
+the “bad event” at the end of the exploration phase. That is, af-
+ter each arm was pulled 𝑁 times. Using Hoeffding’s inequality,
+P(
+
+ˆ̀𝑖,𝑡 − `𝑖
+ ≤ 𝑟𝑡 (𝑖)) ≥ 1 − 2
+𝑇 4
+. Using the union bound, the proba-
+bility for the clean event is
+P(∀𝑖 ∈ [𝐾]
+
+ˆ̀𝑖,𝑡 − `𝑖
+ ≤ 𝑟𝑡 (𝑖)) ≥ 1 − 2𝐾
+𝑇 4
+.
+Since the “bad event” complements the clean event the probabil-
+ity of the “bad event” is at most
+2𝐾
+𝑇 4
+. That the regret of the bad event
+is bounded by the highest possible regret -𝑇 . Combining the two last
+statement together we obtain that R(𝑇 |bad event)P(bad event) <
+2𝐾
+𝑇 3
+.
+The clean event implies that for all 𝑖 ∈ [𝐾],
+| ˆ̀𝑖 − `𝑖 | ≤ 𝑂
+(√
+log𝑇
+𝑁
+)
+= 𝑂
+(
+𝐿−1/3𝑇−1/3 log1/3𝑇
+)
+. Thus, with re-
+spect to 𝑙1 norm, ∥𝝁 − 𝝁 ′∥
+1
+≤ 𝑂
+(
+𝐾𝐿−1/3𝑇−1/3 log1/3𝑇
+)
+, since 𝑓 is
+𝐿-Lipschitz, 𝑇 ∥ 𝑓 (𝝁) − 𝑓 (𝝁)∥
+1
+≤ 𝑂
+(
+𝐾𝐿
+2/3𝑇 2/3
+log
+1/3𝑇
+)
+.
+Next, we examine several cases at the end of the exploration
+phase and their effect on the regret.
+For arm 𝑖 if Δ𝑖 < _ the optimal algorithm pulls arm 𝑖 exactly
+𝑇 𝑓 (`)𝑖 times.
+• If Δ̂𝑖 < _, Algorithm 1will pull arm 𝑖 ,max {𝑁,𝑇 𝑓 (𝝁)𝑖 } times.
+If 𝑇 𝑓 (𝝁)𝑖 ,𝑇 𝑓 (𝝁)𝑖 < 𝑁 the regret is bounded by 𝑁 (Δ𝑖 +
+_) ≤ 𝑂
+(
+𝐿
+2/3𝑇 2/3
+log
+1/3𝑇
+)
+. Otherwise, the regret is bounded
+by (Δ𝑖 + _)𝑇 |𝑓 (𝝁)𝑖 − 𝑓 (𝝁) |.
+• If Δ̂𝑖 > _. Given the clean event it implies that _ − Δ𝑖 ≤
+𝑂
+(√
+log𝑇
+𝑁
+)
+. In this situation, Algorithm 1 will not pull arm 𝑖
+anymore. If 𝑁 ≥ 𝑇 𝑓 (𝝁)𝑖 , the regret is be bounded by 𝑁Δ =
+𝑂
+(
+𝐿
+2/3𝑇 2/3
+log
+1/3𝑇
+)
+. If 𝑁 < 𝑇 𝑓 (𝝁)𝑖 , the regret is (_−Δ𝑖 )𝑁 ≤
+𝑂 (
+√
+𝑁 log𝑇 ) ≤ 𝑂 (𝐿2/3𝑇 2/3
+log
+1/3𝑇 ).
+For arm 𝑖 if Δ𝑖 > _ the optimal algorithm does not pull arm 𝑖 at
+all.
+(1) If Δ̂𝑖 > _, Algorithm 1 will not pull arm 𝑖 anymore. The
+regret is bounded by 𝑁Δ𝑖 ≤ 𝑂
+(
+𝐿
+2/3𝑇 2/3
+log
+1/3𝑇
+)
+.
+(2) If Δ̂𝑖 < _. Given the clean event it implies that Δ𝑖 − _ ≤
+𝑂
+(√
+log𝑇
+𝑁
+)
+= 𝑂
+(
+𝐿−1/3𝑇−1/3 log1/3𝑇
+)
+. Algorithm 1 will play
+arm 𝑖 , max {𝑁,𝑇 𝑓 (𝝁)𝑖 } times. If 𝑁 ≥ 𝑇 𝑓 (𝝁)𝑖 , the regret
+is bounded by 𝑁 (Δ𝑖 + _) = 𝑂
+(
+𝐿
+2/3𝑇 2/3
+log
+1/3𝑇
+)
+. If 𝑁 <
+𝑇 𝑓 (𝝁)𝑖 ≤ 𝑇 𝑓 (𝝁)𝑖 , the regret is bounded by (Δ𝑖 −_)𝑇 𝑓 (𝝁)𝑖 ≤
+𝑂
+(
+𝑇
+2/3
+log
+1/3𝑇
+)
+. Otherwise, if 𝑁 < 𝑇 𝑓 (𝝁)𝑖 and 𝑇 𝑓 (𝝁)𝑖 ≤
+𝑇 𝑓 (𝝁)𝑖 the regret is bounded by (Δ𝑖 −_)𝑇 𝑓 (𝝁)𝑖 +_𝑇 (𝑓 (𝝁)𝑖 −
+𝑓 (𝝁)𝑖 ) ≤ 𝑂 (𝐿2/3𝑇 2/3
+log
+1/3𝑇 )
+The analysis of the cases above implies that after the loop that
+starts on Line 1 ends, for every sub-optimal arm 𝑖𝑁 ∗
+𝑖
+− 𝑁𝑖
+ ≤ 𝑂 (
+𝐿
+2/3𝑇 2/3
+log
+1/3𝑇
+)
++𝑇 |𝑓 (𝝁)𝑖 − 𝑓 (𝝁)𝑖 |. Note that
+𝑇
+𝐾∑
+𝑖=1
+|𝑓 (𝝁)𝑖 − 𝑓 (𝝁)𝑖 | = 𝑇 ∥ 𝑓 (𝝁) − 𝑓 (𝝁)∥1
+≤ 𝑇𝐿 ∥𝝁 − 𝝁∥
+1
+≤ 𝐾𝐿2/3𝑇 2/3
+log
+1/3𝑇
+. Hence the regret in the end of the exploration phase is bounded
+by 𝑂
+(
+𝐾𝐿
+2/3𝑇 2/3
+log
+1/3𝑇
+)
+.
+29
+Corporate Social Responsibility via Multi-Armed Bandits FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Algorithm 1: Fairness-Aware-ETC
+Input: 𝑁 - number of exploration rounds
+1 for 𝑖 = 1, . . . 𝐾 do
+2 pull arm 𝑖 for 𝑁 rounds
+3 for 𝑖 = 1, . . . 𝐾 do
+4 if Δ̂𝑖 < _ then
+5 pull arm 𝑖 for max{𝑇 𝑓 (𝝁)𝑖 − 𝑁, 0} rounds
+6 pull an arbitrary arm from argmax𝑖∈[𝐾 ] ˆ̀𝑖 until the
+execution ends
+The remaining rounds (less than 𝑇 ) are allocated an arbitrary
+arm with the highest observed expected reward. Given the clean
+event, the reward gap between the optimal arm and the sub-optimal
+arm the algorithm commits to is less than 𝑂
+(
+𝐿−1/3𝑇−1/3 log1/3𝑇
+)
+.
+Hence the regret before allocating the remaining rounds is bounded
+by 𝑂 (𝑇 2/3
+log
+1/3𝑇 ).
+Putting it all together, The regret for the event case is bounded
+by -
+R(𝑇 |clean case) ≤ 𝑂
+(
+𝐾𝐿
+2/3𝑇 2/3
+log
+1/3𝑇
+)
+The total regret is bounded by -
+R(𝑇 ) ≤ (1−2𝐾
+𝑇 4
+)𝑂
+(
+𝐾𝐿
+2/3𝑇 2/3
+log
+1/3𝑇
+)
++2𝐾
+𝑇 4
+·𝑇 ≤ 𝑂
+(
+𝐾𝐿
+2/3𝑇 2/3
+log
+1/3𝑇
+)
+□
+Notice that Algorithm 1 is almost data independent. The explo-
+ration phase in Lines 1-2 continues even if the estimates of 𝝁 and
+𝑓 (𝝁) are accurate. The predefined exploration length 𝑁 prevents
+the algorithm from stopping the exploration early. Such an early
+stopping is important after identifying arms with high opportunity
+cost or arms that already satisfy the fairness requirements.
+3.1 Fairness Aware Black-Box algorithm
+In this section, we present a data dependent algorithm addressing
+the problems of Algorithm 1 above. If the algorithm is certain (with
+high. probability) that the cost of opportunity is higher than the
+transfer cost, the decision-maker can stop pulling this arm. If the
+fairness function admits low values, the algorithm can satisfy the
+fairness requirement within less than ?̃?
+(
+𝑇
+2/3
+)
+pulls.
+We now explain the course of Algorithm 2. Full version of the
+algorithm appears in Section B. The algorithm takes 𝛼 and 𝛽 , which
+we describe shortly, and 𝐴𝐿𝐺 , a black-box no-regret MAB algo-
+rithm as input, where𝐴𝐿𝐺 is no-regret with respect to the classical,
+rewards-only MAB objective (e.g. UCB1 [34]).
+In Lines 1-3 the main variables are initialized: confidence bounds
+representing the probable estimates of the reward gaps, i.e.,𝐿𝐶𝐵(Δ𝑖 ),
+𝑈𝐶𝐵(Δ𝑖 ), and 𝐶𝑡 (Line 3) which is the hyper-cube of probable esti-
+mates of 𝝁. Lines 4-10 consist of four different phases. In the first
+phase (Lines 4-5), the reward gaps are approximated up to a factor
+of 𝛽 . After this phase, the algorithm knows with high probability
+for each arm whether its reward gap is higher or lower than the
+transfer cost by more than 𝛽 . To be precise, we care for accurate
+approximation of Δ𝑖 , only if it is close to the transfer cost, _.
+The second phase (Lines 6-7), approximates 𝑓 for arms with low
+opportunity cost up to a factor of 𝛼 . If there is an arm with low
+opportunity cost for which the approximation of 𝑓 is not accu-
+rate enough, all the arms are pulled. The term max𝝁′∈𝐶𝑡 𝑓 (𝝁
+′)𝑖 −
+min𝝁′∈𝐶𝑡 𝑓 (𝝁
+′)𝑖 upper bounds the highest change of 𝑓 (𝝁 ′)𝑖 inside
+the hyper-cube 𝐶𝑡 , and hence also upper bounds our estimation
+error of 𝑓 (?̂?)𝑖 . To clarify why we pull all arms in Line 7, recall that
+𝑓 (𝝁)𝑖 also depends on ` 𝑗 , 𝑗 ≠ 𝑖 , in the general case; if our estimate
+ˆ̀𝑗 is not accurate, the estimation of 𝑓 (𝝁)𝑖 might not be accurate as
+well. Pulling all arms ensures that all the estimates improve for the
+subsequent round, namely, 𝐶𝑡 shrinks in all of its dimensions. In
+the third phase (Lines 8-9), we ensure that we pull all arms with low
+opportunity cost according to the estimate of 𝑓 (?̂?)𝑖 . Lastly, in the
+fourth step (Line 10), we invoke𝐴𝐿𝐺 until the end of the execution.
+Next, we discuss the input hyper-parameters, 𝛼 , 𝛽 and 𝐴𝐿𝐺 . 𝛼
+is the confidence interval hyper-parameter for the approximation
+of 𝑓 . Setting 𝛼 to small values implies that arms should be pulled
+many times and this can inflict a regret due to over pulling arms.
+The approximation error of 𝑓 can be as big as 𝑇𝛼 is. The hyper-
+parameter 𝛽 is the confidence interval for the approximation of the
+reward gaps. If the reward gap is not close to the transfer cost _, it
+would be identified almost immediately. Otherwise, Algorithm 2
+uses the black-box MAB algorithm 𝐴𝐿𝐺 . This allows the decision-
+maker to devote the fourth and final phase to identifying the best
+arm and exploiting its reward.
+The only computationally non-trivial step in Algorithm 2 appears
+in Line 6: Computing max𝝁′∈𝐶𝑡 𝑓 (𝝁
+′)𝑖 −min𝝁′∈𝐶𝑡 𝑓 (𝝁
+′)𝑖 . Finding
+the global maximum of a Lipschitz function inside a hyper-cube is
+a computationally challenging task. However, due to role 𝑓 plays
+in our setting, we argue that it should have a natural structure.
+Indeed, 𝑓 quantifies a societal requirement and as such should be
+easy to grasp: Providing opportunities according to a cumbersome,
+hard-to-optimize and unexplainable criteria is likely to be unfair
+in and of itself. Consequentially, we shall assume that there is an
+oracle that computes the minimal and maximal values 𝑓 at entry
+𝑖 can obtain in a given hyper-cube. In Subsection A.1, we show
+that for the softmax function 𝑓 sft, implementing such an oracle
+boils down to solving a convex optimization problem over a single
+variable. As an additional example, the family of monotonically
+non-decreasing Cartesian product functions obtain minimum and
+maximum on the extreme points of the confidence intervals and
+hence are easy to handle. Examples of such functions are linear
+functions, exponential functions (e.g., 𝑓 (𝝁)𝑖 = `𝑐
+𝑖
+/𝐾 for 𝑐 ≥ 1)
+and constant functions. We are ready to state the guarantees of
+Algorithm 2.
+Theorem 2. Fix any arbitrary instance of R-O MAB, and let
+𝛼 = 𝐾
+2/3𝐿2/3𝑇−1/3 log1/3𝑇 , 𝛽 = 𝑇−1/3 log1/3𝑇 . Then, Algorithm 2 has a
+regret of 𝑂 (𝐾 5/3𝐿2/3𝑇 2/3
+log
+1/3𝑇 ).
+Proof. We analyze the regret that stems from the different
+phases: Approximating the reward gap (Phase 1), approximating
+𝑓 (Phase 2), granting opportunities (Phase 3), and invoking 𝐴𝐿𝐺
+(Phase 4).
+Lemma 2, which we prove below, guarantees that after each
+arm was pulled at most 8𝑇𝛽 the algorithm is certain (with high
+probability.) for every arm if its cost of opportunity is bigger or
+30
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Tom Ron, Omer Ben-Porat, and Uri Shalit
+smaller than the transfer cost by a factor of 𝛽 . Thus the regret that
+stems from this phase is bounded by 𝑂 (𝑇𝐾𝛽).
+The second phase approximates 𝑓 only for entries with low cost
+of opportunity, i.e., 𝐿𝐶𝐵(Δ𝑖 ) < _. Lemma 3 shows that after each
+arm is pulled at most 8𝑇𝛼 times, 𝑓 is approximated up to a factor of
+𝛼 in the relevant entries. An immediate consequence of Lemma 3 is
+that after at most 8𝑇𝛼 rounds,
+∑
+𝑖∈[𝐾 ];𝐿𝐶𝐵 (Δ𝑖 ) ≤_ max𝝁′∈𝐶𝑡 𝑓 (𝝁
+′)𝑖−
+min𝝁′∈𝐶𝑡 𝑓 (𝝁
+′)𝑖 ≤ 𝛼 . Thus the regret from this phase is bounded
+by 𝑂 (𝑇𝐾𝛼). The regret from the first two phases is bounded by
+𝑂 (𝑇𝐾 max{𝛼, 𝛽}).
+In the third phase, the algorithm pulls each arm with low oppor-
+tunity cost until the condition in Line 9 is met; therefore,
+(1) For arm 𝑖 with Δ𝑖 < _, the regret stems form the approxima-
+tion error of 𝑓 which is bounded by 𝑂 (𝑇𝛼).
+(2) For arm 𝑖 withΔ𝑖 > _, if arm 𝑖 is pulled during the third phase.
+This happens when the reward gap is very close to the trans-
+fer cost and 𝑇𝛽 rounds are not sufficient to approximate Δ𝑖
+correctly. If𝑁𝑖 ≤ 8𝑇 max{𝛼, 𝛽}, the regret is also bounded by
+this term. Otherwise, assume 𝑁𝑖 > 8𝑇 max{𝛼, 𝛽}. Note that
+the regret is bounded by𝑇 𝑓 (𝝁)𝑖 (Δ𝑖 −_) +_𝑇 |𝑓 (𝝁)𝑖 − 𝑓 (𝝁)𝑖 |.
+The second part of this expression is bounded by the approx-
+imation error of 𝑓 , i.e., 𝑂 (𝑇𝛼). We bound the first part of
+the regret by bounding Δ𝑖 − _. To do so, we now look into
+the two possible cases that stopped the loop in Line 5. The
+term the clean event is similar to the clean event defined in
+Subsection 3.
+(a) If 𝑈𝐶𝐵(Δ𝑖 ) < _ + 𝛽 , given the clean event, _ − 𝛽 < _ <
+Δ𝑖 ≤ 𝑈𝐶𝐵(Δ𝑖 ) ≤ _ + 𝛽 . This implies that Δ𝑖 − _ ≤ 2𝛽 .
+Thus, the first part of the regret is bounded by 2𝑇𝛽 .
+(b) If 𝐿𝐶𝐵(Δ𝑖 ) > _ − 𝛽 , given the clean event, _ − 𝛽 <
+𝐿𝐶𝐵(Δ𝑖 ) ≤ _ < Δ𝑖 ≤ _ + 𝛽 . This implies that Δ𝑖 − _ ≤ 2𝛽
+and therefore the first part of the regret is bounded by
+2𝑇𝛽 .
+To summarize, if arm 𝑖 with Δ𝑖 > _ is pulled in the third
+phase, the regret associated with this arm is bounded by
+𝑂 (𝑇 (𝛼 + 𝛽)).
+Eventually, Phase 4 (invoking 𝐴𝐿𝐺) contributes the regret of
+𝐴𝐿𝐺 .
+The regret from the approximation phases is bounded by
+𝑂
+(
+𝐾
+5/3𝐿2/3𝑇 2/3
+log
+1/3𝑇
+)
+. The regret from filling the fairness require-
+ments is also bounded by this term. Ultimately, the total regret
+is bounded by 𝑂
+(
+𝐾
+5/3𝐿2/3𝑇 2/3
+log
+1/3𝑇
+)
+, assuming that this term is
+an upper bound on the regret of 𝐴𝐿𝐺 with respect to a vanilla
+stochastic bandit setting. □
+Lemma 2. Fix any arbitrary instance of R-O MAB and let 𝛽 =
+𝑇−1/3 log1/3𝑇 . Then after at most 8𝑇𝛽 rounds, for every 𝑖 ∈ [𝐾], either
+𝑈𝐶𝐵(Δ𝑖 ) < _ + 𝛽 or 𝐿𝐶𝐵(Δ𝑖 ) > _ − 𝛽
+Proof. With high probability after pulling each arm𝑇𝛽 = 𝑇
+2/3
+log
+1/3
+times, with high probability
+Δ̂𝑖 − Δ𝑖  < 2
+√
+2 log𝑇
+8𝑇𝛽
+= 𝑇−1/3 log1/3𝑇 =
+𝛽 . Therefore, 𝑈𝐶𝐵(Δ𝑖 ) − 𝐿𝐶𝐵(Δ𝑖 ) ≤ 2𝛽 and hence at least one of
+the following happens - 𝐿𝐶𝐵(Δ𝑖 ) ≥ _ − 𝛽 or𝑈𝐶𝐵(Δ𝑖 ) ≤ _ + 𝛽 . □
+Algorithm 2: Self-regulated Utility Maximization
+Input: Black-box bandit algorithm 𝐴𝐿𝐺 , allowed
+approximation error parameters 𝛼 and 𝛽
+1 𝑡 = 1
+2 Initialize arms’ data - 𝑁𝑖 = 0, 𝐿𝐶𝐵(Δ𝑖 ) = 0,𝑈𝐶𝐵(Δ𝑖 ) = 1 for
+all 𝑖 ∈ [𝐾]
+3 𝐶1 = [0, 1]𝐾 // Hyper-cube of 𝝁 values’ in the clean event
+4 while ∃𝑖 ∈ [𝐾] s.t𝑈𝐶𝐵(Δ𝑖 ) > _ + 𝛽 and 𝐿𝐶𝐵(Δ𝑖 ) < _ − 𝛽
+do // Phase 1
+5 Pull all arms once, update 𝑡 , counters, confidence
+bounds and 𝐶𝑡
+6 while ∃𝑖 ∈ [𝐾] s.t. max𝝁′∈𝐶𝑡 𝑓 (𝝁
+′)𝑖 −min𝝁′∈𝐶𝑡 𝑓 (𝝁
+′)𝑖 >
+𝛼 and 𝐿𝐶𝐵(Δ𝑖 ) < _ do // Phase 2
+7 Pull all arms once, update 𝑡 , counters, confidence
+bounds and 𝐶𝑡
+8 while
+∃𝑖 ∈ [𝐾] s.t. 𝐿𝐶𝐵(Δ𝑖 ) < _ and 𝑁𝑖 < 𝑇 𝑓 (𝝁)𝑖 and 𝑡 < 𝑇 do
+// Phase 3
+9 Pull arm 𝑖 the minimal number of times so 𝑁𝑖 ≥ 𝑇 𝑓 (𝝁)𝑖 ,
+update 𝑡 and counters.
+10 Invoke 𝐴𝐿𝐺 for the remaining rounds // Phase 4
+Lemma 3. Fix any arbitrary instance of R-O MAB and let 𝛼 =
+𝐾
+2/3𝐿2/3𝑇−1/3 log1/3𝑇 and a hyper-cube𝐶 ⊆ [0, 1]𝐾 . Then after pulling
+each arm at most 8𝑇𝛼 times, for every 𝑖 ∈ [𝐾], max𝝁′∈𝐶 𝑓 (𝝁 ′)𝑖 −
+min𝝁′∈𝐶 𝑓 (𝝁 ′)𝑖 ≤ 𝛼 .
+Proof. After pulling each arm 8𝑇𝛼 times, with high probabil-
+ity for every 𝑖 ∈ [𝐾], | ˆ̀𝑖 − `𝑖 | ≤ 𝐾−1/3𝐿−1/3𝑇−1/3 log1/3𝑇 . That is
+|𝝁 − 𝝁 | < 𝐾
+2/3𝐿−1/3𝑇−1/3 log1/3𝑇 . Since 𝑓 is 𝐿-Lipschitz, we obtain
+max𝝁′∈𝐶 𝑓 (𝝁 ′)𝑖 −min𝝁′∈𝐶 𝑓 (𝝁 ′)𝑖 ≤ 𝐾 2/3𝐿2/3𝑇−1/3 log1/3𝑇 = 𝛼 . □
+3.2 Special Cases
+In this section, we present two private cases that achieve better
+regret than the worst-case regret of ?̃? (𝑇 2/3) presented in Section 3.
+First, if 𝑓 has very loose fairness requirements, i.e., 𝑓 (𝝁)𝑖 ≤ 𝑇−𝛾
+for all 𝝁 and 𝛾 ≥ 1
+2
+. In such a case, pulling each arm for 𝑂 (𝑇 1−𝛾 )
+rounds and invoking a black-box algorithm for the remaining
+rounds achieves a regret of 𝑂 (max{𝐾𝑇 1−𝛾 ,R(𝐴𝐿𝐺)}). Formally,
+let 𝛾 ≥ 1
+2
+, 𝑓 ∈ Fmin
+𝑇,𝛾
+if for all 𝝁 ∈ [0, 1]𝐾 and for all 𝑖 ∈ [𝐾],
+𝑓 (𝝁)𝑖 ≤ 𝑇−𝛾 .
+Proposition 1. Fix any R-O MAB instance with horizon 𝑇 and
+fairness function 𝑓 ∈ Fmin
+𝑇,𝛾
+, pulling all arms 𝑂 (𝑇 1−𝛾 ) and invoking
+a black-box bandit algorithm for the remaining rounds achieves a
+regret bounded by 𝑂 (max{𝐾𝑇 1−𝛾 ,R(𝐴𝐿𝐺)}).
+Proof. For every arm 𝑖 after it was pulled𝑇 1−𝛾
+times,𝑇 𝑓 (𝝁)𝑖 ≤
+𝑁𝑖 . Thus, the regret that stems from this phase is bounded by
+𝑂
+(
+𝐾𝑇 1−𝛾 )
+. The optimal algorithm pulls the optimal arm for the
+remaining rounds. Thus any additional regret is a consequence of
+𝐴𝐿𝐺 and therefore the regret is bounded by 𝑂 (R(𝐴𝐿𝐺)). □
+The second case is a generalization of 𝑓 uni which was presented
+in Section 2.2. Formally, 𝑓 ∈ F const
+if there exists 𝛾 ≤ 1
+𝐾
+such that
+31
+Corporate Social Responsibility via Multi-Armed Bandits FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Algorithm 3: Constant function utility maximization al-
+gorithm
+Input: Black-box bandit algorithm 𝐴𝐿𝐺
+1 for 𝑖 = 1, . . .𝑇𝛾 do // Phase 1
+2 for 𝑗 = 1 . . . 𝐾 do
+3 pull arm 𝑗 if 𝐿𝐶𝐵(Δ 𝑗 ) ≤ _
+4 Invoke 𝐴𝐿𝐺 for the remaining rounds // Phase 2
+for all 𝝁 ∈ [0, 1]𝐾 and for all 𝑖 ∈ [𝐾], 𝑓 (𝝁)𝑖 = 𝛾 . Algorithm 3 is a
+variation of Successive Elimination [34] that achieves a regret of
+𝑂 (max{
+√
+𝐾𝑇 log𝑇,R(𝐴𝐿𝐺)}).
+To illustrate the motivation to use Algorithm 3 instead of Al-
+gorithm 2 consider the following R-O MAB instance. Fix horizon
+𝑇 , number of arms 𝐾 and define 𝑓 to be 𝑓 (𝝁)𝑖 = 1
+𝑇
+for every
+𝝁 ∈ [0, 1]𝐾 and every 𝑖 ∈ [𝐾]. Let _ = 1
+2
+. Set `1 = 1, `2 = 1+𝑇 −1/3
+2
+and set the expected rewards of the other arms arbitrarily. Note
+that Δ2 =
+1−𝑇 −1/3
+2
+. Thus, the first phase of Algorithm 2 pulls each
+arm𝑂
+(
+𝑇
+2/3
+)
+and incur a Ω
+(
+𝑇
+2/3
+)
+regret. Algorithm 3 will pull each
+arm exactly once and then invoke the black-box algorithm. Thus,
+in this case the regret is bounded by the regret of 𝐴𝐿𝐺 .
+Algorithm 3 leverages the fact that functions in F const
+has no ap-
+proximation error and thus can combine phases 1-3 in Algorithm 2
+to one phase. Note that if an arm is pulled 𝑇𝛾 times we can stop
+pulling it. In the first phase (Lines 1-3) arms are pulled either at
+most 𝑇𝛾 times or until the algorithm is certain that Δ𝑖 > _. In the
+second phase (Line 4), the black box algorithm is invoked and thus
+the regret is also bounded by the regret of the black box algorithm.
+Proposition 2. For any R-O MAB instance with fairness function
+𝑓 ∈ F const, Algorithm 3 achieves a regret of
+𝑂
+(
+max{
+√
+𝐾𝑇 log𝑇,R(𝐴𝐿𝐺)}
+)
+.
+Proof. We start by analyzing the regret of the first phase. For
+arm 𝑖 with Δ𝑖 < _, given the clean event, arm 𝑖 is pulled exactly
+𝑇𝛾 ≤ 𝑇
+𝐾
+times in the first phase, as in the optimal algorithm.
+For arm 𝑖 with Δ𝑖 > _, if Δ𝑖 − _ ≤ 𝑂
+(√
+log𝑇
+𝑇𝛾
+)
+, arm 𝑖 is pulled
+𝑇𝛾 times and the regret will be bounded by 𝑂
+(√
+𝑇 log𝑇
+𝐾
+)
+. Oth-
+erwise, Δ𝑖 − _ > 𝑂
+(√
+log𝑇
+𝑇𝛾
+)
+. Arm 𝑖 is pulled as long as Δ𝑖 −
+_ ≤ 𝑂
+(√
+log𝑇
+𝑁𝑖
+)
+. Thus the regret of the first phase is bounded
+by 𝑂 (
+√
+𝐾𝑇 log𝑇 ). The regret that stems from the second phase is
+bounded by the regret of 𝐴𝐿𝐺 . Combining the two together we get
+that R( Algorithm 3, 𝐴𝐿𝐺) ≤ 𝑂 (max{
+√
+𝐾𝑇 log𝑇,R(𝐴𝐿𝐺)}). □
+3.3 Instance Dependent Bounds
+In this section we analyze the instance dependent regret of Algorithm
+2, rather than the general regret given by Theorem 2. We first add
+several notations. The instance-dependent bounds revolve around
+two main parameters: 𝛿𝑖 = |Δ𝑖 − _ | which is the gap between the
+reward gap of arm 𝑖 and the transfer cost, and 𝛿∗ = min𝑖∈[𝐾 ] 𝛿𝑖
+which is the minimal gap between the reward gap and the trans-
+fer cost. The smaller 𝛿𝑖 is, the more rounds are required in order
+to identify whether the reward gap is smaller or larger than the
+transfer cost, and what is the optimal sub-algorithm.
+Given an R-O MAB instance, let B𝑁 be 𝐾 dimensional ball cen-
+tered around 𝝁 with radius
+√
+2 log𝑇
+𝑁
+. After pulling each arm 𝑁
+times, with high probability the observed vector of expected re-
+wards vector lies in B𝑁 . Denote by B𝑁𝛼 the 𝐾 dimensional ball
+centered around 𝝁 with the largest radius such that for all 𝑖 ∈ [𝐾],
+max𝝁′∈B𝑁𝛼 𝑓 (𝝁
+′)𝑖 −min𝝁′∈B𝑁𝛼 𝑓 (𝝁
+′)𝑖 < 𝛼 .
+Theorem 3. Fix any arbitrary instance of R-O MAB, and let 𝛼 =
+𝐾
+2/3𝐿2/3𝑇−1/3 log1/3𝑇 , 𝛽 = 𝑇−1/3 log1/3𝑇 . Then, the regret of Algorithm
+2 is bounded by 𝑂
+(
+𝐾 (min{𝑇𝛽, log𝑇
+𝛿∗2
+} +𝑇𝛼 + 𝑁𝛼 ) + R(𝐴𝐿𝐺)
+)
+Proof. In order to analyze the instance dependent bounds of
+Algorithm 2 we analyze the instance dependent bound that stems
+from each of its phases. The term “clean event” used in this proof
+and in the following proofs is similar to the clean event defined in
+Subsection 3.
+Lemma 4 argues that the first phase ends after each arm was
+pulled at most 8min
+{
+𝑇𝛽,
+log𝑇
+𝛿∗2
+}
+times and therefore the regret from
+this phase is bounded by 𝑂 (𝐾 min
+{
+𝑇𝛽,
+log𝑇
+𝛿∗2
+}
+).
+Lemma 5 proves that the second phase ends after each arm was
+pulled at most 8min {𝑇𝛼, 𝑁𝛼 } times. Hence, the regret from this
+phase is bounded by 𝑂 (𝐾 min {𝑇𝛼, 𝑁𝛼 }).
+The regret from the third phase depends on the approximation
+error of 𝑓 . The approximation error of 𝑓 on a single entry is bounded
+by 𝑂 (min {𝛼, Y𝛼 }). We divide the analysis into two cases -
+(1) For arm 𝑖 with Δ𝑖 < _, the regret stems from the approxima-
+tion error of 𝑓 which is bounded by 𝑂 (𝑇 min {𝛼, Y𝛼 }).
+(2) For arm 𝑖 with Δ𝑖 > _, given the clean case, if arm 𝑖 is
+pulled during the third phase it implies that the reward gap
+is very close to the transfer cost. I.e. 𝛿𝑖 < 𝛽 . Thus, 8𝑇𝛽
+rounds were not sufficient to approximate Δ𝑖 correctly and
+8𝑇𝛽 ≤ 𝑁𝑖 . If 𝑁𝑖 ≤ 8𝑇 max {𝛼, 𝛽} the regret is bounded by
+this term. Otherwise the regret is bounded by 𝑇 𝑓 (𝝁)𝑖𝛿𝑖 +
+_𝑇 |𝑓 (𝝁)𝑖 − 𝑓 (𝝁)𝑖 | ≤ 𝑂 (𝑇 (𝛽 +min {𝛼, 𝜖𝛼 })).
+To summarize, the regret resulting from the approximation phases
+is bounded by 𝑂 (𝐾 (min{𝑇𝛽, log𝑇
+𝛿∗2
+} + min {𝑇𝛼, 𝑁𝛼 })). The regret
+from the third step is bounded by𝑂 (𝑇𝐾 (min {𝛼, Y𝛼 }+min
+{
+𝛽,
+log𝑇
+𝛿∗2
+}
+)).
+The regret of the fourth phase depends on the regret of the black-box
+algorithm and hence the additional term R(𝐴𝐿𝐺) which completes
+the regret analysis. □
+Lemma 4. Fix any R-O MAB instance, the first phase of Algorithm
+2 ends after each arm is pulled at most 8min{𝑇𝛽, log𝑇
+𝛿∗2
+} times.
+Proof. In order for the first phase to endwe need to approximate
+all the reward gaps sufficiently well. If 𝛿∗ ≤ 𝛽 then given the clean
+event all arms will be pulled 8𝑇
+2/3
+log
+1/3𝑇 times in order to obtain
+a confidence interval smaller than 2𝛽 , which ensures that either
+𝐿𝐶𝐵(Δ𝑖 ) > _ − 𝛽 or𝑈𝐶𝐵(Δ𝑖 ) < _ + 𝛽 for all 𝑖 ∈ [𝐾].
+32
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Tom Ron, Omer Ben-Porat, and Uri Shalit
+Otherwise, if 𝛿∗ > 𝛽 , i.e. for all 𝑖 ∈ [𝐾], 𝛿𝑖 > 𝛽 . Assuming the
+clean event, after pulling each arm
+8 log𝑇
+𝛿∗2
+times,𝑈𝐶𝐵(Δ𝑖 ) ≤ Δ𝑖 +𝛿∗
+and 𝐿𝐶𝐵(Δ𝑖 ) ≥ Δ𝑖 − 𝛿∗. We examine two cases:
+(1) If Δ𝑖 > _, then 𝛿𝑖 = Δ𝑖 − _, this implies that Δ𝑖 = _ + 𝛿𝑖 .
+𝐿𝐶𝐵(Δ𝑖 ) ≥ Δ𝑖 − 𝛿∗ = _ + 𝛿𝑖 − 𝛿∗ > _ − 𝛽 . Therefore arm 𝑖
+will not satisfy the condition in Line 5.
+(2) If Δ𝑖 < _, then 𝛿𝑖 = _ − Δ𝑖 , hence Δ𝑖 = _ − 𝛿𝑖 . 𝑈𝐶𝐵(Δ𝑖 ) ≤
+Δ𝑖 +𝛿∗ = _ −𝛿𝑖 +𝛿∗ ≤ _ + 𝛽 . Therefore arm 𝑖 will not satisfy
+the condition in Line 5.
+Combining the above together, the first phase ends after each
+arm was pulled at most 8min
+{
+𝑇𝛽,
+log𝑇
+𝛿∗2
+}
+times. □
+Lemma5. Fix any R-OMAB instance. The second phase of Algorithm
+2 ends after each arm is pulled at most min {8𝑇𝛼, 4𝑁𝛼 } times.
+Proof. Assuming the clean case, after pulling each arm 4𝑁𝛼
+times,𝐶4𝑁𝛼 is a ball of radius
+√
+log𝑇
+2𝑁𝛼
+centered around 𝝁 such that for
+every 𝑖 ∈ [𝐾], |`𝑖 − ˆ̀𝑖 | ≤
+√
+log𝑇
+2𝑁𝛼
+. Thus, 𝐶4𝑁𝛼 ⊂ B𝑁𝛼 . Therefore,
+max𝝁′∈𝐶4𝑁𝛼
+𝑓 (𝝁 ′)𝑖 −min𝝁′∈𝐶4𝑁𝛼
+𝑓 (𝝁 ′)𝑖 ≤ 𝛼 .
+If 4𝑁𝛼 > 8𝑇𝛼 , as shown in Lemma 3 the condition in Line 7 is
+satisfied trivially. Putting the above observations together, after
+each arm is pulled at most min {8𝑇𝛼, 4𝑁𝛼 } no arm satisfies the
+condition in Line 7 and therefore the second phase ends. □
+3.4 Fairness Over the Entire Horizon
+Ideally, we would like the impose the fairness requirements or
+the CSR payments on every round. This is not always achievable
+since we first need to approximate the reward gaps and the fairness
+function 𝑓 well enough. Additionally, Algorithm 2 requires a known
+horizon while the horizon is not always known in advance. We
+therefore analyze a anytime version of Algorithm 2 which uses the
+doubling trick with geometric growth.
+Following the proof by Besson andKaufmann [12] ifR(𝐴𝐿𝐺 ;𝑇 ) ≤
+𝑐𝑇𝛾 log𝛿 𝑇 then the regret of anytime version (denoted by 𝐴𝐿𝐺 ′)
+with geometric growth achieves a regret of
+R(𝐴𝐿𝐺 ′;𝑇 ) ≤ 𝑙 (𝛾, 𝛿,𝑇0, 𝑏)𝑐𝑇𝛾 log𝛿 𝑇 + 𝑔(𝑇 ) with increasing func-
+tion𝑔(𝑡) = 𝑜 (𝑡𝛾 𝑙𝑜𝑔𝛿𝑡). Setting𝑇0 = 𝐾2
+and𝑏 = 2 attains 𝑙 (𝛾, 𝛿,𝑇0, 𝑏) <
+3.
+4 LOWER BOUND
+In the previous section, we presented Algorithm 2, which incurs a
+regret of ?̃?
+(
+𝑇
+2/3
+)
+in the worst case. Here we show that this bound is
+asymptotically optimal by designing a family of R-OMAB instances
+that can mislead any algorithm.
+Theorem 4. Fix time horizon 𝑇 , number of arms 𝐾 , and Lipschitz
+constant 𝐿. For any algorithm, there exists a R-O MAB instance such
+that R(𝑇 ) ≥ Ω(𝑇 2/3).
+Proof. We construct a family of R-O MAB instances F that any
+algorithm will incur a high regret. For a given 𝐾,𝑇 and 𝐿. Let _ = 1
+and 𝜖 = 𝑐 ·𝑇−1/3. We build F in the following way -
+I𝐽 ,𝑆 =
+
+`𝑖 = 1 𝑖 = 𝑗
+`𝑖 =
+1
+2
+𝑖 ≠ 𝑗, 𝑖 ∈ 𝑆
+`𝑖 =
+1+𝜖
+2
+𝑖 ≠ 𝑗, 𝑖 ∉ 𝑆
+𝑓 (𝝁)𝑖 =
+
+0 `𝑖 ≤ 1
+2
+𝐿 (`𝑖−0.5)
+𝐾
+1
+2
+< `𝑖 ≤ 1
+2
++ 𝜖
+𝐿𝜖
+𝐾
+1
+2
++ 𝜖 < `𝑖 ≤ 1
+I𝐽 ,𝑆 describes a vector of expected rewards. The vector is com-
+posed of arm 𝑗 with expected reward 1, subset of arms, 𝑆 , with
+expected reward
+1
+2
+and the remaining arms have expected reward
+of
+1+𝜖
+2
+. The size of F is 𝐾 · 2𝐾−1. The fairness function, 𝑓 is piece-
+wise linear with 3 pieces. The first piece, for values less or equal to
+1
+2
+is constant and equal to 0. The second piece, for values between
+1
+2
+to
+1
+2
++𝜖 is linear that goes from 0 to
+𝐿𝜖
+𝐾
+. The third piece, for values
+greater than
+1
+2
++ 𝜖 is constant and equal to
+𝐿𝜖
+𝐾
+. In Claim 1 we prove
+that 𝑓 is 𝐿-Lipschitz and sums to at most one.
+Following the optimal algorithm described in Section 2.1, for
+every instance in F the optimal algorithm pulls all the sub-optimal
+arms according to the fairness function. This means the optimal
+algorithm does not pull at all the arms in 𝑆 and pulls
+𝑇𝐿𝜖
+2𝐾
+times
+sub-optimal arms not in 𝑆 . The algorithm pulls the optimal arm
+the remaining rounds (𝑇 −𝑇𝐿𝜖 (𝐾 − 1 − |𝑆 |)/2𝐾 ). In order to distin-
+guish between two instances in F , the decision-maker must pull
+each arm at least 1/8𝜖2 times, otherwise with positive probability
+the decision-maker is unable to distinguish between at least two
+instances.
+We use the following notation for simplicity - I1 = I𝐾, [𝐾−1] ,
+I𝐾,𝑖 = I𝐾, [𝐾−1]\{𝑖 } . I1 is an instance where the 𝐾 ’th arm is the
+optimal arm and all the other arms have an expected reward of
+1
+2
+.
+I𝐾,𝑖 is an instance where the 𝐾 ’th arm is the optimal arm and all
+the other arms expect arm 𝑖 ≠ 𝐾 have an expected reward of
+1
+2
+and
+arm 𝑖 has an expected reward of
+1+𝜖
+2
+.
+Fix an algorithm𝐴𝐿𝐺 . If𝐴𝐿𝐺 pulls each arm at least 1/8𝜖2 times,
+the utility of 𝐴𝐿𝐺 -
+U𝐴𝐿𝐺 (I1) ≤ (𝑇 − (𝐾 − 1)/8𝜖2) + (𝐾 − 1)/8𝜖2 ·
+1
+2
+= 𝑇 − (𝐾 − 1)𝑇
+2/3
+16𝑐2
+.
+On the other hand, the optimal algorithm will pull only arm 𝐾
+and hence, the utility of 𝑂𝑃𝑇 is 𝑇 . The regret is then - R(I1) =
+U𝑂𝑃𝑇 (I1) − U𝐴𝐿𝐺 (I1) ≥ (𝐾−1)𝑇
+2/3
+16𝑐2
+= Ω(𝑇 2/3).
+Otherwise, there exists arm 𝑖 that 𝐴𝐿𝐺 draws less than 1/8𝜖2
+times. With probability at least 0.01, in the instance that generated
+the sequence of rewards 𝑖 ∉ 𝑆 . That is, `𝑖 = 1+𝜖
+2
+. For example
+I𝐾, [𝐾−1]\{𝑖 } . Denote by 𝑁𝑖 the number of times arm 𝑖 is pulled by
+𝐴𝐿𝐺 .
+33
+Corporate Social Responsibility via Multi-Armed Bandits FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+U𝐴𝐿𝐺 (I𝐾,𝑖 ) ≤ (𝑇 − 𝑁𝑖 ) + 𝑁𝑖
+(
+1 + 𝜖
+2
+)
+− (𝑇 · 𝑓 (I𝐾,𝑖 )𝑖 − 𝑁𝑖 )
+= 𝑇 + 𝑁𝑖
+(
+1 + 𝜖
+2
+)
+−𝑇 · 𝑓 (I𝐾,𝑖 )𝑖
+≤ 𝑇 + 1
+8𝜖2
+(
+1 + 𝜖
+2
+)
+− 𝑇𝐿𝜖
+2𝐾
+= 𝑇 −𝑇 2/3
+(
+𝑐𝐿
+2𝐾
+− 1
+16𝑐2
+)
++ Θ
+(
+𝑇
+1/3
+)
+(3)
+The optimal algorithm will pull arm 𝑖 , 𝑇𝐿𝜖/2𝐾 times and arm 𝐾
+the remaining rounds. The utility of 𝑂𝑃𝑇 is -
+U𝑂𝑃𝑇 (I𝐾,𝑖 ) = (1 −
+𝐿𝜖
+2𝐾
+)𝑇 + 𝑇𝐿𝜖
+2𝐾
+(
+1 + 𝜖
+2
+)
+= 𝑇 − 𝑇𝐿𝜖
+4𝐾
++ 𝑇𝐿𝜖
+2
+4𝐾
+= 𝑇 − 𝑇
+2/3𝑐𝐿
+4𝐾
++ Θ(𝑇 1/3)
+Finally, observe that
+R(𝐴𝐿𝐺,I𝐾,𝑖 ) = U𝑂𝑃𝑇 (I𝐾,𝑖 ) − U𝐴𝐿𝐺 (I𝐾,𝑖 )
+≥ 𝑇 2/3
+(
+𝑐𝐿
+4𝐾
+− 1
+16𝑐2
+)
++ Θ(𝑇 1/3)
+= Ω(𝑇 2/3)
+□
+Claim 1. 𝑓 is 𝐿-Lipschitz and sums to at most one.
+Proof. 𝑓 is 𝐿-Lipschitz. 𝑓 is continuous and piece-wise lin-
+ear, hence it is sup |𝑓 ′(𝑥) | − 𝐿𝑖𝑝𝑠𝑐ℎ𝑖𝑡𝑧. sup |𝑓 ′(𝑥) | = 𝐿
+𝐾
+< 𝐿, and
+therefore 𝑓 is 𝐿 − 𝐿𝑖𝑝𝑠𝑐ℎ𝑖𝑡𝑧.
+𝑓 sums to at most 1 - notice that
+max
+𝐾∑
+𝑖=1
+𝑓 (𝝁)𝑖 ≤
+𝐾∑
+𝑖=1
+max
+𝝁∈[0,1]𝐾
+𝑓 (𝝁)𝑖 = 𝐿𝜖.
+𝐿𝜖 ≤ 1 if 𝜖 < 1/𝐿. In the example above, 𝜖 = 𝑐𝑇
+−1/3
+, for large
+enough 𝑇 we obtain 𝜖 < 1/𝐿. □
+5 EXPERIMENTS
+In this section, we perform an empirical analysis of Algorithm
+2. We demonstrate how different fairness policies, i.e., pairs of a
+fairness function 𝑓 and a transfer cost _ influence the course of the
+algorithm and the average utility. We consider several R-O MAB
+instances with 𝐾 = 6 arms, expected values `𝑖 = 0.2 + (𝑖 − 1) · 0.15
+for every 𝑖 ∈ [𝐾], and a varying horizon 𝑇 . For fairness functions,
+we consider 𝑓 uni, 𝑓 lin, and 𝑓 sft from Subsection 2.2. As for the
+transfer cost _, we used 0, 0.4, and 0.8. We used UCB1 as the black
+box algorithm 𝐴𝐿𝐺 in Algorithm 2. Each combination of fairness
+function, transfer cost and horizon was executed 200 times on a
+standard Mac computer. The entire process took several hours. In
+order to compare between the different horizons we present the
+average utility, i.e., the cumulative utility divided by the number of
+rounds.
+Figure 1 demonstrates the behaviour of different fairness func-
+tions with respect to varying values of _. As expected, the average
+utility decreases as the transfer cost increases. In Figure 1a, we see
+that the average utility of all the functions is the same, since 𝐴𝐿𝐺
+is played across all the rounds. As _ increases, the reward gaps Δ
+of more arms go below the transfer cost (see Line 5 in Algorithm 2),
+so the decision-maker should pull them 𝑇 𝑓 (𝝁)𝑖 times (similar to
+the optimal algorithm from Subsection 2.1). The expected utility
+increases with the horizon, since the proportion of approximation
+rounds (Lines 5 and 7) decreases with the horizon. For _ = 0.8, 𝑓 sft
+and 𝑓 uni use all the rounds for allocating opportunities. The differ-
+ence in the average utility stems from the allocation differences.
+𝑓 uni allocates evenly, while 𝑓 sft allocates more opportunities as the
+arm expected reward grows. Observe that 𝑓 uni (𝝁)𝑖 > 𝑓 lin (𝝁)𝑖 for
+every 𝑖 ∈ [𝐾] and the described 𝝁; thus, the utility of 𝑓 lin is greater
+than 𝑓 uni for _ > 0.
+Figure 2 investigates the crux of the execution of Algorithm 2 for
+𝑓 sft: The proportion of rounds devoted to phase 1 (Line 5), phase
+2 (Line 7), phase 3, (Line 9), and phase 4 (invoking 𝐴𝐿𝐺 , Line 10).
+For _ = 0, Algorithm 2 always invokes the black box algorithm
+𝐴𝐿𝐺 . For _ = 0.4 and _ = 0.8, the proportion of approximation
+rounds (phases 1 and 2) decreases as the horizon increases. The
+proportion of phase 3 rounds increases as the horizon grows. The
+reason is that the proportion of approximation rounds decreases,
+while the required number of opportunities grows linearly with
+the horizon. For _ = 0.8, the algorithm dedicates all rounds for
+opportunities. However, for _ = 0.4, it realizes that for arms 1,2, and
+3 (with Δ𝑖 > _ = 0.4) paying the transfer cost _ per each withheld
+opportunities, and hence the remaining rounds are devoted to phase
+4.
+Figure 3 compares the average utility of Algorithm 1 and Algo-
+rithm 2 for 𝑓 sft. This figure emphasizes that although Algorithm
+1 has better asymptotic regret than Algorithm 2, in practice Algo-
+rithm 2 achieves better results. In this experiment, even 200,000
+rounds are not sufficient for Algorithm 1 to approximate the arms
+accurately enough, and therefore the graph for it is flat. Moreover,
+the gap between the average rewards is greater when the transfer
+cost is low. The reason for this phenomenon is that Algorithm 1
+invests many rounds in the exploration of arms which should not
+be pulled according to the optimal algorithm, while Algorithm 2
+can identify those arms early on and adapt.
+Analysis of the pulls distribution and comparison of the average
+utility for 𝑓 lin and 𝑓 uni can be found in Appendix C.
+6 DISCUSSION
+We introduced a MAB problem that models decision making from
+the perspective of Corporate Social Responsibility and allocation
+of opportunities. Our modeling imitates many real-world scenar-
+ios where decision-makers are required to maximize their short-
+term utility while at the same time upholding fairness principles.
+With our framework, commercial companies can incorporate self-
+regulation in their algorithmic products, and provide opportunities
+as a form of social responsibility. We devised a no-regret algorithm
+and showed that its convergence rate is in fact optimal.
+We see considerable scope for follow-up work: Self-regulation
+for increasing subpopulation welfare can be incorporated in many
+34
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Tom Ron, Omer Ben-Porat, and Uri Shalit
+103 104 105
+0.5
+0.7
+0.9
+Horizon
+A
+v
+g.
+U
+ti
+li
+ty
+(a) _ = 0
+103 104 105
+0.5
+0.7
+0.9
+Horizon
+A
+v
+g.
+U
+ti
+li
+ty
+(b) _ = 0.4
+103 104 105
+0.5
+0.7
+0.9
+Horizon
+A
+v
+g.
+U
+ti
+li
+ty
+funi
+f lin
+fsft
+(c) _ = 0.8
+Figure 1: Average utility for different transfer costs.
+104 5 · 104 105 2 · 1050
+0.25
+0.5
+0.75
+1
+Horizon
+P
+u
+ll
+s
+d
+is
+tr
+ib
+u
+ti
+on
+(a) _ = 0
+104 5 · 104 105 2 · 1050
+0.25
+0.5
+0.75
+1
+Horizon
+P
+u
+ll
+s
+d
+is
+tr
+ib
+u
+ti
+on
+(b) _ = 0.4
+104 5 · 104 105 2 · 1050
+0.25
+0.5
+0.75
+1
+Horizon
+P
+u
+ll
+s
+d
+is
+tr
+ib
+u
+ti
+on
+1+2 3 4
+(c) _ = 0.8
+Figure 2: Round distributions per phase for 𝑓 sft.
+103 104 105
+0.5
+0.7
+0.9
+Horizon
+A
+v
+g.
+U
+ti
+li
+ty
+(a) _ = 0
+103 104 105
+0.5
+0.7
+0.9
+Horizon
+A
+v
+g.
+U
+ti
+li
+ty
+(b) _ = 0.4
+103 104 105
+0.5
+0.7
+0.9
+Horizon
+A
+v
+g.
+U
+ti
+li
+ty
+SRUM
+FairETC
+(c) _ = 0.8
+Figure 3: Average utility Algorithm 1 vs Algorithm 2 for 𝑓 sft.
+other tasks, e.g., in classification or load balancing. Granting oppor-
+tunities and investing in CSR can change subpopulations’ expected
+rewards over the long-term. We are interested in the dynamic be-
+tween the change in subpopulations’ expected rewards and the
+fairness policy. The cost of corporate social responsibility consid-
+ered in this paper is linear in the number of deterred opportunities.
+Future work can investigate other forms of cost function. Addi-
+tional extensions of this framework can include more complex
+MAB scenarios such as contextual bandits or sleeping bandits.
+35
+Corporate Social Responsibility via Multi-Armed Bandits FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+REFERENCES
+[1] Amazon scraps secret AI recruiting tool that showed bias against
+women - reuters. URL https://www.reuters.com/article/us-amazon-
+com-jobs-automation-insight/amazon-scraps-secret-ai-recruiting-
+tool-that-showed-bias-against-women-idUSKCN1MK08G.
+[2] How to hire with algorithms. URL https://hbr.org/2016/10/how-to-
+hire-with-algorithms.
+[3] Using mobile to reach the Latin american unbanked | fico. URL https:
+//www.fico.com/en/node/8140?file=7900.
+[4] F. Abel. We know where you should work next summer: Job recom-
+mendations. In Proceedings of the 9th ACM Conference on Recommender
+Systems, pages 230–230, 2015.
+[5] A. Acharya and D. Sinha. Early prediction of students performance
+using machine learning techniques. International Journal of Computer
+Applications, 107(1), 2014.
+[6] S. Agrawal and N. Goyal. Analysis of thompson sampling for the
+multi-armed bandit problem. In Conference on learning theory, pages
+39–1, 2012.
+[7] I. Ajunwa and D. Greene. Platforms at work: Automated hiring plat-
+forms and other new intermediaries in the organization of work. SP
+Vallas, and A. Kovalainen, Work and Labor in the Digital Age, pages
+61–91, 2019.
+[8] P. Auer, N. Cesa-Bianchi, and P. Fischer. Finite-time analysis of the
+multiarmed bandit problem. Machine learning, 47(2-3):235–256, 2002.
+[9] Y. Bechavod and K. Ligett. Penalizing unfairness in binary classifica-
+tion. arXiv preprint arXiv:1707.00044, 2017.
+[10] R. Berk. Criminal justice forecasts of risk: A machine learning approach.
+Springer Science & Business Media, 2012.
+[11] R. Berk, R. Berk, and Drougas. Machine learning risk assessments in
+criminal justice settings. Springer, 2019.
+[12] L. Besson and E. Kaufmann. What doubling tricks can and can’t do
+for multi-armed bandits. arXiv preprint arXiv:1803.06971, 2018.
+[13] A. B. Carroll et al. The pyramid of corporate social responsibility: To-
+ward the moral management of organizational stakeholders. Business
+horizons, 34(4):39–48, 1991.
+[14] S.-C. Chow andM. Chang. Adaptive design methods in clinical trials–a
+review. Orphanet journal of rare diseases, 3(1):11, 2008.
+[15] A. B. Diekman, E. R. Brown, A. M. Johnston, and E. K. Clark. Seek-
+ing congruity between goals and roles: A new look at why women
+opt out of science, technology, engineering, and mathematics careers.
+Psychological science, 21(8):1051–1057, 2010.
+[16] C. Dwork, M. Hardt, T. Pitassi, O. Reingold, and R. Zemel. Fairness
+through awareness. In Proceedings of the 3rd innovations in theoretical
+computer science conference, pages 214–226, 2012.
+[17] M. C. Fu. Alphago and monte carlo tree search: the simulation op-
+timization perspective. In Proceedings of the 2016 Winter Simulation
+Conference, pages 659–670. IEEE Press, 2016.
+[18] A. Fuster, P. Goldsmith-Pinkham, T. Ramadorai, and A. Walther. Pre-
+dictably unequal? the effects of machine learning on credit markets.
+The Effects of Machine Learning on Credit Markets (November 6, 2018),
+2018.
+[19] E. Garriga and D. Melé. Corporate social responsibility theories: Map-
+ping the territory. Journal of business ethics, 53(1-2):51–71, 2004.
+[20] M. Hardt, E. Price, N. Srebro, et al. Equality of opportunity in super-
+vised learning. In Advances in neural information processing systems,
+pages 3315–3323, 2016.
+[21] M. Joseph, M. Kearns, J. Morgenstern, S. Neel, and A. Roth. Fair
+algorithms for infinite and contextual bandits. arXiv preprint
+arXiv:1610.09559, 2016.
+[22] M. Joseph, M. Kearns, J. H. Morgenstern, and A. Roth. Fairness in learn-
+ing: Classic and contextual bandits. In Advances in Neural Information
+Processing Systems, pages 325–333, 2016.
+[23] T. Kamishima, S. Akaho, H. Asoh, and J. Sakuma. Fairness-aware clas-
+sifier with prejudice remover regularizer. In Joint European Conference
+on Machine Learning and Knowledge Discovery in Databases, pages
+35–50. Springer, 2012.
+[24] A. Lambrecht and C. E. Tucker. Algorithmic bias? an empirical study
+into apparent gender-based discrimination in the display of stem career
+ads. An Empirical Study into Apparent Gender-Based Discrimination in
+the Display of STEM Career Ads (March 9, 2018), 2018.
+[25] Y. Liu, G. Radanovic, C. Dimitrakakis, D. Mandal, and D. C. Parkes.
+Calibrated fairness in bandits. arXiv preprint arXiv:1707.01875, 2017.
+[26] T. Lux, R. Pittman, M. Shende, and A. Shende. Applications of su-
+pervised learning techniques on undergraduate admissions data. In
+Proceedings of the ACM International Conference on Computing Frontiers,
+pages 412–417, 2016.
+[27] A. Mas-Colell, M. D. Whinston, J. R. Green, et al. Microeconomic theory,
+volume 1. Oxford university press New York, 1995.
+[28] H. B. McMahan, G. Holt, D. Sculley, M. Young, D. Ebner, J. Grady,
+L. Nie, T. Phillips, E. Davydov, D. Golovin, et al. Ad click prediction:
+a view from the trenches. In Proceedings of the 19th ACM SIGKDD
+international conference on Knowledge discovery and data mining, pages
+1222–1230, 2013.
+[29] Northpointe. Practitioner’s guide to compas core, 2015. URL
+https://assets.documentcloud.org/documents/2840784/Practitioner-
+s-Guide-to-COMPAS-Core.pdf.
+[30] R. Oentaryo, E.-P. Lim, M. Finegold, D. Lo, F. Zhu, C. Phua, E.-Y. Cheu,
+G.-E. Yap, K. Sim, M. N. Nguyen, et al. Detecting click fraud in online
+advertising: a data mining approach. The Journal of Machine Learning
+Research, 15(1):99–140, 2014.
+[31] V. Patil, G. Ghalme, V. Nair, and Y. Narahari. Achieving fairness in the
+stochasticmulti-armed bandit problem. arXiv preprint arXiv:1907.10516,
+2019.
+[32] A. Pérez-Martín, A. Pérez-Torregrosa, andM. Vaca. Big data techniques
+tomeasure credit banking risk in home equity loans. Journal of Business
+Research, 89:448–454, 2018.
+[33] C. Schumann, Z. Lang, N. Mattei, and J. P. Dickerson. Group fairness
+in bandit arm selection. arXiv preprint arXiv:1912.03802, 2019.
+[34] A. Slivkins. Introduction to multi-armed bandits. Foundations and
+Trends® in Machine Learning, 12(1-2):1–286, 2019. ISSN 1935-8237. doi:
+10.1561/2200000068. URL http://dx.doi.org/10.1561/2200000068.
+[35] H. R. Varian and H. R. Varian. Microeconomic analysis, volume 3.
+Norton New York, 1992.
+[36] A. Waters and R. Miikkulainen. Grade: Machine learning support for
+graduate admissions. AI Magazine, 35(1):64–64, 2014.
+[37] J. White. Bandit algorithms for website optimization. " O’Reilly Media,
+Inc.", 2012.
+[38] M. B. Zafar, I. Valera, M. G. Rodriguez, and K. P. Gummadi. Fair-
+ness constraints: Mechanisms for fair classification. arXiv preprint
+arXiv:1507.05259, 2015.
+[39] C. Zeng, Q. Wang, S. Mokhtari, and T. Li. Online context-aware rec-
+ommendation with time varying multi-armed bandit. In Proceedings of
+the 22nd ACM SIGKDD international conference on Knowledge discovery
+and data mining, pages 2025–2034, 2016.
+[40] S. Zhang, W. Xiong, W. Ni, and X. Li. Value of big data to finance:
+observations on an internet credit service company in china. Financial
+Innovation, 1(1):17, 2015.
+[41] J. Zhao, T. Wang, M. Yatskar, V. Ordonez, and K.-W. Chang. Men also
+like shopping: Reducing gender bias amplification using corpus-level
+constraints. arXiv preprint arXiv:1707.09457, 2017.
+36
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Tom Ron, Omer Ben-Porat, and Uri Shalit
+A OMITTED PROOFS
+A.1 Efficient Oracle for Computing
+Equation (4) for Softmax
+Proposition 3. Let 𝑓 sft (𝝁)𝑖 = exp
+`𝑖∑𝐾
+𝑙=1
+exp
+`𝑙
+. For every hyper-cube𝐶 ⊆
+[0, 1]𝐾 , the term
+max
+`∈𝐶
+𝑓 sft (𝝁)𝑖 −min
+`∈𝐶
+𝑓 sft (𝝁)𝑖 (4)
+can be computed efficiently.
+Proof. Let
+𝑓 sft (𝝁) = exp
+`𝑖
+exp
+`𝑖 +∑𝑙≠𝑗 exp`𝑙 =
+𝑥
+𝑥 + 𝑦
+for 𝑥 = exp
+`𝑖
+and 𝑦 =
+∑
+𝑙≠𝑗 exp
+`𝑙
+exp
+`𝑖 . Due to Proposition 4 below,
+the function 𝑔(𝑥,𝑦) def= 𝑥
+𝑥+𝑦 is monotonically increasing in 𝑥 and
+monotonically decreasing in 𝑦. Consequently,
+• max𝝁∈𝐶 𝑓 sft (𝝁)𝑖 is obtained for `𝑖 = max𝐶 [𝑖] and ` 𝑗 =
+min𝐶 [ 𝑗] for all 𝑗 ∈ [𝐾], 𝑗 ≠ 𝑖 .
+• min𝝁∈𝐶 𝑓 sft (𝝁)𝑖 is obtained for `𝑖 = min𝐶 [𝑖] and for all
+𝑗 ∈ [𝐾], 𝑗 ≠ 𝑖 ` 𝑗 = max𝐶 [ 𝑗].
+Combining these facts, we proved that Equation 4 can be computed
+efficiently.
+□
+Proposition 4. Let 𝑔(𝑥,𝑦) = 𝑥
+𝑥+𝑦 , where 𝑥,𝑦 > 0. Then 𝑔 is mono-
+tonically increasing in 𝑥 and monotonically decreasing in 𝑦.
+Proof. Since 𝑔 is differentiable, so it is suffice to show that the
+partial derivatives are always positive for 𝑥 and always negative
+for 𝑦. Observe that
+𝜕𝑔
+𝜕𝑥
+=
+𝑦
+(𝑥 + 𝑦)2
+,
+𝜕𝑔
+𝜕𝑦
+=
+−𝑥
+(𝑥 + 𝑦)2
+.
+Since 𝑦 > 0,
+𝜕𝑔
+𝜕𝑥 is always positive; thus, 𝑔 is monotonically increas-
+ing in 𝑥 . Additionally, since 𝑥 > 0,
+𝜕𝑔
+𝜕𝑦 is always negative; thus, 𝑔 is
+monotonically decreasing in 𝑦. □
+37
+Corporate Social Responsibility via Multi-Armed Bandits FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+B FULL VERSION OF ALGORITHM 2
+In this section we present the full version of Algorithm 2, brought
+here as Algorithm 4. The algorithm relies heavily on the confidence
+intervals of the rewards and of the rewards gaps. The confidence
+intervals of the rewards are used to estimate 𝑓 ’s variability inside
+the hyper-cube of expected rewards. The confidence interval of
+the expected reward of arm 𝑖 , given that it was pulled 𝑁𝑖 times is
+[ ˆ̀𝑖 −
+√
+2 log𝑇
+𝑁𝑖
+, ˆ̀𝑖 +
+√
+2 log𝑇
+𝑁𝑖
+]. The confidence intervals of the reward
+gaps Δ𝑖 are used to determine the most probable optimal algorithm
+and follow it. They are defined to be 𝐿𝐶𝐵(Δ𝑖 ) = max𝑗 ∈[𝐾 ] ˆ̀𝑗 +
+ˆ̀𝑖 − 2
+√
+2 log𝑇
+𝑁𝑖
+,𝑈𝐶𝐵(Δ𝑖 ) = max𝑗 ∈[𝐾 ] ˆ̀𝑗 + ˆ̀𝑖 + 2
+√
+2 log𝑇
+𝑁𝑖
+. Note that
+using the formulas above the upper confidence bound can be above
+one and the lower confidence bound can be less than zero. This is
+not possible in our settings. The bounds are trimmed all through
+the algorithm to be between zero and one. Note that in order to
+calculate the confidence interval of the reward gaps we use the fact
+that in the first two phases all the arms are pulled the same number
+of times.
+The algorithm starts with initialization phase (Lines 1-5). In
+Line 1 the time variable is initialized. We then initialize the arms’
+data - the number of pulls is set to zero (Line 3), the confidence
+interval of the reward gap is set to [0, 1] (Line 4). Lastly, the hyper-
+cube of the rewards, 𝐶1 is initialize with [0, 1]𝐾 (Line 5).
+After the initialization the first phase of the algorithm starts
+(Line 6). If there is an arm that the algorithm is not certain with
+high probability whether its reward gap is lower or higher than _
+by more than 𝛽 , all arms are pulled (Line 7). After arm 𝑖 is pulled
+we increase the number of times arm 𝑖 was pulled by one (Line 9),
+increase the time by one (Line 10) and update the expected reward
+based on the obtained reward (𝑟𝑡 ) and the previous expected reward
+(Line 11). Possibly, the desired approximation is not achieved before
+𝑇 steps. In this case the execution is stopped once 𝑇 rounds were
+played. This is done in Line 12. After pulling all the arms we update
+the estimators of the reward gapsΔ𝑖 . In Line 14 we find the armwith
+the maximal expected reward. Then for each arm, the confidence
+interval of the reward gap is calculated (Lines 16-18) and the cube
+of probable expected values is updates (Line 19).
+The second phase starts in Line 20. If there is an arm with low
+opportunity cost, i.e. 𝐿𝐶𝐵(Δ𝑖 ) < _, and the variability of 𝑓 for this
+entry in the hyper-cube is high, all arms are pulled once (Line 21).
+As in the previous phase, first we pull each arm, update its counter,
+the time and the expected reward and then update the estimators.
+In Line 26, we assure that even if the desired approximation is not
+achieved by 𝑇 rounds the execution ends.
+In the third phase, which starts in Line 33, we ensure that each
+armwith low opportunity cost is pulled a sufficient number of times
+with respect to the fairness function 𝑓 .𝑀𝑖 denotes the number of
+additional times arm 𝑖 should be pulled.𝑀𝑖 is the difference between
+the number of times arm 𝑖 should be pulled according to the fairness
+function (𝑇 𝑓 (𝝁)𝑖 ) and the number of times it was already pulled
+(𝑁𝑖 ) rounded down to an integer. Arm 𝑖 is then pulled𝑀𝑖 times and
+the counter and time are updated accordingly (Lines 36-38). To be
+precise, in order not to pull more than 𝑇 times,𝑀𝑖 is set to be the
+minimum between 𝑇 − 𝑡 and ⌊𝑇 𝑓 (𝝁)𝑖 − 𝑁𝑖 ⌋.
+Algorithm 4: Self-regulated Utility Maximization
+Input: Black-box bandit algorithm 𝐴𝐿𝐺 , allowed
+approximation error parameters 𝛼 and 𝛽
+1 𝑡 = 1
+2 for 𝑖 = 1, . . . 𝐾 do // Initialization
+3 𝑁𝑖 ← 0
+4 𝐿𝐶𝐵(Δ𝑖 ) ← 0,𝑈𝐶𝐵(Δ𝑖 ) ← 1
+5 𝐶1 [𝑖] ← [0, 1]
+6 while ∃ 𝑗 ∈ [𝐾] s.t𝑈𝐶𝐵(Δ 𝑗 ) > _ + 𝛽 and 𝐿𝐶𝐵(Δ 𝑗 ) < _ − 𝛽
+do // Phase 1
+7 for 𝑖 = 1, . . . , 𝐾 do
+8 Pull arm 𝑖 , receive a reward 𝑟𝑡
+9 𝑁𝑖 ← 𝑁𝑖 + 1
+10 𝑡 ← 𝑡 + 1
+11 ˆ̀𝑖,𝑡 ← ((𝑁𝑖 − 1) ˆ̀𝑖,𝑡−1 + 𝑟𝑡 )/𝑁𝑖
+12 if 𝑡 > 𝑇 then
+13 End execution
+14 𝑗∗ ← argmax𝑗 ∈[𝐾 ] ˆ̀𝑗
+15 for 𝑖 = 1, . . . , 𝐾 do
+16 𝑐𝑖 ←
+√
+2 log𝑇
+𝑁𝑖
+17 𝐿𝐶𝐵(Δ𝑖 ) ← max{0, ˆ̀𝑗∗ − ˆ̀𝑖 − 2𝑐𝑖 }
+18 𝑈𝐶𝐵(Δ𝑖 ) ← min{1, ˆ̀𝑗∗ − ˆ̀𝑖 + 2𝑐𝑖 }
+19 𝐶𝑡 [𝑖] ← [max{0, ˆ̀𝑖 − 𝑐𝑖 },min{1, ˆ̀𝑖 + 𝑐𝑖 }]
+20 while ∃ 𝑗 ∈ [𝐾] s.t. max𝝁′∈𝐶𝑡 𝑓 (𝝁
+′)𝑗 −min𝝁′∈𝐶𝑡 𝑓 (𝝁
+′)𝑗 >
+𝛼 and 𝐿𝐶𝐵(Δ 𝑗 ) < _ do // Phase 2
+21 for 𝑗 = 1, . . . , 𝐾 do
+22 Pull arm 𝑖 , receive a reward 𝑟𝑡
+23 𝑁𝑖 ← 𝑁𝑖 + 1
+24 𝑡 ← 𝑡 + 1
+25 ˆ̀𝑖,𝑡 ← ((𝑁𝑖 − 1) ˆ̀𝑖,𝑡−1 + 𝑟𝑡 )/𝑁𝑖
+26 if 𝑡 > 𝑇 then
+27 End execution
+28 𝑗∗ ← argmax𝑗 ∈[𝐾 ] ˆ̀𝑗
+29 for 𝑗 = 1, . . . , 𝐾 do
+30 𝑐𝑖 ←
+√
+2 log𝑇
+𝑁𝑖
+31 𝐶𝑡 [𝑖] ← [max{0, ˆ̀𝑖 − 𝑐𝑖 },min{1, ˆ̀𝑖 + 𝑐𝑖 }]
+32 𝐿𝐶𝐵(Δ𝑖 ) ← ˆmax{0, ` 𝑗∗ − ˆ̀𝑖 − 2𝑐𝑖 }
+33 for 𝑖 = 1, . . . 𝐾 do // Phase 3
+34 if 𝐿𝐶𝐵(Δ𝑖 ) < _ and 𝑁𝑖 < 𝑇 𝑓 (𝝁 ′)𝑖 then
+35 𝑀𝑖 ← min{𝑇 − 𝑡, ⌊𝑇 𝑓 (𝝁)𝑖 − 𝑁𝑖 ⌋}
+36 Pull arm 𝑖 𝑀𝑖 times
+37 𝑁𝑖 ← 𝑁𝑖 +𝑀𝑖
+38 𝑡 ← 𝑡 +𝑀𝑖
+39 Invoke 𝐴𝐿𝐺 for the remaining rounds // Phase 4
+If there are any remaining rounds, 𝐴𝐿𝐺 is invoked until the end
+of the execution (Line 39).
+38
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Tom Ron, Omer Ben-Porat, and Uri Shalit
+C EXPERIMENTS SUPPLEMENTARY RESULTS
+In this section we complete the results shown in Section 5. Figures 4 and 6 demonstrate the round distribution for 𝑓 lin and 𝑓 uni respectively
+and Figures 5 and 7 compares the average utility of Algorithm 1 to 2 with respect to 𝑓 lin and 𝑓 uni respectively.
+104 5 · 104 105 2 · 1050
+0.25
+0.5
+0.75
+1
+Horizon
+P
+u
+ll
+s
+d
+is
+tr
+ib
+u
+ti
+on
+(a) _ = 0
+104 5 · 104 105 2 · 1050
+0.25
+0.5
+0.75
+1
+Horizon
+P
+u
+ll
+s
+d
+is
+tr
+ib
+u
+ti
+on
+(b) _ = 0.4
+104 5 · 104 105 2 · 1050
+0.25
+0.5
+0.75
+1
+Horizon
+P
+u
+ll
+s
+d
+is
+tr
+ib
+u
+ti
+on
+1+2 3 4
+(c) _ = 0.8
+Figure 4: Round distributions per phase for 𝑓 lin.
+103 104 105
+0.5
+0.7
+0.9
+Horizon
+A
+v
+g.
+U
+ti
+li
+ty
+(a) _ = 0
+103 104 105
+0.5
+0.7
+0.9
+Horizon
+A
+v
+g.
+U
+ti
+li
+ty
+(b) _ = 0.4
+103 104 105
+0.5
+0.7
+0.9
+Horizon
+A
+v
+g.
+U
+ti
+li
+ty
+SRUM
+FairETC
+(c) _ = 0.8
+Figure 5: Average utility Algorithm 1 vs Algorithm 2 for 𝑓 lin.
+104 5 · 104 105 2 · 1050
+0.25
+0.5
+0.75
+1
+Horizon
+P
+u
+ll
+s
+d
+is
+tr
+ib
+u
+ti
+on
+(a) _ = 0
+104 5 · 104 105 2 · 1050
+0.25
+0.5
+0.75
+1
+Horizon
+P
+u
+ll
+s
+d
+is
+tr
+ib
+u
+ti
+on
+(b) _ = 0.4
+104 5 · 104 105 2 · 1050
+0.25
+0.5
+0.75
+1
+Horizon
+P
+u
+ll
+s
+d
+is
+tr
+ib
+u
+ti
+on
+1+2 3 4
+(c) _ = 0.8
+Figure 6: Round distributions per phase for 𝑓 uni.
+39
+Corporate Social Responsibility via Multi-Armed Bandits FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+103 104 105
+0.5
+0.7
+0.9
+Horizon
+A
+v
+g.
+U
+ti
+li
+ty
+(a) _ = 0
+103 104 105
+0.5
+0.7
+0.9
+Horizon
+A
+v
+g.
+U
+ti
+li
+ty
+(b) _ = 0.4
+103 104 105
+0.5
+0.7
+0.9
+Horizon
+A
+v
+g.
+U
+ti
+li
+ty
+SRUM
+FairETC
+(c) _ = 0.8
+Figure 7: Average utility Algorithm 1 vs Algorithm 2 for 𝑓 uni.
+40

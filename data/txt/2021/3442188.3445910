@@ -1,0 +1,1083 @@
+Fairness Through Robustness:
+Investigating Robustness Disparity in Deep Learning
+Vedant Nanda∗
+vedant@cs.umd.edu
+University of Maryland
+MPI-SWS
+Samuel Dooley∗
+sdooley1@cs.umd.edu
+University of Maryland
+Sahil Singla
+ssingla@cs.umd.edu
+University of Maryland
+Soheil Feizi
+sfeizi@cs.umd.edu
+University of Maryland
+John P. Dickerson
+john@cs.umd.edu
+University of Maryland
+ABSTRACT
+Deep neural networks (DNNs) are increasingly used in real-world
+applications (e.g. facial recognition). This has resulted in concerns
+about the fairness of decisions made by these models. Various no-
+tions and measures of fairness have been proposed to ensure that
+a decision-making system does not disproportionately harm (or
+bene￿t) particular subgroups of the population. In this paper, we
+argue that traditional notions of fairness that are only based on
+models’ outputs are not su￿cient when the model is vulnerable to
+adversarial attacks. We argue that in some cases, it may be easier
+for an attacker to target a particular subgroup, resulting in a form
+of robustness bias. We show that measuring robustness bias is a
+challenging task for DNNs and propose two methods to measure
+this form of bias. We then conduct an empirical study on state-
+of-the-art neural networks on commonly used real-world datasets
+such as CIFAR-10, CIFAR-100, Adience, and UTKFace and show
+that in almost all cases there are subgroups (in some cases based
+on sensitive attributes like race, gender, etc) which are less robust
+and are thus at a disadvantage. We argue that this kind of bias
+arises due to both the data distribution and the highly complex
+nature of the learned decision boundary in the case of DNNs, thus
+making mitigation of such biases a non-trivial task. Our results
+show that robustness bias is an important criterion to consider
+while auditing real-world systems that rely on DNNs for deci-
+sion making. Code to reproduce all our results can be found here:
+https://github.com/nvedant07/Fairness-Through-Robustness
+CCS CONCEPTS
+• Computing methodologies ! Neural networks; • General
+and reference ! Evaluation.
+∗Both authors contributed equally to the paper
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for pro￿t or commercial advantage and that copies bear this notice and the full citation
+on the ￿rst page. Copyrights for components of this work owned by others than the
+author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or
+republish, to post on servers or to redistribute to lists, requires prior speci￿c permission
+and/or a fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+© 2021 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+https://doi.org/10.1145/3442188.3445910
+ACM Reference Format:
+Vedant Nanda, Samuel Dooley, Sahil Singla, Soheil Feizi, and John P. Dicker-
+son. 2021. Fairness Through Robustness: Investigating Robustness Disparity
+in Deep Learning. In Conference on Fairness, Accountability, and Trans-
+parency (FAccT ’21), March 3–10, 2021, Virtual Event, Canada. ACM, New
+York, NY, USA, 21 pages. https://doi.org/10.1145/3442188.3445910
+1 INTRODUCTION
+Automated decision-making systems that are driven by data are
+being used in a variety of di￿erent real-world applications. In many
+cases, these systems make decisions on data points that repre-
+sent humans (e.g., targeted ads [44, 53], personalized recommen-
+dations [3, 50], hiring [47, 48], credit scoring [31], or recidivism
+prediction [9]). In such scenarios, there is often concern regarding
+the fairness of outcomes of the systems [2, 18]. This has resulted
+in a growing body of work from the nascent Fairness, Account-
+ability, Transparency, and Ethics (FATE) community that—drawing
+on prior legal and philosophical doctrine—aims to de￿ne, measure,
+and (attempt to) mitigate manifestations of unfairness in automated
+systems [4, 9, 17, 37].
+Most of the initial work on fairness in machine learning con-
+sidered notions that were one-shot and considered the model and
+data distribution to be static [2, 9, 15, 59–61]. Recently, there has
+been more work exploring notions of fairness that are dynamic and
+consider the possibility that the world (i.e., the model as well as data
+points) might change over time [24, 26, 27, 38]. Our proposed no-
+tion of robustness bias has subtle di￿erence from existing one-shot
+and dynamic notions of fairness in that it requires each partition of
+the population be equally robust to imperceptible changes in the
+input (e.g., noise, adversarial perturbations, etc).
+We propose a simple and intuitive notion of robustness biaswhich
+requires subgroups of populations to be equally “robust.” Robustness
+can be de￿ned in multiple di￿erent ways [19, 41, 55]. We take a
+general de￿nition which assigns points that are farther away from
+the decision boundary higher robustness. Our key contributions
+are as follows:
+• We de￿ne a simple, intuitive notion of robustness bias that
+requires all partitions of the dataset to be equally robust. We
+argue that such a notion is especially important when the
+decision-making system is a deep neural network (DNN)
+since these have been shown to be susceptible to various
+attacks [8, 40]. Importantly, our notion depends not only on
+the outcomes of the system, but also on the distribution of
+1
+466
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Vedant Nanda, Samuel Dooley, Sahil Singla, Soheil Feizi, and John P. Dickerson
+distances of data-points from the decision boundary, which
+in turn is a characteristic of both the data distribution and
+the learning process.
+• We propose di￿erent methods to measure this form of
+bias. Measuring the exact distance of a point from the deci-
+sion boundary is a challenging task for deep neural networks
+which have a highly non-convex decision boundary. This
+makes the measurement of robustness bias a non-trivial task.
+In this paper we leverage the literature on adversarial ma-
+chine learning and show that we can e￿ciently approximate
+robustness bias by using adversarial attacks and randomized
+smoothing to get estimates of a point’s distance from the
+decision boundary.
+• We do an in-depth analysis of robustness bias on popularly
+used datasets and models. Through extensive empirical
+evaluation we show that unfairness can exist due to dif-
+ferent partitions of a dataset being at di￿erent levels of ro-
+bustness for many state-of-the art models that are trained
+on common classi￿cation datasets. We argue that this form
+of unfairness can happen due to both the data distribution
+and the learning process and is an important criterion to
+consider when auditing models for fairness.
+1.1 Related Work
+Fairness in ML. Models that learn from historic data have been
+shown to exhibit unfairness, i.e., they disproportionately bene￿t
+or harm certain subgroups (often a sub-population that shares a
+common sensitive attribute such as race, gender etc.) of the popu-
+lation [2, 9, 31]. This has resulted in a lot of work on quantifying,
+measuring and to some extent also mitigating unfairness [1, 7, 13–
+15, 20, 23, 33, 36, 43, 45, 57–61]. Most of these works consider no-
+tions of fairness that are one-shot—that is, they do not consider how
+these systems would behave over time as the world (i.e., the model
+and data distribution) evolves. Recently more works have taken into
+account the dynamic nature of these decision-making systems and
+consider fairness de￿nitions and learning algorithms that fare well
+across multiple time steps [24, 26, 27, 38]. We take inspiration from
+both the one-shot and dynamic notions, but take a slightly di￿erent
+approach by requiring all subgroups of the population to be equally
+robust to minute changes in their features. These changes could
+either be random (e.g.natural noise in measurements) or carefully
+crafted adversarial noise. This is closely related to Heidari et al.
+[27]’s e￿ort-based notion of fairness; however, their notion has a
+very speci￿c use case of societal scale models whereas our approach
+is more general and applicable to all kinds of models. Our work is
+also closely related to and inspired by Zafar et al.’s use of a regu-
+larized loss function which captures fairness notions and reduces
+disparity in outcomes [60]. There are major di￿erences in both
+the approach and application between our work and that of Zafar
+et al’s. Their disparate impact formulation aims to equalize the
+average distance of points to the decision boundary, E[3 (G)]; our
+approach, instead, aims to equalize the number of points that are
+“safe”, i.e., E[ {3 (G) > g}] (see section 3 for a detailed description).
+Our proposed metric is preferable for applications of adversarial
+attack or noisy data, the focus of our paper; whereas the metric of
+Zafar et al is more applicable for an analysis of the consequence of
+a decision in a classi￿cation setting.
+Robustness. Deep Neural Networks (DNNs) have been shown
+to be susceptible to carefully crafted adversarial perturbations
+which—imperceptible to a human—result in a misclassi￿cation by
+themodel [19, 41, 55]. In the context of our paper, we use adversarial
+attacks to approximate the distance of a data point to the decision
+boundary. For this we use state-of-the-art white-box attacks pro-
+posed by Moosavi-Dezfooli et al. [40] and Carlini and Wagner [8].
+Due to the many works on adversarial attacks, there have been
+many recent works on provable robustness to such attacks. The
+high-level goal of these works is to estimate a (tight) lower bound
+on the distance of a point from the decision boundary [10, 46, 51].
+We leverage these methods to estimate distances from the decision
+boundary which helps assess robustness bias (de￿ned formally in
+Section 3).
+Fairness andRobustness. Recent works have proposed poisoning
+attacks on fairness [39, 52]. Khani and Liang [32] analyze why
+noise in features can cause disparity in error rates when learning a
+regression. We believe that our work is the very ￿rst to show that
+di￿erent subgroups of the population can have di￿erent levels of
+robustness which can lead to unfairness. We hope that this will
+lead to more work at the intersection of these two important sub
+￿elds of ML.
+2 HETEROGENEOUS ROBUSTNESS
+In a classi￿cation setting, a learner is given data D = {(G8 ,~8 )}#8=1
+consisting of inputs G8 2 R3 and outputs ~8 2 C which are labels in
+some set of classes C = {21, . . . , 2: }. These classes form a partition
+on the dataset such that D =
+√
+22C{(G8 ,~8 ) | ~8 = 2 9 }. The goal of
+learning in decision boundary-based optimization is to draw delin-
+eations between points in feature space which sort the data into
+groups according to their class label. The learning generally tries
+to maximize the classi￿cation accuracy of the decision boundary
+choice. A learner chooses some loss function L to minimize on a
+ᶦ
+ᶦ
+% &
+Figure 1: A toy example showing robustness bias. A.) the classi￿er
+(solid line) has 100% accuracy for blue and green points. However
+for a budget g (dotted lines), 70% of points belonging to the “round”
+subclass (showed by dark blue and dark green) will get attacked
+while only 30% of points in the “cross” subclass will be attacked.
+This shows a clear bias against the “round” subclass which is less
+robust in this case. B.) shows a di￿erent classi￿er for the same data
+points also with 100% accuracy. However, in this case, with the same
+budget g , 30% of both “round” and “cross” subclass will be attacked,
+thus being less biased.
+2
+467
+Fairness Through Robustness:
+Investigating Robustness Disparity in Deep Learning FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+(a) Three-class classi￿cation problem for randomly generated data. (b) Proportion samples which are greater than g away from a decision boundary.
+Figure 2: An example of multinomial logistic regression.
+training dataset, parameterized by parameters \ , while maximizing
+the classi￿cation accuracy on a test dataset.
+Of course there are other aspects to classi￿cation problems that
+have recently become more salient in the machine learning commu-
+nity. Considerations about the fairness of classi￿cation decisions,
+for example, are one such way in which additional constraints are
+brought into a learner’s optimization strategy. In these settings,
+the data D = {(G8 ,~8 , B8 )}#8=1 is imbued with some metadata which
+have a sensitive attribute S = {B1, . . . , BC } associated with each
+point. Like the classes above, these sensitive attributes form a parti-
+tion on the data such that D =
+√
+B2S{(G8 ,~8 , B8 ) | B8 = B}. Without
+loss of generality, we assume a single sensitive attribute. Generally
+speaking, learning with fairness in mind considers the output of a
+classi￿er based o￿ of the partition of data by the sensitive attribute,
+where some objective behavior, like minimizing disparate impact
+or treatment [60], is integrated into the loss function or learning
+procedure to ￿nd the optimal parameters \ .
+There is not a one-to-one correspondence between decision
+boundaries and classi￿er performance. For any given performance
+level on a test dataset, there are in￿nitely many decision boundaries
+which produce the same performance, see Figure 1. This raises the
+question: if we consider all decision boundaries or model parame-
+ters which achieve a certain performance, how do we choose among
+them? What are the properties of a desirable, high-performing deci-
+sion boundary? As the community has discovered, one undesirable
+characteristic of a decision boundary is its proximity to data which
+might be susceptible to adversarial attack [19, 41, 55]. This provides
+intuition that we should prefer boundaries that are as far away as
+possible from example data [5, 54].
+Let us look at how this plays out in a simple example. In multi-
+nomial logistic regression, the decision boundaries are well under-
+stood and can be written in closed form. This makes it easy for us to
+compute how close each point is to a decision boundary. Consider
+for example a dataset and learned classi￿er as in Figure 2a. For this
+dataset, we observe that the brown class, as a whole, is closer to a
+decision boundary than the yellow or blue classes. We can quan-
+tify this by plotting the proportion of data that are greater than a
+distance g away from a decision boundary, and then varying g . Let
+3\ (G) be the minimal distance between a point G and a decision
+boundary corresponding to parameters \ . For a given partition P
+of a dataset, D, such that D =
+√
+% 2P % , we de￿ne the function:
+b % (g) = |{(G,~) 2 % | 3\ (G) > g,~ = ~̂}|
+|% |
+If each element of the partition is uniquely de￿ned by an element,
+say a class label, 2 , or a sensitive attribute label, B , we equivalently
+will write b 2 (g) or b B (g) respectively. We plot this over a range of g
+in Figure 2b for the toy classi￿cation problem in Figure 2a. Observe
+that the function for the brown class decreases signi￿cantly faster
+than the other two classes, quantifying how much closer the brown
+class is to the decision boundary.
+From a strictly classi￿cation accuracy point of view, the brown
+class being signi￿cantly closer to the decision boundary is not of
+concern; all three classes achieve similar classi￿cation accuracy.
+However, when we move away from this toy problem and into
+neural networks on real data, this di￿erence between the classes
+could become a potential vulnerability to exploit, particularly when
+we consider adversarial examples.
+3 ROBUSTNESS BIAS
+Our goal is to understand how susceptible di￿erent classes are to
+perturbations (e.g., natural noise, adversarial perturbations). Ideally,
+no one class would be more susceptible than any other, but this
+may not be possible. We have observed that for the same dataset,
+there may be some classi￿ers which have di￿erences between the
+distance of that partition to a decision boundary; and some which
+do not. There may also be one partition P which exhibits this
+discrepancy, and another partition P 0 which does not. Therefore,
+we make the following statement about robustness bias:
+D￿￿￿￿￿￿￿￿￿ 1. A dataset D with a partition P and a classi￿er
+parameterized by \ exhibits robustness bias if there exists an ele-
+ment % 2 P for which the elements of % are either signi￿cantly closer
+to (or signi￿cantly farther from) a decision boundary than elements
+not in % .
+A partition P may be based on sensitive attributes such as race,
+gender, or ethnicity—or other class labels. For example, given a clas-
+si￿er and dataset with sensitive attribute “race”, we might say that
+classi￿er exhibits robustness bias if, partitioning on that sensitive
+attribute, for some value of “race” the average distance of members
+3
+468
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Vedant Nanda, Samuel Dooley, Sahil Singla, Soheil Feizi, and John P. Dickerson
+4VIHMGXIH
++VSYRH8VYXL
+6EGI&PEGO
++IRHIV*IQEPI
+4VIHMGXIH
++VSYRH8VYXL
+6EGI;LMXI
++IRHIV1EPI
+4VIHMGXIH
+4VIHMGXIH
+ƤTIVXYVFEXMSR
+ƤTIVXYVFEXMSR
+Figure 3: An example of robustness bias in the UTKFace dataset. A model trained to predict age group from faces is fooled for an inputs
+belonging to certain subgroups (black and female in this example) for a given perturbation, but is robust for inputs belonging to other sub-
+groups (white and male in this example) for the same magnitude of perturbation. We use the UTKFace dataset to make a broader point that
+robustness bias can cause harms. In the speci￿c case of UTKFace (and similar datasets), the task de￿nition of predicting age from faces itself
+is ￿awed, as has been noted in many previous studies [6, 11, 12].
+of that particular racial value are substantially closer to the decision
+boundary than other members.
+We might say that a dataset, partition, and classi￿er do not
+exhibit robustness bias if for all %, % 0 2 P and all g > 0
+P(G,~)2D{3\ (G) > g | G 2 %,~ = ~̂} ⇡
+P(G,~)2D{3\ (G) > g | G 2 % 0,~ = ~̂}. (1)
+Intuitively, this de￿nition requires that for a given perturbation
+budget g and a given partition % , one should not have any incentive
+to perturb data points from % over points that do not belong to % .
+Even when examining this criteria, we can see that this might be
+particularly hard to satisfy. Thus, we want to quantify the disparate
+susceptibility of each element of a partition to adversarial attack,
+i.e., how much farther or closer it is to a decision boundary when
+compared to all other points. We can do this with the following
+function for a datasetD with partition element % 2 P and classi￿er
+parameterized by \ :
+RB(%, g) = | PG 2D{3\ (G) > g | G 2 %,~ = ~̂} 
+PG 2D{3\ (G) > g | G 8 %,~ = ~̂} | (2)
+Observe that RB(%, g) is a large value if and only if the elements
+of % are much more (or less) adversarially robust than elements
+not in % . We can then quantify this for each element % 2 P—but a
+more pernicious variable to handle is g . We propose to look at the
+area under the curve b % for all g :
+f (%) =  *⇠ (b % )   *⇠ (Õ% 0<% c % 0)
+ *⇠ (Õ% 0<% c % 0)
+(3)
+Note that these notions take into account the distances of data
+points from the decision boundary and hence are orthogonal and
+complementary to other traditional notions of bias or fairness (e.g.,
+disparate impact/disparate mistreatment [60], etc). This means that
+having lower robustness bias does not necessarily come at the cost
+of fairness as measured by these notions. Consider the motivating
+example shown in Figure 1: the decision boundary on the right
+has lower robustness bias but preserves all other common notions
+(e.g. [15, 23, 59]) as both classi￿ers maintain 100% accuracy.
+3.1 Real-world Implications: Degradation of
+Quality of Service
+Deep neural networks are the core of many real world applications,
+for example, facial recognition, object detection, etc. In such cases,
+perturbations in the input can occur due to multiple factors such as
+noise due to the environment or malicious intent by an adversary.
+Previous works have highlighted how harms can be caused due to
+the degradation in quality of service for certain sub-populations [11,
+28]. Figure 3 shows an example of inputs from the UTKFace dataset
+where an ✓2 perturbation of 0.5 could change the predicted label for
+an input with race “black” and gender “female” but an input with
+race “white” and gender “male” was robust to the same magnitude
+of perturbation. In such a case, the system worked better for a
+certain sub-group (white, male) thus resulting in unfairness. It
+is important to note that we use datasets such as Adience and
+UTKFace (described in detail in section 5) only to demonstrate the
+importance of having unbiased robustness. As noted in previous
+works, the very task of predicting age from a person’s face is a
+￿awed task de￿nition with many ethical concerns [6, 11, 12].
+4 MEASURING ROBUSTNESS BIAS
+Robustness bias as de￿ned in the previous section requires a way
+to measure the distance between a point and the (closest) decision
+boundary. For deep neural networks in use today, a direct com-
+putation of 3\ (G) is not feasible due to their highly complicated
+and non-convex decision boundary. However, we show that we
+can leverage existing techniques from the literature on adversarial
+4
+469
+Fairness Through Robustness:
+Investigating Robustness Disparity in Deep Learning FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Figure 4: For each dataset, we plot b 2 (g) for each class 2 in each dataset. Each blue line represents one class. The red line represents the mean
+of the blue lines, i.e.,
+Õ
+22C b 2 (g) for each g .
+Figure 5: For each dataset, we plot b gB for each sensitive attribute B in each dataset. Figures for other models can be found in Appendix A.
+attacks to e￿ciently approximate 3\ (G). We describe these in more
+detail in this section.
+4.1 Adversarial Attacks (Upper Bound)
+For a given input and model, one can compute an upper bound on
+3\ (G) by performing an optimization which alters the input image
+slightly so as to place the altered image into a di￿erent category
+than the original. Assume for a given data point G , we are able to
+compute an adversarial image G̃ , then the distance between these
+two images provides an upper bound on distance to a decision
+boundary, i.e, kG   G̃ k   3\ (G).
+We evaluate two adversarial attacks: DeepFool [40] and Carlini-
+Wagner’s L2 attack [8]. We extend b % for DeepFool and CarliniWag-
+ner as d ⇡ 
+% =
+|{(G,~) 2 % |g < kG   G̃ k,~ = ~̂}|
+|% | (4)
+and d ⇠,% =
+|{(G,~) 2 % |g < kG   G̃ k,~ = ~̂}|
+|% | (5)
+respectively.We use similar notation to de￿nef⇡  (%), andf⇠, (%)
+(f as de￿ned in Eq 3). While these methods are guaranteed to yield
+upper bounds on 3\ (G), they need not yield similar behavior to b %
+or f (%). We perform an evaluation of this in Section 7.1.
+4.2 Randomized Smoothing (Lower Bound)
+Alternatively one can compute a lower bound on 3\ (G) using
+techniques from recent works on training provably robust clas-
+si￿ers [10, 46]. For each input, these methods calculate a radius
+in which the prediction of G will not change (i.e. the robustness
+certi￿cate). In particular, we use the randomized smoothing method
+[10, 46] since it is scalable to large and deep neural networks
+and leads to the state-of-the-art in provable defenses. Random-
+ized smoothing transforms the base classi￿er 5 to a new smooth
+classi￿er 6 by averaging the output of 5 over noisy versions of G .
+This new classi￿er 6 is more robust to perturbations while also
+having accuracy on par to the original classi￿er. It is also possible
+to calculate the radius XG (in the ✓2 distance) in which, with high
+probability, a given input’s prediction remains the same for the
+smoothed classi￿er (i.e. 3\ (G)   XG ). A given input G is then said to
+be provably robust, with high probability, for a XG ✓2-perturbation
+where XG is the robustness certi￿cate of G .
+For each point we use its XG , calculated using the method pro-
+posed by [46], as a proxy for 3\ (G). The magnitude of XG for an
+input is a measure of how robust an input is. Inputs with higher XG
+are more robust than inputs with smaller XG . Again, we extend b %
+for Randomized Smoothing as
+c '(% =
+|{(G,~) 2 % |g < XG ,~ = ~̂}|
+|% | (6)
+We use similar notation to de￿ne f'( (%) (see Eq 3).
+5 EMPIRICAL EVIDENCE OF ROBUSTNESS
+BIAS IN THEWILD
+We hypothesize that there exist datasets and model architectures
+which exhibit robustness bias. To investigate this claim, we examine
+several image-based classi￿cation datasets and common model
+architectures.
+Datasets and Model Architectures:. We perform these tests of
+the datasetsCIFAR-10 [34],CIFAR-100 [34] (using both 100 classes
+and 20 super classes), Adience [16], and UTKFace [62]. The ￿rst
+two are widely accepted benchmarks in image classi￿cation, while
+5
+470
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Vedant Nanda, Samuel Dooley, Sahil Singla, Soheil Feizi, and John P. Dickerson
+the latter two provide signi￿cant metadata about each image, per-
+mitting various partitions of the data by ￿nal classes and sensitive
+attributes. More details can be found in Appendix A.
+Our experiments were performed using PyTorch’s torchvision
+module [42]. We ￿rst explore a simple Multinomial Logistic Re-
+gression model which could be fully analyzed with direct compu-
+tation of the distance to the nearest decision boundary. For con-
+volutional neural networks, we focus on Alexnet [35], VGG19
+[49],ResNet50 [25],DenseNet121 [29], and Squeezenet1_0 [30]
+which are all available through torchvision. We use these models
+since these are widely used for a variety of tasks. We achieve per-
+formance that is comparable to state of the art performance on
+these datasets for these models.1 Additionally we also train some
+other popularly used dataset speci￿c architectures like a deep con-
+volutional neural network (we call this Deep CNN)2 and Pyra-
+midNet (U = 64, depth=110, no bottleneck) [21] for CIFAR-10. We
+re-implemented Deep CNN in pytorch and used the publicly avail-
+able repo to train PyramidNet3. We use another deep convolutional
+neural network (which we refer to as Deep CNN CIFAR1004 and
+PyramidNet (U = 48, depth=164, with bottleneck) for CIFAR-100
+and CIFAR-100Super. For Adience and UTKFace we additionally
+take simple deep convolutional neural networks with multiple con-
+volutional layers each of which is followed by a ReLu activation,
+dropout and maxpooling. As opposed to architectures from torchvi-
+sion (which are pre-trained on ImageNet) these architectures are
+trained from scratch on the respective datasets. We refer to them
+as UTK Classi￿er and Adience Classi￿er respectively. These
+simple models serve two purposes: they form reasonable baselines
+for comparison with pre-trained ImageNet models ￿netuned on the
+respective datasets, and they allow us to analyze robustness bias
+when models are trained from scratch.
+In sections 7 and 8 we audit these datasets and the listed models
+for robustness bias. In section 6, we train logistic regression on all
+the mentioned datasets and evaluate robustness bias using an exact
+computation. We then show in section 7 and 8 that robustness bias
+can be e￿ciently approximated using the techniques mentioned in
+4.1 and 4.2 respectively for much more complicated models, which
+are often used in the real world.We also provide a thorough analysis
+of the types of robustness biases exhibited by some of the popularly
+used models on these datasets.
+6 EXACT COMPUTATION IN A SIMPLE
+MODEL: MULTINOMIAL LOGISTIC
+REGRESSION
+We begin our analysis by studying the behavior of multinomial
+logistic regression. Admittedly, this is a simple model compared
+to modern deep-learning-based approaches; however, it enables is
+to explicitly compute the exact distance to a decision boundary,
+3\ (G). We ￿t a regression to each of our vision datasets to their
+native classes and plot b 2 (g) for each dataset. Figure 4 shows the
+1See Appendix A Table 2 for model performances, additional quantitative results and
+supporting ￿gures.
+2http://torch.ch/blog/2015/07/30/cifar.html
+3https://github.com/dyhan0920/PyramidNet-PyTorch
+4https://github.com/aaron-xichen/pytorch-playground/blob/master/cifar/model.py
+distributions of b 2 (g), from which we observe three main phenom-
+ena: (1) the general shape of the curves are similar for each dataset,
+(2) there are classes which are signi￿cant outliers from the other
+classes, and (3) the range of support of the g for each dataset varies
+signi￿cantly. We discuss each of these individually.
+First, we note that the shape of the curves for each dataset is
+qualitatively similar. Since the form of the decision boundaries in
+multinomial logistic regression are linear delineations in the input
+space, it is fair to assume that this similarity in shape in Figure 4
+can be attributed to the nature of the classi￿er.
+Second, there are classes 2 which indicate disparate treatment
+under b 2 (g). The treatment disparities are most notable in UTKFace,
+the superclass version CIFAR-100, and regular CIFAR-100. This
+suggests that, when considering the dataset as a whole, these outlier
+classes are less suceptible to adversarial attack than other classes.
+Further, in UTKFace, there are some classes that are considerably
+more susceptible to adversarial attack because a larger proportion
+of that class is closer to the decision boundaries.
+We also observe that the median distance to decision boundary
+can vary based on the dataset. The median distance to a decision
+boundary for each dataset is: 0.40 for CIFAR-10; 0.10 for CIFAR-100;
+0.06 for the superclass version of CIFAR-100; 0.38 for Adience; and
+0.12 for UTKFace. This is no surprise as 3\ (G) depends both on the
+location of the data points (which are ￿xed and immovable in a
+learning environment) and the choice of architectures/parameters.
+Finally, we consider another partition of the datasets. Above,
+we consider the partition of the dataset which occurs by the class
+labels. With the Adience and UTKFace datasets, we have an addi-
+tional partition by sensitive attributes. Adience admits partitions
+based o￿ of gender; UTKFace admits partition by gender and eth-
+nicity. We note that Adience and UTKFace use categorical labels for
+these multidimensional and socially complex concepts. We know
+this to be reductive and serves to minimize the contextualization
+within which race and gender derive their meaning [6, 22]. Further,
+we acknowledge the systems and notions that were used to reify
+such data partitions and the subsequent implications and conclu-
+sions draw therefrom. We use these socially and systemically-laden
+partitions to demonstrate that the functions we de￿ne, b % and f
+depend upon how the data are divided for analysis. To that end, the
+function b % is visualized in Figure 5. We observe that the Adience
+dataset, which exhibited some adversarial robustness bias in the
+partition on C only exhibits minor adversarial robustness bias in
+the partition on S for the attribute ‘Female’. On the other hand,
+UTKFace which had signi￿ant adversarial robustness bias does
+exhibit the phenomenon for the sensitive attribute ‘Black’ but not
+for the sensitive attribute ‘Female’.
+This emphasizes that adversarial robustness bias is dependant
+upon the dataset and the partition. We will demonstrate later that
+it is also dependant on the choice of classi￿er. First, we talk about
+ways to approximate 3\ (G) for more complicated models.
+7 EVALUATION OF ROBUSTNESS BIAS USING
+ADVERSARIAL ATTACKS
+As described in Section 4.1, we argued that adversarial attacks can
+be used to obtain upper bounds on 3\ (G) which can then be used
+to measure robustness bias. In this section we audit some popularly
+6
+471
+Fairness Through Robustness:
+Investigating Robustness Disparity in Deep Learning FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+(a) UTK Classi￿er: DeepFool (b) UTK Classi￿er: CarliniWagner (c) UTK Classi￿er: Rand. Smoothing
+(d) ResNet50: DeepFool (e) ResNet50: CarliniWagner (f) ResNet50: Rand. Smoothing
+(g) Alexnet: DeepFool (h) Alexnet: CarliniWagner (i) Alexnet: Rand. Smoothing
+(j) VGG-19: DeepFool (k) VGG-19: CarliniWagner (l) VGG-19: Rand. Smoothing
+(m) Densenet: DeepFool (n) Densenet: CarliniWagner (o) Densenet: Rand. Smoothing
+(p) Squeezenet: DeepFool (q) Squeezenet: CarliniWagner (r) Squeezenet: Rand. Smoothing
+Figure 6: UTKFace partitioned by race. We can see that across models, that di￿erent populations are at di￿erent levels of robustness as
+calculated by di￿erent proxies (DeepFool on the left, CarliniWagner in the middle and Randomized Smoothing on the right). This suggests
+that robustness bias is an important criterion to consider when auditing models for fairness.
+7
+472
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Vedant Nanda, Samuel Dooley, Sahil Singla, Soheil Feizi, and John P. Dickerson
+used models on datasets mentioned in Section 5 for robustness bias
+as measured using the approximation given by adversarial attacks.
+7.1 Evaluation of c ⇡ 
+% and d ⇠,%
+To compare the estimate of 3\ (G) by DeepFool and CarliniWag-
+ner, we ￿rst look at the signedness of f (%), f⇡  (%), and f⇠, (%).
+For a given partition % , f (%) captures the disparity in robustness
+between points in % relative to points not in % (see Eq 3). Consider-
+ing all 151 possible partitions (based on class labels and sensitive
+attributes, where available) for all ￿ve datasets, both CarliniWag-
+ner and DeepFool agree with the signedness of the direct com-
+putation 125 times, i.e., %
+⇥
+sign(f (%)) = sign(f⇡  (%))
+⇤
+= 125 =
+%
+⇥
+sign(f (%)) = sign(f⇠, (%))
+⇤
+. Further, the mean di￿erence be-
+tween f (%) and f⇠, (%) or f⇡  (%), i.e., (f (%)   f⇡  (%)), is 0.17
+for DeepFool and 0.19 for CarliniWagner with variances of 0.07 and
+0.06 respectively.
+There is 83% agreement between the direct computation and the
+DeepFool and CarliniWagner estimates of b % . This behavior pro-
+vides evidence that adversarial attacks provide meaningful upper
+bounds on 3\ (G) in terms of the behavior of identifying instances
+of robustness bias.
+7.2 Audit of Commonly Used Models
+We now evaluate ￿ve commonly-used convolutional neural net-
+works (CNNs): Alexnet, VGG, ResNet, DenseNet, and Squeezenet.
+We trained these networks using PyTorch with standard stochastic
+gradient descent. We achieve comparable performance to docu-
+mented state of the art for these models on these datasets. A full
+table of performance on the test data are described in Table 2 (Ap-
+pendix). After training each model on each dataset, we generated
+adversarial examples using both methods and computed f (%) for
+each possible partition of the dataset. An example of the results for
+the UTKFace dataset can be see in Figure 7.5.
+With evidence from Section 7.1 that DeepFool and CarliniWagner
+can approximate the robustness bias behavior of direct computa-
+tions of 3\ , we ￿rst ask if there are any major di￿erences between
+the two methods. If DeepFool exhibits adversarial robustness bias
+for a dataset and a model and a class, does CarliniWagner exhibit
+the same? and vice versa? Since there are 5 di￿erent convolutional
+models, we have 151 ·5 = 755 di￿erent comparisons to make. Again,
+we ￿rst look at the signedness of f⇡  (%) and f⇠, (%) and we see
+that %
+⇥
+sign(f⇡  (%)) = sign(f⇠, (%))
+⇤
+= 708. This means there
+is 94% agreement between DeepFool and CarliniWagner about the
+direction of the adversarial robustness bias.
+To investigate if this behavior is exhibited earlier in the training
+cycle than at the ￿nal, fully-trained model, we compute f⇠, (%)
+and f⇡  (%) for the various models and datasets for trained models
+after 1 epoch and the middle epoch. For the ￿rst epoch, 637 of the
+755 partitions were internally consistent, i.e., the signedness of f
+was the same in the ￿rst and last epoch, and 621 were internally
+consistent. We see that at the middle epoch, 671 of the 755 partitions
+were internally consistent for DeepFool and 665 were internally
+consistent for CarliniWagner. Unsurprisingly, this implies that as
+the training progresses, so does the behavior of the adversarial
+5Our full slate of approximation results are available in Appendix A
+robustness bias. However, it is surprising that much more than 80%
+of the ￿nal behavior is determined after the ￿rst epoch, and there
+is a slight increase in agreement by the middle epoch.
+We note that, of course, adversarial robustness bias is not neces-
+sarily an intrinsic value of a dataset; it may be exhibited by some
+models and not by others. However, in our studies, we see that
+the UTKFace dataset partition on Race/Ethnicity does appear to be
+signi￿cantly prone to adversarial attacks given its comparatively
+low f⇡  (%) and f⇠, (%) values across all models.
+8 EVALUATION OF ROBUSTNESS BIAS USING
+RANDOMIZED SMOOTHING
+In Section 4.2, we argued that randomized smoothing can be used to
+obtain lower bounds on 3\ (G) which can then be used to measure
+robustness bias. In this section we audit popular models on a variety
+of datasets (described in detail in Section 5) for robustness bias, as
+measured using the approximation given by randomzied smoothing.
+8.1 Evaluation of c '(%
+To assess whether the estimate of 3\ (G) by randomized smooth-
+ing is an appropriate measure of robustness bias, we compare
+the signedness of f (%) and f'( (%). When f (%) has positive sign,
+higher magnitude indicates a higher robustness of members of par-
+tition % as compared to members not included in that partition % ;
+similarly, when f (%) is negatively signed, higher magnitude corre-
+sponds to lesser robustness for those members of partition % (see
+Eq 3). We may interpret shared signedness of both f (%) (where
+3\ (G) is deterministic) and f'( (%) (where 3\ (G) is measured by
+randomized smoothing as described in Section 4.2) as positive sup-
+port for the c '(% measure.
+Similar to Section 7.1, we consider all possible 151 partitions
+across CIFAR-10, CIFAR-100, CIFAR-100Super, UTKFace and Adi-
+ence. For each of these partitions, we compare f'( (%) to the cor-
+responding f (%). We ￿nd that their sign agrees 101 times, i.e.,
+%
+⇥
+sign(f (%)) = sign(f'( (%))
+⇤
+= 101, thus giving a 66.9% agree-
+ment. Furthermore, the mean di￿erence between f (%) and f'( (%),
+i.e., (f (%)   f'( (%)) is 0.08 with a variance of 0.19.
+This provides evidence that randomized smoothing can also
+provide a meaningful estimate on 3\ (G) in terms of measuring
+robustness bias.
+8.2 Audit of Commonly Used Models
+Wenow evaluate the samemodels and all the datasets for robustness
+bias as measured by randomized smoothing. Our comparison is
+analogous to the one performed in Section 7.2 using adversarial
+attacks. Figure 8 shows results for all models on the UTKFace
+dataset. Here we plotf'(% for each partition of the dataset (on x-axis)
+and for each model (y-axis). A darker color in the heatmap indicates
+high robustness bias (darker red indicates that the partition is less
+robust than others, whereas a darker blue indicates that the partition
+is more robust). We can see that some partitions, for example, the
+partition based on class label “40-60” and the partition based on
+race “black” tend to be less robust in the ￿nal trained model, for
+all models (indicated by a red color across all models). Similarly
+there are partitions that are more robust, for example, the partition
+8
+473
+Fairness Through Robustness:
+Investigating Robustness Disparity in Deep Learning FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Figure 7: Depiction of f⇡ 
+% and f⇠,
+% for the UTKFace dataset with partitions corresponding to the (1) class labels C and the, (2) gender, and
+(3) race/ethnicity. These values are reported for all ￿ve convolutional models both at the beginning of their training (after one epoch) and at
+the end. We observe that, largely, the signedness of the functions are consistent between the ￿ve models and also across the training cycle.
+Figure 8: Depiction of f'(
+% for the UTKFace dataset with partitions corresponding to the (1) class labels C and the, (2) gender, and (3)
+race/ethnicity. A more negative value indicates less robustness bias for the partition. Darker regions indicate high robustness bias. We ob-
+serve that the trend is largely consistent amongst models and also similar to the trend observed when using adversarial attacks to measure
+robustness bias (see Figure 7).
+based on class “0-15” and race “asian” end up being robust across
+di￿erent models (indicated by a blue color). Figure 6 takes a closer
+look at the distribution of distances for the UTKFace dataset when
+partitioned by race, showing that for di￿erent models di￿erent races
+can be more or less robust. Figures 6, 7 and 8 (we see similar trends
+for CIFAR-10, CIFAR-100, CIFAR-100Super and Adience which we
+report exhaustively in Appendix A) lead us to the following key
+conclusions:
+Dependence on data distribution. The presence of certain parti-
+tions that show similar robustness trends as discussed above (e.g.see
+￿nal trained model in Figs 8 and 7, the partitions by class “0-15” and
+race “asian” are more robust, whereas the class “40-60” and race
+“black” are less robust across all models) point to some intrinsic
+property of the data distribution that results in that partition being
+more (or less) robust regardless of the type decision boundary. Thus
+we conclude that robustness bias may depend in part on the data
+distribution of various sub-populations.
+Dependence on model. There are also certain partitions of the
+dataset (e.g., based on the classes “15-25” and “60+” as per Fig 8)
+that show varying levels of robustness across di￿erent models.
+Moreover, even partitions that have same sign of f'( (%) across
+di￿erent models have very di￿erent values of f'( (%). This is also
+evident from Fig 6 which shows that the distributions of 3\ (G)
+(as approximated by all our proposed methods) for di￿erent races
+can be very di￿erent for di￿erent models. Thus, we conclude that
+robustness bias is also dependent on the learned model.
+Role of pre-training. We now explore the role of pre-training on
+our measures of robustness bias. Speci￿cally, we pre-train ￿ve of
+the six models (Resnet, Alexnet, VGG, Densenet, and Squeezenet)
+on ImageNet and then ￿ne-tune on UTKFace. We also train a UTK
+classi￿er from scratch on UTKFace. Figures 8 and 7 shows robust-
+ness bias scores after the ￿rst epoch and in the ￿nal, fully-trained
+model. At epoch 1, we mostly see no robustness bias (indicated by
+close-to-zero values of f'( (%)) for UTK Classi￿er. This is because
+the model has barely trained by that ￿rst epoch and predictions are
+roughly equivalent to random guesses. In contrast, the other ￿ve
+models already have pre-trained ImageNet weights, and hence we
+see certain robustness biases that already exist in the model, even
+after the ￿rst epoch of training. Thus, we conclude that pre-trained
+models bring in biases due to the distributions of the data on which
+they were pre-trained and the resulting learned decision boundary
+9
+474
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Vedant Nanda, Samuel Dooley, Sahil Singla, Soheil Feizi, and John P. Dickerson
+after pre-training. We additionally see that these biases can persist
+even after ￿ne-tuning.
+8.3 Comparison of Randomized Smoothing
+and Upper Bounds
+We have now presented two ways of measuring robustness bias:
+via upper bounds and via randomized smoothing. While there are
+important distinctions between the two methods, it is worth com-
+paring them. To do this, we compare the sign of the randomized
+smoothing method and the upper bounds as
+%
+h
+sign(f'( (%)) = sign(f⇡  (%))
+i
+and
+%
+h
+sign(f'( (%)) = sign(f⇠, (%))
+i
+.
+We see that there is some evidence that the two methods agree. The
+Adience, UTKFace, and CIFAR-10 dataset have strong agreement (at
+or above 75%) between the randomized smoothing for both types of
+upper bounds (DeepFool and CariliniWagner), while the CIFAR-100
+dataset has a much weaker agreement (above but closer to 50%)
+and CIFAR-100Super has an approximately 66% agreement.
+It is important to point out that it is not entirely appropriate to
+perform a comparison in this way. Recall that the upper bounds
+provide estimates of 3\ using a trained model. However, the ran-
+domized smoothing method estimates 3\ not directly with the
+trained model — instead it ￿rst modi￿es (smooths) the model of
+interest and then performs an estimation. Since the upper bounds
+and randomized smoothing methods are so di￿erent in practice,
+there may be no truly appropriate way to compare the results there-
+from. Therefore, too much credence should not be placed on the
+comparison of these two methods. Both methods indicate the ex-
+istence of the robustness bias phenomenon and can be useful in
+distinct settings.
+We present the full results table in Appendix C.
+9 AN “OBVIOUS” MITIGATION STRATEGY
+Having demonstrated the existence of this robustness bias phe-
+nomenon, it is natural to look ahead at common machine learning
+techniques to address it. In Appendix B, we have done just that by
+adding to the objective function a regularizer term which penalizes
+for large distances in the treatment of a minority and majority
+group. We write the empiric estimate of RB(%, g) as R̃B(%, g); a full
+derivation can be found in Appendix B.1. Formally,
+R̃B(%,g) =
+     
+1’
+G8%
+{~ = ~̂ }
+’
+G8%
+~=~̂
+{3\ (G) > g } 
+1’
+G2%
+{~ = ~̂ }
+’
+G2%
+~=~̂
+{3\ (G) > g }
+     
+Details of a full implementation of this loss function and the
+results can be found in Appendix B. Experimental results based
+on that implemntation, reported in Appendix B.2, support the idea
+that regularization—a typical approach taken by the fairness in
+machine learning community—can reduce measures of robustness
+bias. However, we do believe that this type of experimentation
+belies the larger point of the present, largely descriptive, work:
+that robustness bias is a real and signi￿cant artifact of popular
+and commonly-used datasets and models. Surely there are ways
+to mitigate some of the e￿ects or manifestations of this bias (as
+we show with our fairly standard regularization-based mitigation
+technique). However, we believe that any type of mitigation should
+be taken in concert with the contextualization of these technical
+systems in the social world, and thus leave “mitigation” research
+to, ideally, application-speci￿c future work involving both machine
+learning practictioners and the stakeholders of particular systems.
+10 DISCUSSION AND CONCLUSION
+We propose a unique de￿nition of fairness which requires all par-
+titions of a population to be equally robust to minute (often ad-
+versarial) perturbations, and give experimental evidence that this
+phenomenon can exist in some commonly-used models trained
+on real-world datasets. Using these observations, we argue that
+this can result in a potentially unfair circumstance where, in the
+presence of an adversary, a certain partition might be more suscep-
+tible (i.e., less secure). Susceptibility is prone to known issues with
+adversarial robustness such as sensitivity to hyperparameters [56].
+Thus, we call for extra caution while deploying deep neural nets in
+the real world since this form of unfairness might go unchecked
+when auditing for notions that are based on just the model outputs
+and ground truth labels. We then show that this form of bias can be
+mitigated to some extent by using a regularizer that minimizes our
+proposed measure of robustness bias. However, we do not claim
+to “solve” unfairness; rather, we view analytical approaches to bias
+detection and optimization-based approaches to bias mitigation as
+potential pieces in a much larger, multidisciplinary approach to
+addressing these issues in ￿elded systems.
+Indeed, we view our work as largely observational—we observe
+that, on many commonly-used models trained on many commonly-
+used datasets, a particular notion of bias, robustness bias, exists. We
+show that some partitions of data are more susceptible to two state-
+of-the-art and commonly-used adversarial attacks. This knowledge
+could be used for attack or to design defenses, both of which could
+have potential positive or negative societal impacts depending on
+the parties involved and the reasons for attacking and/or defending.
+We have also de￿ned a notion of bias as well as a corresponding
+notion of fairness, and by doing that we admittedly toe a morally-
+laden line. Still, while we do use “fairness” as both a higher-level
+motivation and a lower-level quantitative tool, we have tried to
+remain ethically neutral in our presentation and have eschewed
+making normative judgements to the best of our ability.
+ACKNOWLEDGMENTS
+Dickerson, Dooley, and Nanda were supported in part by NSF CA-
+REER Award IIS-1846237, NIST MSE Award #20126334, DARPA
+GARD #HR00112020007, DARPA SI3-CMD#S4761, DoDWHSAward
+#HQ003420F0035, and a Google Faculty Research Award. Feizi and
+Singla were supported in part by the NSF CAREER award 1942230,
+Simons Fellowship on Deep Learning Foundations, AWS Machine
+Learning Research Award, NIST award 60NANB20D134 and award
+HR001119S0026-GARD-FP-052. The authors would like to thank
+Juan Luque and Aviva Prins for fruitful discussions in earlier stages
+of the project, and reviewers at NeurIPS-20 for detailed discussion
+of an earlier draft of the paper.
+10
+475
+Fairness Through Robustness:
+Investigating Robustness Disparity in Deep Learning FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+REFERENCES
+[1] Tameem Adel, Isabel Valera, Zoubin Ghahramani, and Adrian Weller. One-
+network adversarial fairness. In AAAI Conference on Arti￿cial Intelligence (AAAI),
+pages 2412–2420, 2019.
+[2] Solon Barocas and Andrew D Selbst. Big data’s disparate impact. California Law
+Review, 104:671, 2016.
+[3] Asia J. Biega, Krishna P. Gummadi, and Gerhard Weikum. Equity of attention:
+Amortizing individual fairness in rankings. In ACM Conference on Research and
+Development in Information Retrieval (SIGIR), page 405–414, 2018.
+[4] Reuben Binns. Fairness in machine learning: Lessons from political philosophy.
+Proceedings of Machine Learning Research, 81:1–11, 2017.
+[5] Bernhard E. Boser, Isabelle M. Guyon, and Vladimir N. Vapnik. A training
+algorithm for optimal margin classi￿ers. In Conference on Learning Theory
+(COLT), page 144–152, 1992.
+[6] Joy Buolamwini and Timnit Gebru. Gender shades: Intersectional accuracy
+disparities in commercial gender classi￿cation. In ACM Conference on Fairness,
+Accountability, and Transparency (FAccT), pages 77–91, 2018.
+[7] Flavio Calmon, Dennis Wei, Bhanukiran Vinzamuri, Karthikeyan Natesan Ra-
+mamurthy, and Kush R Varshney. Optimized pre-processing for discrimination
+prevention. In Advances in Neural Information Processing Systems 30, NIPS’17,
+pages 3992–4001. 2017. URL http://papers.nips.cc/paper/6988-optimized-pre-
+processing-for-discrimination-prevention.pdf.
+[8] Nicholas Carlini and David Wagner. Towards evaluating the robustness of neural
+networks. In 2017 IEEE Symposium on Security and Privacy (S&P), pages 39–57,
+2017.
+[9] Alexandra Chouldechova. Fair prediction with disparate impact: A study of bias
+in recidivism prediction instruments. Big Data, 5(2):153–163, 2017.
+[10] Jeremy M. Cohen, Elan Rosenfeld, and J. Zico Kolter. Certi￿ed adversarial robust-
+ness via randomized smoothing. In International Conference on Machine Learning
+(ICML), 2019.
+[11] Henriette Cramer, Jenn Wortman Vaughan, Ken Holstein, Hanna Wallach, Jean
+Garcia-Gathright, Hal Daumé III, Miroslav Dudík, and Sravana Reddy. Challenges
+of incorporating algorithmic fairness into industry practice. FAT* Tutorial, 2019.
+URL https://drive.google.com/￿le/d/1rUQkVS0NzSH3IEqZDsczSxBbhYHbjamN/
+view.
+[12] Kate Crawford and Trevor Paglen. Excavating ai: The politics of images in
+machine learning training sets. 2019. URL https://www.excavating.ai/.
+[13] Michele Donini, Luca Oneto, Shai Ben-David, John Shawe-Taylor, and Massimil-
+iano Pontil. Empirical risk minimization under fairness constraints. In Proceedings
+of the 32nd International Conference on Neural Information Processing Systems,
+NIPS’18, page 2796–2806, 2018.
+[14] Cynthia Dwork and Christina Ilvento. Fairness under composition. In Innovations
+in Theoretical Computer Science Conference (ITCS), 2018.
+[15] Cynthia Dwork, Moritz Hardt, Toniann Pitassi, Omer Reingold, and Richard
+Zemel. Fairness through awareness. In Innovations in Theoretical Computer
+Science Conference (ITCS), 2012.
+[16] Eran Eidinger, Roee Enbar, and Tal Hassner. Age and gender estimation of
+un￿ltered faces. IEEE Transactions on Information Forensics and Security, 9(12):
+2170–2179, 2014.
+[17] Michael Feldman, Sorelle A Friedler, JohnMoeller, Carlos Scheidegger, and Suresh
+Venkatasubramanian. Certifying and removing disparate impact. In International
+Conference on Knowledge Discovery and Data Mining (KDD), pages 259–268, 2015.
+[18] Sainyam Galhotra, Yuriy Brun, and Alexandra Meliou. Fairness testing: Testing
+software for discrimination. In Proceedings of the 2017 11th Joint Meeting on
+Foundations of Software Engineering, ESEC/FSE 2017, page 498–510, New York,
+NY, USA, 2017. doi: 10.1145/3106237.3106277. URL https://doi.org/10.1145/
+3106237.3106277.
+[19] Ian J. Goodfellow, Jonathon Shlens, and Christian Szegedy. Explaining and
+harnessing adversarial examples. In International Conference on Learning Repre-
+sentations (ICLR), 2015.
+[20] Nina Grgić-Hlača, Muhammad Bilal Zafar, Krishna P. Gummadi, and Adrian
+Weller. Beyond distributive fairness in algorithmic decision making: Feature se-
+lection for procedurally fair learning. In AAAI Conference on Arti￿cial Intelligence
+(AAAI), 2018.
+[21] Dongyoon Han, Jiwhan Kim, and Junmo Kim. Deep pyramidal residual networks.
+IEEE CVPR, 2017.
+[22] Alex Hanna, Emily Denton, Andrew Smart, and Jamila Smith-Loud. Towards a
+critical race methodology in algorithmic fairness. In ACM Conference on Fairness,
+Accountability, and Transparency (FAccT), pages 501–512, 2020.
+[23] Moritz Hardt, Eric Price, andNathan Srebro. Equality of opportunity in supervised
+learning. In Proceedings of the Annual Conference on Neural Information Processing
+Systems (NeurIPS), 2016.
+[24] Tatsunori B. Hashimoto, Megha Srivastava, Hongseok Namkoong, and Percy
+Liang. Fairness without demographics in repeated loss minimization. In Interna-
+tional Conference on Machine Learning (ICML), 2018.
+[25] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning
+for image recognition. In Computer Vision and Pattern Recognition (CVPR), pages
+770–778, 2016.
+[26] Hoda Heidari and Andreas Krause. Preventing disparate treatment in sequential
+decision making. In Proceedings of the International Joint Conference on Arti￿cial
+Intelligence (IJCAI), 2018.
+[27] Hoda Heidari, Vedant Nanda, and Krishna P. Gummadi. On the long-term impact
+of algorithmic decision policies: E￿ort unfairness and feature segregation through
+social learning. In International Conference on Machine Learning (ICML), 2019.
+[28] Kenneth Holstein, Jennifer Wortman Vaughan, Hal Daumé, Miro Dudik, and
+Hanna Wallach. Improving fairness in machine learning systems: What do
+industry practitioners need? In Proceedings of the 2019 CHI Conference on Human
+Factors in Computing Systems, CHI ’19, page 1–16, 2019. ISBN 9781450359702.
+doi: 10.1145/3290605.3300830. URL https://doi.org/10.1145/3290605.3300830.
+[29] Gao Huang, Zhuang Liu, Laurens Van Der Maaten, and Kilian Q Weinberger.
+Densely connected convolutional networks. In Computer Vision and Pattern
+Recognition (CVPR), 2017.
+[30] Forrest N Iandola, Song Han, Matthew W Moskewicz, Khalid Ashraf, William J
+Dally, and Kurt Keutzer. SqueezeNet: AlexNet-level accuracy with 50x fewer
+parameters and <0.5mb model size. CoRR, abs/1602.07360, 2016.
+[31] Amir E. Khandani, Adlar J. Kim, and AndrewW. Lo. Consumer credit-risk models
+via machine-learning algorithms. Journal of Banking & Finance, 34(11):2767–2787,
+2010.
+[32] Fereshte Khani and Percy Liang. Noise induces loss discrepancy across groups
+for linear regression, 2019.
+[33] Niki Kilbertus, Mateo Rojas Carulla, Giambattista Parascandolo, Moritz Hardt,
+Dominik Janzing, and Bernhard Schölkopf. Avoiding discrimination through
+causal reasoning. In Proceedings of the Annual Conference on Neural Information
+Processing Systems (NeurIPS), pages 656–666, 2017.
+[34] Alex Krizhevsky. Learning multiple layers of features from tiny images. Master’s
+thesis, University of Toronto, 2009.
+[35] Alex Krizhevsky. One weird trick for parallelizing convolutional neural networks.
+CoRR, abs/1404.5997, 2014.
+[36] Matt J Kusner, Joshua Loftus, Chris Russell, and Ricardo Silva. Counterfactual
+fairness. In Advances in Neural Information Processing Systems 30, pages 4066–
+4076. 2017. URL http://papers.nips.cc/paper/6995-counterfactual-fairness.pdf.
+[37] Derek Leben. Normative principles for evaluating fairness in machine learning.
+In Conference on Arti￿cial Intelligence, Ethics, and Society (AIES), pages 86–92,
+2020.
+[38] Lydia T Liu, Sarah Dean, Esther Rolf, Max Simchowitz, andMoritz Hardt. Delayed
+impact of fair machine learning. In International Conference on Machine Learning
+(ICML), 2018.
+[39] Ninareh Mehrabi, Muhammad Naveed, Fred Morstatter, and Aram Galstyan.
+Exacerbating algorithmic bias through fairness attacks, 2020.
+[40] Seyed-Mohsen Moosavi-Dezfooli, Alhussein Fawzi, and Pascal Frossard. Deep-
+fool: a simple and accurate method to fool deep neural networks. In Computer
+Vision and Pattern Recognition (CVPR), pages 2574–2582, 2016.
+[41] Nicolas Papernot, Patrick McDaniel, Somesh Jha, Matt Fredrikson, Z Berkay
+Celik, and Ananthram Swami. The limitations of deep learning in adversarial
+settings. In IEEE European Symposium on Security and Privacy (EuroS&P), pages
+372–387. IEEE, 2016.
+[42] Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory
+Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, Alban Des-
+maison, Andreas Kopf, Edward Yang, Zachary DeVito, Martin Raison, Alykhan
+Tejani, Sasank Chilamkurthy, Benoit Steiner, Lu Fang, Junjie Bai, and Soumith
+Chintala. Pytorch: An imperative style, high-performance deep learning library.
+In NeurIPS, pages 8026–8037. 2019.
+[43] Geo￿ Pleiss, Manish Raghavan, FelixWu, Jon Kleinberg, and Kilian QWeinberger.
+On fairness and calibration. In I. Guyon, U. V. Luxburg, S. Bengio, H. Wallach,
+R. Fergus, S. Vishwanathan, and R. Garnett, editors, Advances in Neural Informa-
+tion Processing Systems 30, pages 5680–5689. Curran Associates, Inc., 2017. URL
+http://papers.NeurIPS.cc/paper/7151-on-fairness-and-calibration.pdf.
+[44] Filipe N. Ribeiro, Koustuv Saha, Mahmoudreza Babaei, Lucas Henrique, John-
+natan Messias, Fabricio Benevenuto, Oana Goga, Krishna P. Gummadi, and
+Elissa M. Redmiles. On microtargeting socially divisive ads: A case study of
+russia-linked ad campaigns on facebook. In Proceedings of the Conference on
+Fairness, Accountability, and Transparency, FAT* ’19, page 140–149, New York,
+NY, USA, 2019. ISBN 9781450361255. doi: 10.1145/3287560.3287580. URL
+https://doi.org/10.1145/3287560.3287580.
+[45] Debjani Saha, Candice Schumann, Duncan C. McElfresh, John P. Dickerson,
+Michelle L Mazurek, and Michael Carl Tschantz. Measuring non-expert com-
+prehension of machine learning fairness metrics. In International Conference on
+Machine Learning (ICML), 2020.
+[46] Hadi Salman, Jerry Li, Ilya Razenshteyn, Pengchuan Zhang, Huan Zhang, Se-
+bastien Bubeck, and Greg Yang. Provably robust deep learning via adversarially
+trained smoothed classi￿ers. In Proceedings of the Annual Conference on Neural
+Information Processing Systems (NeurIPS), pages 11292–11303. 2019.
+[47] Candice Schumann, Samsara N. Counts, Je￿rey S. Foster, and John P. Dickerson.
+The diverse cohort selection problem. In International Conference on Autonomous
+Agents and Multi-Agent Systems (AAMAS), page 601–609, 2019.
+11
+476
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Vedant Nanda, Samuel Dooley, Sahil Singla, Soheil Feizi, and John P. Dickerson
+[48] Candice Schumann, Je￿rey S. Foster, Nicholas Mattei, and John P. Dickerson. We
+need fairness and explainability in algorithmic hiring. In International Conference
+on Autonomous Agents and Multi-Agent Systems (AAMAS), page 1716–1720, 2020.
+[49] Karen Simonyan and Andrew Zisserman. Very deep convolutional networks for
+large-scale image recognition. In International Conference on Learning Represen-
+tations (ICLR), 2015.
+[50] Ashudeep Singh and Thorsten Joachims. Fairness of exposure in rankings. In
+International Conference on Knowledge Discovery and Data Mining (KDD), 2018.
+[51] Sahil Singla and Soheil Feizi. Second-order provable defenses against adversarial
+attacks. In International Conference on Machine Learning (ICML), 2020.
+[52] David Solans, Battista Biggio, and Carlos Castillo. Poisoning attacks on algorith-
+mic fairness, 2020.
+[53] Till Speicher, Muhammad Ali, Giridhari Venkatadri, Filipe Nunes Ribeiro, George
+Arvanitakis, Fabrício Benevenuto, Krishna P. Gummadi, Patrick Loiseau, and
+Alan Mislove. Potential for discrimination in online targeted advertising. In
+ACM Conference on Fairness, Accountability, and Transparency (FAccT), 2018.
+[54] J. A. K. Suykens and J. Vandewalle. Least squares support vector machine classi-
+￿ers. Neural Processing Letters, 9(3):293–300, June 1999.
+[55] Christian Szegedy,Wojciech Zaremba, Ilya Sutskever, Joan Bruna, Dumitru Erhan,
+Ian Goodfellow, and Rob Fergus. Intriguing properties of neural networks. In
+International Conference on Learning Representations (ICLR), 2014.
+[56] Florian Tramer, Nicholas Carlini, Wieland Brendel, and Aleksander Madry. On
+adaptive attacks to adversarial example defenses, 2020.
+[57] Christina Wadsworth, Francesca Vera, and Chris Piech. Achieving fairness
+through adversarial learning: an application to recidivism prediction. CoRR,
+abs/1807.00199, 2018.
+[58] ZeyuWang, Klint Qinami, Yannis Karakozis, Kyle Genova, P. Nair, Kenji Hata, and
+Olga Russakovsky. Towards fairness in visual recognition: E￿ective strategies
+for bias mitigation. 2020 IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 8916–8925, 2020.
+[59] Muhammad Bilal Zafar, Isabel Valera, Manuel Gomez Rodriguez, Krishna P.
+Gummadi, and AdrianWeller. From parity to preference-based notions of fairness
+in classi￿cation. In Proceedings of the Annual Conference on Neural Information
+Processing Systems (NeurIPS), 2017.
+[60] Muhammad Bilal Zafar, Isabel Valera, Manuel Gomez-Rodriguez, and Krishna P.
+Gummadi. Fairness constraints: A ￿exible approach for fair classi￿cation. Journal
+of Machine Learning Research, 20(75):1–42, 2019.
+[61] Rich Zemel, Yu Wu, Kevin Swersky, Toni Pitassi, and Cynthia Dwork. Learning
+fair representations. In International Conference on Machine Learning (ICML),
+pages 325–333, 2013.
+[62] Zhifei Zhang, Yang Song, and Hairong Qi. Age progression/regression by con-
+ditional adversarial autoencoder. In IEEE Conference on Computer Vision and
+Pattern Recognition (CVPR). IEEE, 2017.
+12
+477

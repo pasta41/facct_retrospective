@@ -1,0 +1,1151 @@
+The Social Cost of Strategic Classification
+Smitha Milli
+smilli@berkeley.edu
+University of California, Berkeley
+John Miller
+miller_john@berkeley.edu
+University of California, Berkeley
+Anca D. Dragan
+anca@berkeley.edu
+University of California, Berkeley
+Moritz Hardt
+hardt@berkeley.edu
+University of California, Berkeley
+ABSTRACT
+Consequential decision-making typically incentivizes individuals to
+behave strategically, tailoring their behavior to the specifics of the
+decision rule. A long line of work has therefore sought to counteract
+strategic behavior by designing more conservative decision bound-
+aries in an effort to increase robustness to the effects of strategic
+covariate shift.
+We show that these efforts benefit the institutional decision
+maker at the expense of the individuals being classified. Introducing
+a notion of social burden, we prove that any increase in institutional
+utility necessarily leads to a corresponding increase in social bur-
+den. Moreover, we show that the negative externalities of strategic
+classification can disproportionately harm disadvantaged groups
+in the population.
+Our results highlight that strategy-robustness must be weighed
+against considerations of social welfare and fairness.
+CCS CONCEPTS
+• Computing methodologies →Machine learning; Stochastic
+games;
+KEYWORDS
+Strategic classification, fairness, machine learning
+ACM Reference Format:
+Smitha Milli, John Miller, Anca D. Dragan, and Moritz Hardt. 2019. The
+Social Cost of Strategic Classification. In FAT* ’19: Conference on Fairness,
+Accountability, and Transparency (FAT* ’19), January 29–31, 2019, Atlanta,
+GA, USA. ACM, New York, NY, USA, 11 pages. https://doi.org/10.1145/
+3287560.3287576
+1 INTRODUCTION
+As machine learning increasingly supports consequential decision
+making, its vulnerability to manipulation and gaming is of grow-
+ing concern. When individuals learn to adapt their behavior to
+the specifics of a statistical decision rule, its original predictive
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+https://doi.org/10.1145/3287560.3287576
+power will deteriorate. This widely observed empirical phenome-
+non, known as Campbell’s Law or Goodhart’s Law, is often summa-
+rized as: “Once a measure becomes a target, it ceases to be a good
+measure” [26].
+Institutions using machine learning to make high-stakes deci-
+sions naturally wish to make their classifiers robust to strategic
+behavior. A growing line of work has sought algorithms that achieve
+higher utility for the institution in settings where we anticipate
+a strategic response from the the classified individuals [4, 10, 14].
+Broadly speaking, the resulting solution concepts correspond to
+more conservative decision boundaries that increase robustness to
+some form of distributional shift.
+But there is a flip side to strategic classification. As insitutional
+utility increases as a result of more cautious decision rules, honest
+individuals worthy of a positive classification outcome may face a
+higher bar for success.
+The costs incurred by individuals as a consequence of strategic
+classification are by no means hypothetical, as the example of lend-
+ing shows. In the United States, credit scores are widely deployed to
+allocate credit. However, even creditworthy individuals routinely
+engage in artificial practices intended to improve their credit scores,
+such as opening up a certain number of credit lines in a certain
+time period [9].
+In this work, we study the tension between accuracy to the in-
+stitution and impact to the individuals being classified. We first
+introduce a general measure of the cost of strategic classification,
+which we call the social burden. Informally, the social burden mea-
+sures the expected cost that a positive individual needs to incur to
+be correctly classified correctly.
+For a broad class of cost functions, we prove there exists an
+intrinsic trade-off between institutional accuracy and social burden:
+any increase in institutional accuracy comes at an increase in social
+burden. Moreover, we precisely characterize this trade-off and show
+the commonly considered Stackelberg equilibrium solution achieves
+maximal institutional accuracy at the expense of maximal social
+burden.
+Equipped with this generic trade-off result, we turn towards a
+more careful study of how the social burden of strategic classifi-
+cation impacts different subpopulations. We find that the social
+burden can fall disproportionally on disadvantaged subpopulations,
+under two different notions by which one group can be disadvan-
+taged relative to another group. Furthermore, we show that as the
+institution improves its accuracy, it exacerbates the gap between
+the burden to an advantaged and disadvantaged group. Finally, we
+illustrate these conditions and their consequences with a case study
+on FICO data.
+1.1 Our Contributions
+In this paper, we make the following contributions:
+(1) We prove a general result demonstrating the trade-off be-
+tween institutional accuracy and individual utility in the
+strategic setting. Our theoretical characterization is supple-
+mentedwith examples illustratingwhen an institutionwould
+prefer to operate along different points in this trade-off curve.
+(2) We show fairness considerations inevitably arise in the strate-
+gic setting. When individuals incur cost as a consequence of
+making a classifier robust to strategic behavior, we show the
+costs can disproportionally fall by disadvantaged subpopula-
+tions. Furthermore, as the institution increases its robustness,
+it also increases the disparity between subpopulations.
+(3) Using FICO credit data as a case-study, we empirically vali-
+date our modeling assumptions and illustrate both the gen-
+eral trade-offs and fairness concerns involved with strategic
+classification in a concrete setting.
+Reflecting on our results, we argue that the existing view of strate-
+gic classification has been instituition-centric, ignoring the social
+burden resulting from improved institutional utility. Our frame-
+work makes it possible to select context-specific trade-offs between
+institutional and individual utility, leading to a richer space of solu-
+tions.
+Another key insight is that discussions of strategy-robustness
+must go hand in hand with considerations of fairness and the real
+possibility that robustness-promoting mechanisms can have dis-
+parate impact in different segments of the population.
+2 MODEL
+Strategic classification. Throughout this work, we consider
+the binary classification setting. Each individual has features x ∈ X
+and a label y ∈ Y = {0, 1}. The institution publishes a classifier
+f : X → Y. In the non-strategic setting, the institution maximizes
+the non-strategic utility, which is simply the classification accuracy
+of f :
+U(f ) = P(f (x) = y) .
+In the strategic setting, the individual can modify their features,
+and the institution aims to preempt the individual’s strategic manip-
+ulation. In response to the institution’s classifier f , the individual
+can change her features x to new features x ′. However, modifica-
+tion incurs a cost given by c : X × X → R≥0. The individual then
+receives an individual utility ux (f ,x
+′) = f (x ′) − c(x ,x ′), which
+trades off between the cost of manipulation c(x ,x ′) and the benefits
+of classification f (x ′).
+The institution models the individual x as maximizing their
+utility ux (f ,x
+′) and acting according to the best-response to the
+classifier f :
+∆(x ; f ) = argmax
+x ′
+ux (f ,x
+′).
+When it is clear from context we will drop the dependence on f
+and write the individual’s best response as ∆(x). Although ∆(x)
+may not have a unique maximizer, it is assumed that the individual
+x does not adapt her features if she is already accepted by the
+classifier, i.e. f (x) = 1, or if there is no maximizer x ′ she can move
+to such that f (x ′) = 1. In cases where the individual does adapt,
+let x ′ be an arbitrary maximizer such that f (x ′) = 1. In practice, it
+is unlikely individuals actually play best-response solutions, and
+we will discuss as appropriate the impact of deviations from best-
+response play.
+Given this model, the institution aims to maximize the strategic
+utility, which measures accuracy after individual responses:
+U∆(f ) = P(f (∆(x)) = y).
+For example, imagine that the institution is trying to rank pages
+on a social network. Although the number of likes a page has may
+be predictive, it is also an easy feature to game. Therefore, models
+with high strategic utility will assign low weight to this feature,
+even if it is useful in the static setting. Henceforth, we will refer to
+the strategic utility as simply the institutional utility.
+Social burden. Focusing purely on maximizing U∆, as done
+in prior work, ignores the cost a classifier imposes on individuals
+[5, 12, 15]. To account for these costs, we define the individual
+burden of a classifier f as the minimum cost an individual needs to
+incur in order to be classified positively: bf (x) = minf (x ′)=1 c(x ,x
+′).
+For positive individuals with y = 1, a high individual burden
+means the individual has to incur great cost to obtain the correct
+classification. To quantity this cost, we introduce the social burden,
+defined as the expected individual burden of positive individuals.
+Definition 2.1 (Social burden). The social burden of a classifier f
+is defined as B+(f ) = E
+[
+bf (x) | y = 1
+]
+.
+The social burden measures the expected cost that positive in-
+dividuals would need to incur to be classified positively, regard-
+less of whether the best response ∆(x) indicates that they should
+adapt. One could imagine other ways of measuring the impact
+on individuals, such as the expected utility of positive individuals,
+E [ux (f ,∆(x)) | y = 1], or the corresponding measure over all indi-
+viduals, rather than only positive individuals. Most of our results
+still hold for these alternative measures, and we relegate discussion
+about the choice of social burden to Section 7.
+Assumptions on cost function. While there are many possible
+models for the cost function, we restrict our attention to a natu-
+ral set of cost functions that we call outcome monotonic. Outcome
+monotonic costs capture two intuitive properties: (1) Monotoni-
+cally improving one’s outcome requires monotonically increasing
+amounts of work, and (2) it is zero cost to worsen one’s outcome.
+This captures the intuition that, for example, it is harder to pay
+back loans than it is to go bankrupt.
+Definition 2.2 (Outcome likelihood). The outcome likelihood of
+an individual x is ℓ(x) = P(Y = 1 | X = x).
+We assume that all individuals have a positive outcome likeli-
+hood, i.e, ℓ(x) > 0 for all x .
+Definition 2.3 (Outcome Monotonic Cost). A cost function c :
+X × X → R≥0 is outcome monotonic if for any x ,x ′,x∗ ∈ X the
+following properties hold.
+• Zero-cost to move to lower outcome likelihoods. c(x ,x ′) > 0 if
+and only if ℓ(x ′) > ℓ(x).
+• Monotonicity in first argument. c(x ,x∗) > c(x ′,x∗) > 0 if and
+only if ℓ(x∗) > ℓ(x ′) > ℓ(x).
+• Monotonicity in second argument. c(x ,x∗) > c(x ,x ′) > 0 if
+and only if ℓ(x∗) > ℓ(x ′) > ℓ(x).
+Under these assumptions, we can equivalently express the cost
+as a cost over outcome likelihoods, cL : ℓ(X)×ℓ(X) → R≥0, defined
+in the following lemma.
+Lemma 2.1. When the cost function c(x ,x ′) is outcome monotonic,
+then it can be written as a cost function over outcome likelihoods
+cL(l , l
+′) B c(x ,x ′) where x ,x ′ ∈ X are any points such that l = ℓ(x)
+and l ′ = ℓ(x ′).
+Proof. The monotonicity assumptions imply that if ℓ(x∗) =
+ℓ(x ′), then c(·,x ′) = c(·,x∗) and c(x ′, ·) = c(x∗, ·). Thus, cL(l , l
+′) B
+c(x ,x ′) is well-defined because any points x and x ′ such that l =
+ℓ(x) and l ′ = ℓ(x ′) yield the same value of c(x ,x ′). □
+Throughout the paper, we will make use of the equivalent like-
+lihood cost cL when a proof is more naturally expressed with cL ,
+rather than with the underlying cost c .
+3 INSTITUTIONAL UTILITY VERSUS SOCIAL
+BURDEN
+In this section, we characterize the inherent trade-offs between
+institutional utility and social burden in the strategic setting. In
+particular, we show any classifier that improves institutional utility
+over the best classifier in the static setting causes a corresponding
+increase in social burden.
+To prove this result we first show that any classifier can be
+represented as a threshold classifier that accepts all individuals
+with outcome likelihood greater than some threshold τ ∈ [0, 1].
+Then, we show increasing utility for the institution requires raising
+this threshold τ , but that this always increases the social burden.
+Equipped with this result, we show the (Pareto-optimal) set of
+classifiers that increase institutional utility in the strategic setting
+corresponds to an interval I . Each threshold τ ∈ I represents a
+particular trade-off between institutional utility and social bur-
+den. Strategic classification corresponds to one extremum: the best
+strategic utility but the worst social burden. The non-strategic util-
+ity corresponds to the other: doing nothing to prevent gaming.
+Neither is likely to be the right trade-off in practical contexts. Real
+domains will require a careful weighting of these two utilities, lead-
+ing to a choice somewhere in between. Thus, a main contribution
+of our work is exposing this interval.
+3.1 General Trade-Off
+We now proceed to prove the trade-off between institutional utility
+and social burden. Our first step is to show that in the strategic
+setting we can restrict attention to classifiers that threshold on the
+outcome likelihood (assuming the cost is outcome monotonic as in
+Definition 2.3).
+Definition 3.1 (Outcome threshold classifier). An outcome thresh-
+old classifier f is a classifier of the form f (x) = I{ℓ(x) ≥ τ } for
+τ ∈ [0, 1].
+In practice, the institution may not know the outcome likelihood
+ℓ(x) = P(Y = 1 | X = x). However, as shown in the next lemma,
+for any classifier that they do use, there is a threshold classifier
+with equivalent institutional utility and social burden. Thus, we
+can restrict our theoretical analysis to only consider threshold
+classifiers.
+Lemma 3.1. For any classifier f there is an outcome threshold
+classifier f ′ such that U∆(f ) = U∆(f
+′) and B+(f ) = B+(f
+′).
+Proof. Let τ (f ) = minx :f (x )=1 ℓ(x) be the minimum outcome
+likelihood at which an individual is accepted by the classifier f .
+Then, let f ′(x) = I{ℓ(x) ≥ τ (f )} be the outcome threshold classi-
+fier that accepts all individuals above τ (f ). We will show that the
+institutional utility and social burden of f and f ′ are equal.
+Since the cost function is outcome monotonic, it is the same cost
+to move to any point with the same outcome likelihood. Further-
+more, it is higher cost to move to points of higher likelihood, i.e,
+if ℓ(x ′) > ℓ(x∗) > ℓ(x), then c(x ,x ′) > c(x ,x∗) > 0. Since indi-
+viduals game optimally, when an individual changes her features
+in response to the classifier f , she has no incentive to move to a
+point with likelihood higher than τ (f ) – that would just cost more.
+Therefore, she will move to any point with likelihood τ (f ) to be
+accepted by f and will incur the same cost, regardless of which
+point it is. Thus, we can write the set of individuals accepted by f ,
+A∆(f ), as
+A∆(f ) = {x | f (∆(x)) = 1}
+= {x | ∃x ′ : f (x ′) = 1, c(x ,x ′) ≤ 1}
+= {x | ∃ x ′ : ℓ(x ′) = τ (f ), c(x ,x ′) ≤ 1} .
+Since τ (f ) = τ (f ′), the individuals accepted by f and f ′ are
+equal: A∆(f ) = A∆(f
+′). Therefore, their institutional utilities
+U∆(f ) andU∆(f
+′) are equal. We can similarly show that the social
+burdens of f and f ′ are also equal:
+B+(f ) = E
+[
+min
+x ′
+:f (x ′)=1
+c(x ,x ′) | y = 1
+]
+,
+= E
+[
+c(x ,x ′) | y = 1
+]
+for some x ′ : ℓ(x ′) = τ (f ),
+= E
+[
+c(x ,x ′) | y = 1
+]
+for some x ′ : ℓ(x ′) = τ (f ′),
+= E
+[
+min
+x ′
+:f ′(x ′)=1
+c(x ,x ′) | y = 1
+]
+= B+(f
+′) .
+□
+Since outcome threshold classifiers can represent all classifiers
+in the strategic setting, we will henceforth only consider outcome
+threshold classifiers. Furthermore, we will overload notation and
+useU∆(τ ) and B+(τ ) to refer toU∆(fτ ) and B+(fτ )where fτ (x) =
+I{ℓ(x) ≥ τ } is the outcome threshold classifier with threshold τ .
+Figure 1 illustrates how institutional utility and social burden
+change as the threshold of the classifier increases. The institutional
+utility is quasiconcave, while the social burden is monotonically
+non-decreasing. The next lemma provides a formal characterization
+of the shapes shown in Figure 1.
+Theorem 3.1. The institutional utilityU∆(τ ) is quasiconcave in
+τ and has a maximum at a threshold τ ∗ ≥ τ0 where τ0 = 0.5 is the
+threshold of the non-strategic optimal classifier. The social burden
+B+(τ ) is monotonically non-decreasing in τ . Furthermore, ifU∆(τ ) ,
+U∆(τ
+′), then B+(τ ) , B+(τ
+′).
+⌧⇤⌧0
+Social Burden
+Institution Utility U 
+B+
+Figure 1: The general shapes of the institution utility and
+social burden as a function of the threshold the institution
+chooses. The threshold t0 is the non-strategic optimal, while
+the threshold τ ∗ is the Stackelberg equilibrium.
+Proof. LetA∆(τ ) andA(τ ) be the set of individuals accepted by
+f in the strategic and non-strategic setting, respectively. If τ < τ0,
+we haveA∆(τ ) ⊇ A∆(τ0) ⊇ A(τ0). SinceA(τ0) is the optimal non-
+strategic acceptance region, any x < A(τ0) has ℓ(x) < 0.5, and one
+can increaseU∆ by not acceptingx , which impliesU∆(τ ) ≤ U∆(τ0).
+Therefore, if a threshold τ ∗ is optimal for the institution, i.e. if
+U∆(τ
+∗) = maxτ U∆(τ ), then τ
+∗ ≥ τ0.
+Recall that a univariate function f (z) is quasiconcave if there
+exists z∗ such that f is non-decreasing for z < z∗ and is non-
+increasing for z > z∗. Let τ ∗ be as above. For τ0 < τ1 < τ ∗, we have
+A∆(τ0) ⊇ A∆(τ1) ⊇ A∆(τ
+∗). Since U∆(τ
+∗) is optimal, A∆(τ
+∗)
+is the optimal strategic acceptance region, and thus U∆(τ0) ≤
+U∆(τ1) ≤ U∆(τ
+∗). Similarly, if τ1 > τ0 > τ ∗ we have thatA∆(τ
+∗) ⊇
+A∆(τ0) ⊇ A∆(τ1), and thus U∆(τ1) ≤ U∆(τ0) ≤ U∆(τ
+∗). There-
+fore, U∆(τ ) is quasiconcave in τ .
+The individual burden bτ (x) = minℓ(x ′)≥τ c(x ,x
+′) is monotoni-
+cally non-decreasing in τ . Since the social burden B+(τ ) is equal
+to E[bτ (x) | y = 1], the social burden is also monotonically non-
+decreasing.
+Suppose U∆(τ ) , U∆(τ
+′) and without loss of generality let
+τ < τ ′. For all individuals x , bτ ′(x) ≥ bτ (x). If there is at least one
+individual x such that bτ ′(x) > bτ (x), then B+(τ
+′) > B+(τ ). But
+sinceU∆(τ ) , U∆(τ
+′), there must exist an individual x such that
+x ∈ A∆(τ )/A∆(τ
+′) and p(X = x | Y = 1) > 0 since ℓ(x) > 0 by
+assumption. For this individual bτ ′(x) > bτ (x). Therefore,U∆(τ ) ,
+U∆(τ
+′) implies B+(τ
+′) , B+(τ ). □
+As a corollary, if the institution increases its utility beyond that
+attainable by the optimal classifier in the non-strategic setting, then
+the institution also causes higher social burden.
+Corollary 3.1. Let τ be any threshold and τ0 = 0.5 be the opti-
+mal threshold in the non-strategic setting. IfU∆(τ ) > U∆(τ0), then
+B+(τ ) > B+(τ0).
+3.2 Choosing a Concrete Trade-off
+The previous section shows increases in institutional utility come
+at a cost in terms of social burden and vice-versa. This still leaves
+open the question: what is the concrete trade-off an institution
+should choose?
+Theorem 3.1 provides a precise characterization of the choices
+available to trade-off between institutional utility and social burden.
+The baseline choice for the institution is to not account for strategic
+behavior and use the non-strategic optimum τ0. Maximizing utility
+without regard to social burden leads the institution to choose
+τ ∗. In general, the interval [τ0,τ
+∗] offers the set of trade-offs the
+institution considers. Choosing τ > τ0 can increase robustness at
+the price of increasing social burden. Thresholds τ > τ ∗ are not
+Pareto-efficient and are not considered.
+Much of the prior work in machine learning has focused exclu-
+sively on solutions corresponding to the thresholds at the extreme:
+τ0 and τ
+∗
+. The threshold τ0 is the solution when strategic behavior
+is not accounted for. The threshold τ ∗ is also known as the Stack-
+elberg equilibrium and is the subject of recent work in strategic
+classification [5, 12, 14]. While using τ ∗ may be warranted in some
+cases, a proper accounting of social burden would lead institutions
+to choose classifiers somewhere between the extremes of τ0 and τ
+∗
+.
+The exact choice of τ ∈ [τ0,τ
+∗] is context-dependent and depends
+on balancing concerns between institutional and broader social
+interest. We now highlight cases where using τ0 or τ
+∗
+may be sub-
+optimal, and using a threshold τ ∈ (τ0,τ
+∗) that balances robustness
+with social burden is preferable.
+Example 3.1 (Expensive features.). If measuring a feature is costly
+for individuals and offers limited gains in predictive accuracy, an
+institution may choose to ignore the feature, even if it means giving
+up accuracy on the margin. In an educational context, a university
+may decide to no longer require applicants to submit standardized
+test scores, which can cost applicants hundreds of dollars, if the
+corresponding improvement in admissions outcomes is very small
+[1].
+Example 3.2 (Reducing social burden under resource constraints.).
+Aid organizations increasingly use machine learning to determine
+where to allocate resources after natural disasters [19]. In these
+cases, positive individuals are precisely those people who are in
+need of aid and may experience very high costs to change their
+features. Using thresholds with high social burden is therefore un-
+desirable. At the same time, aid organizations often face significant
+resource constraints. False positives from individuals gaming the
+classifier ties up resources that could be better used elsewhere. Con-
+sequently, using the non-strategic threshold is also undesirable. The
+aid organization should choose a some threshold τ with τ0 < τ < τ ∗
+that reflects these trade-offs.
+Example 3.3 (Misspecification of agent model.). Strategic classifi-
+cation models typically assume the individual optimally responds
+to the classifier f . In reality, individuals will not have perfect knowl-
+edge of the classifier f when it is first deployed. Instead, they may
+be able to learn about how the classifier works over time, and
+gradually improve their ability to game the classifier. For example,
+self-published romance authors exchanged information in private
+chat groups about how to best game Amazon’s book recommen-
+dation algorithms [20]. For the institution, it is difficult to a priori
+model the dynamics of how information about the classifier propa-
+gates. A preferable solution may be to simply make the assumption
+that the individual can best respond to the classifier, but to only
+gradually increase the threshold from the non-strategic τ0 to the
+Stackelberg optimal τ ∗ over time.
+In fact, misspecification of the agent model (described above), is
+why Brückner et al. [4] suggest the Stackelberg equilibrium is too
+conservative, and instead prefer to use Nash equilibrium strategies.
+Complementary to their observation, we show that there is a more
+general reasonNash equilibriamay be preferable. Namely, that Nash
+equilibria have lower social burden than the Stackelberg solution.
+As the following lemma shows, in our context, the set of Nash
+equilibria form an interval [tN ,τ
+∗] ⊂ I for some tN ≥ t0. The proof
+is deferred to the appendix.
+Lemma 3.2. Suppose the cost over likelihoods cL is continuous and
+ℓ(X) = [0, 1], i.e, all likelihoods have non-zero support. Then, the set
+of Nash equilibrium strategies for the institution is [τN ,τ ∗] for some
+τN ≥ τ0 where τ0 = 0.5 is the non-strategic optimal threshold and τ ∗
+is the Stackelberg equilibrium strategy.
+The Stackelberg equilibrium requires the institution to choose
+τ ∗, whereas Nash equilibria give the institution latitude to trade-off
+between institutional utility and social burden by choosing from
+the interval [tN ,τ
+∗] ⊂ I . This provides an additional argument in
+favor of Nash equilibria– institutions can still reason in terms of
+equilibria and achieve more favorable outcomes in terms of social
+burden.
+4 FAIRNESS TO SUBPOPULATIONS
+Our previous section showed that increased robustness in the face
+of strategic behavior comes at the price of additional social burden.
+In this section, we show this social burden is not fairly distributed:
+when the individuals being classified are from latent subpopulations,
+say of race, gender, or socioeconomic status, the social burden can
+disproportionately fall on disadvantaged subpopulations. Further-
+more, we find that improving the institution’s utility can exacerbate
+the gap between the social burden incurred by an advantaged and
+disadvantaged group.
+Concretely, suppose each individual is from a subpopulation
+д ∈ {a,b}. The social burden a classifier f has on a groupд is the ex-
+pectedminimum cost required for a positive individual from groupд
+to be accepted: B+,д(f ) = E
+[
+minx ′
+:f (x ′)=1 c(x ,x
+′) | Y = 1,G = д
+]
+.
+We can then define the social gap between groups a and b:
+Definition 4.1 (Social gap). The social gap G(f ) induced by a
+classifier f is the difference in the social burden to groupb compared
+to a: G(f ) = B+,b (f ) − B+,a (f ).
+The social gap is a measure of how much more costly it is for a
+positive individual from groupb to be accepted by the classifier than
+a positive individual from group a. For example, there is evidence
+that women need to attain higher educational qualifications than
+their male counterparts to receive the same salary [6].
+A high social gap is alarming for two reasons. First, even when
+two people from group a and group b are equally qualified, the
+individual from group a may choose not to participate at all because
+of the cost she would need to endure to be accepted. Secondly, if she
+does decide to participate, she may continue to be at a disadvantage
+after being accepted because of the additional cost she had to endure,
+e.g., repaying student loans.
+Non-strategic classification can already induce a social gap be-
+tween two groups, and strategic classification can exacerbate this
+gap. We show this under two natural ways group b may be dis-
+advantaged. In the first setting, the feature distributions of group
+a and b are such that a positive individual from group b is less
+likely to be considered positive, compared to group a. In the second
+setting, individuals from group b have a higher cost to adapt their
+features compared to group a. Under both of these conditions, any
+improvement the institution can make to its own strategic utility
+has the side effect of worsening (increasing) the social gap.
+4.1 Different Feature Distributions
+In the first setting we analyze, the way groups a and b differ is
+through their distributions over features. We say that group b is
+disadvantaged if the features distributions are such that positive
+individuals from group b are less likely to be considered positive
+than those from group a. Formally, this can be characterized as the
+following:
+Definition 4.2 (Disadvantaged in features). Let L+,д = ℓ(X ) | Y =
+1,G = д be the outcome likelihood of a positive individual from
+groupд, and let F+,д be the cumulative distribution function of L+,д .
+We say that group b is disadvantaged in features if F+,b (l) > F+,a (l)
+for all l ∈ (0, 1).
+In the economics literature, the relationship between L+,a and
+L+,b is referred to as strict first-order stochastic dominance [22].
+Intuitively, that group b is disadvantaged in features if and only
+if the distribution of L+,a can be transformed to the distribution
+of L+,b by transferring probability mass from higher values to
+lower values. This definition captures the notion that the outcome
+likelihood of positive individuals from group b is skewed lower
+than the outcome likelihood of positive individuals from a.
+In a case study on FICO credit scores in Section 5, we find the
+minority group (blacks) is disadvantaged in features compared to
+the majority group (whites) (see Figure 2). There are many reasons
+that a group could be disadvantaged in features. Below, we go
+through a few potential causes.
+Example 4.1 (Group membership explains away features). Even
+if two groups are equally likely to have positive individuals, i.e.,
+P(Y = 1 | G = a) = P(Y = 1 | G = b), group b can still be
+disadvantaged compared to group a. Consider the graph below.
+Although the label Y is independent of the group G, the label Y is
+not independent of the group G once conditioned on the features
+X because the group G can provide an alternative reason for the
+observed features.
+G Y
+X
+Concretely, let groups a and b be native and non-native speakers of
+english, X be the number of grammatical errors on an individual’s
+job application, and Y be whether the individual is a qualified
+candidate. Negative individuals (Y = 0) are less meticulous when
+filling out their application and more likely to have grammatical
+errors. However, for individuals from group b there is another
+explanation for having grammatical errors – being a non-native
+speaker. Thus, positive individuals from group b end up with lower
+outcome likelihoods than those from a, even though they may be
+equally qualified.
+Example 4.2 (Predicting base rates). Suppose the rate of positives
+in group b is lower than that of group a: P(Y = 1 | G = b) < P(Y =
+1 | G = a). If there is a feature in the dataset that can be used
+as a proxy for predicting the group, such as zip code or name for
+predicting race, then the outcome likelihoods of positive individuals
+from group b can end up lower than those of positive individuals
+from group a because the features are simply predicting the base
+rate of each group.
+Social gap increases. We now state and prove the main result
+showing that the social gap increases as the institution increases its
+threshold for acceptance. Before turning to the result, we introduce
+one technical requirement. The likelihood condition is that
+∂cL (l,τ )
+∂l
+is monotonically non-increasing in τ for l ,τ ∈ [0, 1]. When the
+cost function c is outcome monotonic, the likelihood condition is
+satisfied for a broad class of differentiable likelihood cost functions
+cL , such as the following examples.
+• Differentiable separable cost functions of the form cL(l , l
+′) =
+max(c2(l
+′) − c1(l), 0) for c1, c2 : [0, 1] → R≥0.
+• Differentiable shift-invariant cost functions of the form
+cL(l , l
+′) =
+{
+c0(l
+′ − l) l < l ′
+0 l ≥ l ′
+,
+for convex c0 : [0, 1] → R≥0.
+Notably, any linear cost cL(l , l
+′) = max(α(l ′ − l), 0) where α > 0
+satisfies the likelihood condition.
+Under the likelihood condition, we now show that the social gap
+increases as the institution increases its threshold for acceptance.
+Theorem 4.1. Let τ ∈ (0, 1] be the threshold of the classifier.
+If group b is disadvantaged in features compared to group a, and
+∂cL (l,τ )
+∂l is monotonically non-increasing in τ , then G(τ ) is positive
+and monotonically increasing over τ .
+Proof. By Lemma 2.1, any outcome monotonic cost function
+can be written as a cost over outcome likelihoods. Therefore, the
+social burden can be written as
+B+,д(τ ) = E [cL(ℓ(x),τ ) | Y = 1,G = д]
+=
+∫ τ
+where F+,д denotes the CDF of the group outcome likelihood L+,д .
+Integrating by parts, we obtain a simple expression for B+,д(τ ):
+B+,д(τ ) =
+∫ τ
+= [cL(l ,τ )F+,д(l)]
+τ
+∫ τ
+∂l
+F+,д(l) dl
+= −
+∫ τ
+∂l
+F+,д(l) dl ,
+where the last line follows because cL(τ ,τ ) = 0 and F+,д(0) = 0.
+This expression for B+,д(τ ) allows us to conveniently write the
+social gap as
+G(τ ) = B+,b (τ ) − B+,a (τ ) =
+∫ τ
+∂l
+(F+,a (l) − F+,b (l)) dl .
+We now argue the social gap G(τ ) is positive. By the monotonicity
+assumptions,
+∂cL (l,τ )
+∂l < 0 for l ∈ (0,τ ). Since group b is disadvan-
+taged in features, F+,a (l) − F+,b (l) < 0 for l ∈ (0, 1). Therefore,
+G(τ ) > 0.
+Now, we show G(τ ) is increasing in τ . Let 0 ≤ τ < τ ′ ≤ 1. Then,
+the difference in the social gap is given by
+G(τ ′) − G(τ ) =
+∫ τ
+′) − cL(l ,τ ))
+∂l
+(F+,a (l) − F+,b (l)) dl
++
+∫ τ ′
+τ
+∂cL(l ,τ
+′)
+∂l
+(F+,a (l) − F+,b (l)) dl .
+Since group b is disadvantaged in features, (F+,a (l) − F+,b (l)) < 0
+for all l . By assumption,
+∂cL (l,τ )
+∂l is monotonically non-increasing
+in τ , so the first term is non-negative. Similarly,
+∂cL (l,τ ′)
+∂l < 0 by
+monotonicity, so the second term is positive. Hence, G(τ ′)−G(τ ) >
+0, which establishes G(τ ) is monotonically increasing in τ . □
+As a corollary, if the institution improves its utility beyond the
+non-strategic optimal classifier, then it also causes the social gap to
+increase.
+Corollary 4.1. Suppose group b is disadvantaged in features
+compared to group a, and ∂cL (l,τ )
+∂l is monotonically non-decreasing
+in τ . Let τ ∈ (0, 1] be a threshold and τ0 = 0.5 be the optimal non-
+strategic threshold. If U∆(τ ) > U∆(τ0), then G(τ ) > G(τ0).
+Proof. By Theorem 3.1, if U∆(τ ) > U∆(τ0), then τ > τ0. By
+Theorem 4.1, if τ > τ0, then G(τ ) > G(τ0). □
+4.2 Different Costs
+In Section 4.1, we showed that when two subpopulations have
+different feature distributions, the social burden can disproportion-
+ately fall on one group. In this section, we show that even if the
+feature distributions of the two groups are exactly identical, the
+social burden can still disproportionately impact one group.
+We have thus far assumed the existence of a cost function c that
+is uniform across groups a and b. For a variety of structural reasons,
+it is unlikely this assumption holds in practice. Rather, it is often
+the case that different groups experience different costs for changing
+their features.
+When the cost for group b is systematically higher than the
+cost for group a, we prove group b incurs higher social burden
+than group a. Furthermore, if the institution improves its utility by
+increasing its threshold τ , then as a side effect it also increases the
+social gap between group b and a (Theorem 4.2).
+Much of the prior work on fairness in classification focuses on
+preventing unfairness that can arise when different subpopulations
+have different distributions over features and labels [8, 13, 15]. Our
+result provides a reason to be concerned about the unfair impacts of
+a classifier even when two groups have identical initial distributions.
+Namely, that it can be easier for one group to game the classifier than
+another.
+Formally, we say that group b is disadvantaged in cost compared
+to group a if the following condition holds.
+Definition 4.3 (Disadvantaged in cost). Let cд(x ,x
+′) be the cost
+for an individual from group д to adapt their features from x to
+x ′. Group b is disadvantaged in cost if cb (x ,x
+′) = κca (x ,x
+′) for all
+x ,x ′ ∈ X and some scalar κ > 1.
+Next, we give a variety of example scenarios of when a group
+can be disadvantaged in cost.
+Example 4.3 (Opportunity Costs). Many universities have adopted
+gender-neutral policies that stop the “tenure-clock” for a year for
+family-related reasons, e.g. childbirth. Ostensibly, no research is
+expected while the clock is stopped. However, the adoption of
+gender-neutral clocks actually increased the gap between the per-
+centage of men and women who received tenure [2]. The suggested
+cause is that women still shoulder more of the burden of bearing
+and caring for children, compared to men. Men who stop their
+tenure clock are more productive during the period than women,
+who have a higher opportunity cost to doing research while raising
+a child.
+Example 4.4 (Information Asymmetry). A large portion of high-
+achieving, low-income students do not apply to selective colleges,
+despite the fact that these colleges are typically less expensive for
+them because of the financial aid they would receive [17]. This
+phenomenon seems to be due to low-income students having less
+access to information about college [16]. Since low-income students
+havemore barriers to gaining information about college, it is natural
+to assume that, compared to their wealthier peers, they have a
+higher cost to strategically manipulating their admission features.
+Example 4.5 (Economic Differences). Consider a social media
+company that wishes to classify individuals as “influencers,” either
+to more widely disseminate their content or to identify promising
+accounts for online marketing campaigns. Wealthy individuals can
+purchase followers or likes, whereas other groups have to increase
+these numbers organically [7]. Consequently, the costs to increasing
+one’s popularity metric differs based on access to capital.
+Finally, our main technical result shows that even when the
+distributions of groups a and b are identical, if group b is disadvan-
+taged in cost, then when the institution increases its threshold for
+acceptance, it also increases the social gap between the two groups.
+Theorem 4.2. Suppose positive individuals from groups a and b
+have the same distribution over features, i.e, if Z = (X | Y = 1), then
+Z is independent of the group G. If group b is disadvantaged in cost
+compared to group a, then the social gap G(τ ) is non-negative and
+monotonically non-decreasing in the threshold τ .
+Proof. Since X | Y = 1 is independent of G, the social burden
+to a group д can be written as
+B+,д(τ ) =
+∫
+X
+min
+x ′
+:fτ (x ′)=1
+cд(x ,x
+′)p(X = x | Y = 1) dx
+where fτ is the outcome likelihood classifier with threshold τ . The
+social gap can then be expressed as
+G(τ ) = B+,b (τ ) − B+,a (τ )
+=
+∫
+X
+(κ − 1) min
+x ′
+:fτ (x ′)=1
+ca (x ,x
+′) p(X = x | Y = 1) dx
+= (κ − 1)B+,a (τ ).
+Since the group social burden B+,a (τ ) is non-negative and mono-
+tonically non-decreasing, the social gap G(τ ) is also non-negative
+and monotonically non-decreasing. □
+5 CASE STUDY: FICO CREDIT DATA
+We illustrate the impact of strategic classification on different sub-
+populations in the context of credit scoring and lending. FICO scores
+are widely used in the United States to predict credit worthiness.
+The scores themselves are derived from a proprietary classifier that
+uses features that are susceptible to gaming and strategic manipu-
+lation, for instance the number of open bank accounts.
+We use a sample of 301,536 FICO scores derived from TransUnion
+TransRisk scores [25] and preprocessed by Hardt et al. [15]. The
+scores X are normalized to lie between 0 and 100. An individual’s
+outcome is labeled as a default if she failed to pay a debt for at least
+90 days on at least one account in the ensuing 18-24 month period.
+Default events are labeled with Y = 0, and otherwise repayment
+is denoted with Y = 1. The two subpopulations are given by race:
+a = white and b = black.
+We assume the credit lending institution accepts individuals
+based on a threshold on the FICO score. Using the normalized scale,
+a threshold of τ = 58 is typically used to determine eligibility for
+prime rate loans [15]. Our results thus far have used thresholds on
+the outcome likelihood, rather than a score. However, as shown in
+Figure 3, the outcome likelihood is monotonic in the FICO score.
+Therefore, all our conditions and results can be validated using the
+score instead of the outcome likelihood.
+5.1 Different Feature Distributions
+In Section 4.1, we studied the scenario where the distribution of
+outcome likelihoods ℓ(X ) = P(Y = 1 | X ) differed across subpopu-
+lations. In particular, if the likelihoods of the positive individuals
+in group B tend to be lower than the positive individuals in group
+A, then increasing strategic robustness increases the social gap
+between A and B.
+Interestingly, such a skew in score distributions exists in the FICO
+data. Black borrowers who repay their loans tend to have lower
+FICO scores than white borrowers who repay their loans. In terms
+0 50 100
+FICO Score
+0.0
+0.5
+1.0
+C
+D
+F
+of
+P
+os
+it
+iv
+e
+In
+di
+vi
+du
+al
+s
+Disadvantaged in Features
+White
+Black
+Figure 2: Comparison of the distribution of FICO scores
+among black and white borrowers who repaid their loans.
+Credit-worthy black individuals tend to have lower credit
+scores than credit-worthy white individuals. The compari-
+son of the corresponding CDFs demonstrates our “disadvan-
+taged in features” assumption holds.
+0 50 100
+FICO Score
+0.0
+0.5
+1.0
+R
+ep
+ay
+m
+en
+t
+P
+ro
+ba
+bi
+lit
+y
+Repayment Probability as a Function of Score
+Figure 3: Repayment probability as a function of credit score.
+Crucially, the probability of repayment P(Y = 1 | x) is mono-
+tonically increasing in x .
+of the corresponding score CDFs, for every score x , F+,black(x) ≥
+F+,white(x). Figure 2 demonstrates this observation.
+When the score distribution among positive individuals is skewed,
+Theorem 4.1 guarantees the social gap between groups is increas-
+ing in the threshold under a reasonable cost model. Operationally,
+raising the loan threshold to protect against strategic behavior
+increases the relative burden on the black subgroup. To demon-
+strate this empirically, we use a coarse linear cost model, c(x ,x ′) =
+max(α(x ′ − x), 0) for some α > 0. Here, α corresponds to the cost
+of raising one’s FICO score one point. Since the probability of re-
+payment P(Y = 1 | x) is monotonically increasing in x , the linear
+cost c satisfies the requisite outcome monotonicity conditions.
+In Figure 4, we compute G(τ ) as τ varies from 0 to 100 for a
+range of different value of α . For any α , the social utility gap is
+increasing in τ . Moreover, as α becomes large, the rate of increase
+in the social gap grows large as well.
+0 50 100
+Threshold τ
+oc
+ia
+l
+G
+ap
+G(
+τ
+)
+Social Gap with the Same Cost Per-Group
+α=0.01
+α=0.1
+α=0.2
+α=0.5
+α=1.0
+Figure 4: Impact of increasing the threshold τ on white and
+black credit applicants. When the cost to changing one’s
+score α is small, increases to the threshold have only a small
+effect on the social gap. However, as α becomes large, even
+small increases to the threshold can create large discrepan-
+cies in social burden between the two groups.
+5.2 Different Cost Functions
+In Section 4.2, we demonstrated when two subpopulations are
+identically distributed, but incur different costs for changing their
+features, there is a non-trivial social gap between the two. In the
+context of the FICO scores, it is plausible that blacks are both disad-
+vantaged in features and experience higher costs for changing their
+scores. For instance, outstanding debt is an important component
+of FICO scores. One way to reduce debt is to increase earnings.
+However, a persistent black-white wage gap between the two sub-
+populations suggest increasing earnings is easier for group a than
+group b [11]. This setting is not strictly captured by our existing
+results, and we should expect the effects of both different costs
+functions and different feature distributions to compound and ex-
+acerbate the unfair impacts of strategic classification.
+To illustrate this phenomenon, we again use a coarse linear cost
+model. Suppose group A has cost cA(x ,x
+′) = max{α(x ′ − x), 0} for
+some α > 0, and group B has cost cB (x ,x
+′) = max{β(x ′ − x), 0}
+for some β ≥ α . As in Section 4.2, group B is disadvantaged in cost
+provided the ratio κ = β/α > 1. In Figure 5, we show the social gap
+G(τ ) for various settings of κ. The social gap is always increasing
+as a function of τ , and the rate of increase grows large for even
+moderate values of κ. When κ is large, even small increases in τ can
+disproportionately increase the social burden for the disadvantaged
+subpopulation.
+6 RELATEDWORK
+Strategic Classification. Prior work on strategic classification
+focuses solely on the institution, primarily aiming to create high-
+utility solutions for the institution. Our work, on the other hand,
+studies the tradeoff between the institution’s utility and the burden
+to the individuals being classified.
+Brückner and Scheffer [5], Dong et al. [12], Hardt et al. [14]
+give algorithms to compute the Stackelberg equilibrium, which
+corresponds to the extreme τ ∗ solution in our trade-off curves.
+0 50 100
+Threshold τ
+S
+oc
+ia
+l
+G
+ap
+G(
+τ
+)
+Social Gap with Different Costs Per-Group
+κ=1.0
+κ=2.5
+κ=5.0
+κ=10.0
+κ=20.0
+Figure 5: Impact of increasing the threshold τ on white
+and black credit applicants, under the assumption that both
+groups incur different costs for increasing their credit score.
+As the ratio between the costs κ increases, the social cost gap
+grows rapidly between the two groups.
+Although the Stackelberg equilibrium leads to maximal institutional
+utility, we show that it also causes high social burden. We give
+several examples of when the high social burden induced by the
+Stackelberg equilibrium makes it an undesirable solution for the
+institution.
+Rather than the Stackelberg equilibrium, others have also consid-
+ered finding Nash equilibria of the game [4, 10]. Brückner et al. [4]
+argue that since in practice people cannot optimally respond to the
+classifier, the Stackelberg solution tends to be too conservative, and
+thus a Nash equilibrium strategy is preferable. Our work provides
+a complementary reason to prefer Nash equilibria over the Stackel-
+berg solution. Namely, for a broad class of cost functions, any Nash
+equilibrium that is not equal to the Stackelberg equilibrium places
+lower social burden on individuals.
+Finally, we focus on the setting where individuals are merely
+“gaming” their features, i.e., they do not improve their true label by
+adapting their features. However, if the classifier is able to incen-
+tivize strategic behavior that helps improve negative individuals,
+then the social burden placed on positive individuals may be con-
+sidered acceptable. Kleinberg and Raghavan [21] studies how to
+design classifiers that produce such incentives.
+Fairness. Our work studies how strategic classification results in
+differing impacts to different subpopulations and is complemen-
+tary to the large body of work studying the differing impacts of
+classification [3, 24].
+The prior work on classification is primarily concerned with
+preventing unfairness that can arise due to subpopulations having
+differing distributions over features or labels [8, 13, 15]. We show
+that in the strategic setting, a classifier can have differing impact
+due to the subpopulations having differing distributions or differing
+costs to adapting their features. Therefore, when individuals are
+strategic, our work provides an additional reason to be concerned
+about the fairness of a classifier. In particular, it can be easier for
+one group to game the classifier than another.
+Furthermore, we show that if the institution modifies the clas-
+sifier it uses to be more robust to strategic behavior, then it also
+as a side effect, increases the gap between the cost incurred by a
+disadvantaged subpopulation and an advantaged population. Thus,
+strategic classification can exacerbate unfairness in classification.
+Our work is also complementary to Liu et al. [23], who also
+analyze how the institution’s utility trades-off with the impact to
+individuals. They study the trade-off in the non-strategic setting
+and measure the impact of a classifier using a dynamics model of
+how individuals are affected by the classification they receive. We
+study the tradeoff in the strategic setting and measure the impact
+of a classifier by the cost of the strategic behavior induced by the
+classifier.
+In concurrent work, Hu et al. [18] also study negative externali-
+ties of strategic classification. In their model, they show that the
+Stackelberg equilibrium leads to only false negative errors on a
+disadvantaged population and false positives on the advantaged
+population. Furthermore, they show that providing a cost subsidy
+for disadvantaged individuals can lead to worse outcomes for ev-
+eryone.
+7 DISCUSSION OF SOCIAL BURDEN
+To measure the impact of strategic classification on the individuals
+being classified, we introduced a measure of social burden, defined
+as the expected cost that positive individuals need to incur to be
+classified positively: B+(f ) = E
+[
+minf (x ′)=1 c(x ,x
+′) | y = 1
+]
+. An
+alternative measure one might consider is the expected individual
+utility for the positives: S+(f ) = E [ux (f ,∆(x)) | y = 1], which we
+will denote the social utility.
+We prefer social burden to social utility because it makes fewer
+assumptions about individual behavior. Social utility measures the
+utility of the individual while assuming that they respond optimally
+and needs the assumption to hold to be ameaningful measure. Social
+burden, on the other hand, applies irrespective of the different
+policies individuals may actually act according to. Our analysis
+assumes the institution assumes individuals respond optimally, but
+we ourselves believe this to be a strong assumption to hold in
+practice, and would like our measure of impact on individuals to
+apply regardless.
+Moreover, most of our results are agnostic to the specific choice
+of social cost measure. The results in Section 3 about the tradeoff
+between institutional utility and social burden all still hold. Specifi-
+cally, Theorem 3.1 holds with social utility instead of social burden
+(and monotonically non-increasing instead of monotonically non-
+decreasing since lower utility is worse). For our results in Section 4,
+i.e, Theorems 4.1 and 4.2, there is still always a non-negative social
+gap (now defined as the difference in social utilities between the
+groups), but it is not necessarily true that the social gap increases
+as the institution’s threshold increases.
+While both social burden and social utility apply only to positive
+individuals, one could also use versions that integrate over all indi-
+viduals: B(f ) = E
+[
+minf (x ′)=1 c(x ,x
+′)
+]
+and S(f ) = E [ux (f ,∆(x))].
+Our results forB+(f ) go through forB(f ), and the results forS+(f )
+go through for S(f )1. However, in many cases giving a positive
+Definition 4.2 should be modified to no longer condition on Y = 1.
+classification (e.g. a loan) to a negative individual (someone who
+will default) can result in a long-term negative impact to that in-
+dividual [23]. In general, it is uncertain whether the reducing the
+costs incured by the negative individuals confers positive social
+benefits, and we do not incorporate these costs into our measure.
+Overall, there are many potential measures that are complemen-
+tary to our measure of social burden, but they all provide a similar
+takeaway. Namely, that in the strategic setting, there is a tradeoff
+between institutional accuracy and individual impact that must be
+considered when making choices about strategy-robustness.
+8 ACKNOWLEDGEMENTS
+This material is based upon work supported by the National Science
+Foundation Graduate Research Fellowship Program under Grant
+No. DGE 1752814. Any opinions, findings, and conclusions or rec-
+ommendations expressed in this material are those of the author(s)
+and do not necessarily reflect the views of the National Science
+Foundation.
+REFERENCES
+[1] -. 2018. Princeton and Stanford are latest universities to drop sat/act writing
+test. (Jul 2018). https://www.insidehighered.com/admissions/article/2018/07/09/
+princeton-and-stanford-are-latest-universities-drop-satact-writing
+[2] Heather Antecol, Kelly Bedard, and Jenna Stearns. 0. Equal but
+Inequitable: Who Benefits from Gender-Neutral Tenure Clock Stopping Policies?.
+In American Economic Review.
+[3] Solon Barocas and Andrew D Selbst. 2016. Big Data’s Disparate Impact. California
+Law Review 104, 3 (2016), 671.
+[4] Michael Brückner, Christian Kanzow, and Tobias Scheffer. 2012. Static prediction
+games for adversarial learning problems. Journal of Machine Learning Research
+(2012).
+[5] Michael Brückner and Tobias Scheffer. 2011. Stackelberg Games for Adversarial
+Prediction problems. In International Conference on Knowledge Discovery and
+Data Mining (KDD).
+[6] Anthony P Carnevale, Nicole Smith, and Artem Gulish. 2018. Women Can’t Win:
+Despite Making Educational Gains and Pursuing High-Wage Majors, Women
+Still Earn Less than Men. (2018).
+[7] Max Chafkin. 2016. Confessions of an Instagram Influencer. (Nov
+2016). https://www.bloomberg.com/news/features/2016-11-30/
+confessions-of-an-instagram-influencer
+[8] Alexandra Chouldechova. 2017. Fair prediction with disparate impact: A study
+of bias in recidivism prediction instruments. Big data (2017).
+[9] Danielle Keats Citron and Frank Pasquale. 2014. The Scored Society: Due Process
+for Automated Predictions. Washington Law Review 89, 1 (2014), 1.
+[10] Nilesh Dalvi, Pedro Domingos, Sumit Sanghai, Deepak Verma, et al. 2004. Adver-
+sarial classification. In International Conference on Knowledge Discovery and Data
+Mining (KDD).
+[11] Mary Daly, Bart Hobijn, Joseph H Pedtke, et al. 2017. Disappointing facts about
+the black-white wage gap. FRBSF Economic Letter 2017 (2017), 26.
+[12] Jinshuo Dong, Aaron Roth, Zachary Schutzman, BoWaggoner, and Zhiwei Steven
+Wu. 2018. Strategic Classification from Revealed Preferences. In Conference on
+Economics and Computation (EC).
+[13] Cynthia Dwork, Moritz Hardt, Toniann Pitassi, Omer Reingold, and Richard
+Zemel. 2012. Fairness through awareness. In Innovations in Theoretical Computer
+Science (ITCS).
+[14] Moritz Hardt, Nimrod Megiddo, Christos Papadimitriou, and Mary Wootters.
+2016. Strategic classification. In Conference on Innovations in Theoretical Computer
+Science (ITCS).
+[15] Moritz Hardt, Eric Price, Nati Srebro, et al. 2016. Equality of opportunity in
+supervised learning. In Advances in Neural Information Processing Systems (NIPS).
+[16] Caroline Hoxby, Sarah Turner, et al. 2013. Expanding college opportunities
+for high-achieving, low income students. Stanford Institute for Economic Policy
+Research Discussion Paper (2013).
+[17] Caroline M Hoxby and Christopher Avery. 2012. The missing “one-offs”: The
+hidden supply of high-achieving, low income students. Technical Report. National
+Bureau of Economic Research.
+[18] Lily Hu, Nicole Immorlica, and Jennifer Wortman Vaughan. 2019. The Disparate
+Effects of Strategic Manipulation. In FAT*.
+[19] Muhammad Imran, Carlos Castillo, Ji Lucas, Patrick Meier, and Sarah Vieweg.
+2014. AIDR: Artificial intelligence for disaster response. In International Confer-
+ence on World Wide Web (WWW).
+[20] Sarah Jeong. 2018. Bad Romance. (July
+2018). https://www.theverge.com/2018/7/16/17566276/
+cockygate-amazon-kindle-unlimited-algorithm-self-published-romance-novel-cabal
+[21] Jon Kleinberg and Manish Raghavan. 2018. How Do Classifiers Induce Agents
+To Invest Effort Strategically? arXiv preprint arXiv:1807.05307 (2018).
+[22] Haim Levy. 1992. Stochastic dominance and expected utility: survey and analysis.
+Management science (1992).
+[23] Lydia T Liu, Sarah Dean, Esther Rolf, Max Simchowitz, and Moritz Hardt. 2018.
+Delayed impact of fair machine learning. arXiv preprint arXiv:1803.04383 (2018).
+[24] Executive Office of the President, Cecilia Munoz, Domestic Policy Council Direc-
+tor, Megan (US Chief Technology Officer Smith (Office of Science, Technology
+Policy)), DJ (Deputy Chief Technology Officer for Data Policy, Chief Data Sci-
+entist Patil (Office of Science, and Technology Policy)). 2016. Big data: A report
+on algorithmic systems, opportunity, and civil rights. Executive Office of the
+President.
+[25] US Federal Reserve. 2007. Report to the congress on credit scoring and its effects
+on the availability and affordability of credit.
+[26] Marilyn Strathern. 1997. ‘Improving ratings’: audit in the British University
+system. European review 5, 3 (1997), 305–321.

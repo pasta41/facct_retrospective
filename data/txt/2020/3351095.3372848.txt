@@ -1,0 +1,1338 @@
+Multi-Category Fairness in Sponsored Search Auctions
+Christina Ilvento
+∗
+Harvard University
+Meena Jagadeesan
+∗
+Harvard University
+Shuchi Chawla
+University of Wisconsin-Madison
+ABSTRACT
+Fairness in advertising is a topic of particular concern motivated by
+theoretical and empirical observations in both the computer science
+and economics literature. We examine the problem of fairness in
+advertising for general purpose platforms that service advertisers
+from many different categories. First, we propose inter-category
+and intra-category fairness desiderata that take inspiration from
+individual fairness and envy-freeness. Second, we investigate the
+“platform utility” (a proxy for the quality of allocation) achievable by
+mechanisms satisfying these desiderata. More specifically, we com-
+pare the utility of fair mechanisms against the unfair optimum, and
+show by construction that our fairness desiderata are compatible
+with utility. Our mechanisms also enjoy nice implementation prop-
+erties including metric-obliviousness, which allows the platform to
+produce fair allocations without needing to know the specifics of
+the fairness requirements.
+CCS CONCEPTS
+• Theory of Computation → Algorithmic Mechanism Design.
+KEYWORDS
+algorithmic fairness, advertisement auctions, utility, individual fair-
+ness, envy-freeness
+ACM Reference Format:
+Christina Ilvento, Meena Jagadeesan, and Shuchi Chawla. 2020. Multi-
+Category Fairness in Sponsored Search Auctions. In Proceedings of ACM 
+Conference on Fairness, Accountability, and Transparency (FAT* 2020). ACM, 
+New York, NY, USA, 11 pages. https://doi.org/10.1145/3351095.3372848
+1 INTRODUCTION
+In the ongoing discussion of what it means for automated decision-
+making systems to be fair, the topic of online advertising has mer-
+ited particular interest. In the United States, segregated employment
+ads for men and women proved to be a flashpoint in the 1960s, and
+the introduction of ever-more finely-tuned advertising online has
+renewed concerns about discrimination in ads for critical categories
+such as employment, housing and credit. Although individual ad-
+vertisers certainly have opportunities to use fine-grained targeting
+(in some cases targeting individual users) to implement biased ad-
+vertising strategies, there is both empirical evidence and theoretical
+∗
+Alphabetical order.
+Permission to make digital or hard copies of all or part of this work for personal or 
+classroom use is granted without fee provided that copies are not made or distributed 
+for profit or commercial advantage and that copies bear this notice and the full citation 
+on the first page. Copyrights for components of this work owned by others than ACM 
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish, 
+to post on servers or to redistribute to lists, requires prior specific permission and/or a 
+fee. Request permissions from permissions@acm.org.
+FAT* '20, January 27–30, 2020, Barcelona, Spain
+© 2020 Copyright is held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 978-1-4503-6936-7/20/02…$15.00
+https://doi.org/10.1145/3351095.3372848
+support for the idea that skewed advertisement between different
+demographic groups is not solely due to biased advertiser behavior.
+Indeed, recent work has shown that evenwhen the advertisers
+all act fairly in isolation, revenue-optimized platformmech-
+anisms can result in unfairness. In particular, even when each
+advertiser intends to be fair in its delivery, competition between
+advertisers in first-price auctions, particularly across categories,
+can introduce a significant skew in the types of ads people see
+(e.g., [18]). For example, two software engineers, who are targeted
+equally by software engineering companies, may see wildly dif-
+ferent numbers of employment ads depending on competition for
+their attention from other categories. Competition from lucrative
+categories like children’s products can be difficult for an individual
+advertiser to correct for, particularly in categories like employment
+where parental status is considered very sensitive.
+While the idea of parents being excluded from employment ads
+due to competition is troubling, blunt policies like equalizing the
+number of ads across users within each category can also result in
+poor outcomes for individuals. For example, suppose Bob is highly
+qualified for a new credit card, and he is also searching for daycare
+options in his area. Alice is equally qualified for the credit card,
+but she is not interested in daycare. Bob would not want to see
+fewer ads for daycare services to ensure that he sees as many ads
+for credit as Alice, and likewise Alice would not want good credit
+offers suppressed in order to ensure that she doesn’t see more credit
+ads than Bob who doesn’t care as much about credit cards anyway!
+Competition between ads within a single category can also result
+in undesirable skew. Even if two equally qualified individuals see
+the same number of ads in a category, these ads may not be equally
+relevant or valuable to them. For example, these individuals could
+see the same total number of job ads, but with one receiving ads
+for jobs with significantly higher salaries than the other.
+they compatible with consumer, platform, and advertiser utility?
+Our Contributions
+Model and Definitions. In this work, we examine the problem of
+fairness in advertising across multiple categories from a theoretical
+perspective. We propose a stylized model and fairness require-
+ments that match the intuitive fairness desiderata of inter- and
+intra-category guarantees.
+incorporate the qualifications of users as well as their preferences
+across different ad categories. Our definitions are inspired by and
+combine the complementary notions of envy-freeness and indi-
+vidual fairness. Envy-freeness [8] requires that every user should
+prefer their own allocation to that of everyone else; it ignores users’
+may also significantly influence the usefulness of the ads to each user.
+tain notions of fairness interact with platform utility as well as our intuition about what
+is fair rather than to propose a specific notion of fairness for practical implementation.
+qualifications and considers preferences as paramount. Individual
+or metric fairness [12], on the other hand, ignores preferences and
+essentially requires that similar users should be treated similarly.
+Its extension to multi-dimensional allocations as introduced in [13],
+multiple task fairness, requires that individual fairness is satis-
+fied separately and simultaneously for all categories.
+For inter-category competition, we note that multiple task fair-
+ness is at odds with consumer and platform utility. Consider the
+example of Alice and Bob discussed above. Taking this example to
+the extreme suppose that a user, whomwe will call Jack, is a “jack of
+all trades,” i.e., qualified or interested in many categories. Per multi-
+ple task fairness, another user who is as qualified as Jack in a single
+category but unqualified in all other categories, would have their
+allocation within the single category of interest limited to match
+Jack’s allocation within that category. Multiple task fairness would
+then either (1) enforce a minimum amount of exposure for Jack
+to ads they may not care about or (2) dictate a maximum amount
+of exposure to relevant ads for other users who are qualified for
+a smaller number of categories. In effect, by ignoring users’ own
+preferences, this stringent notion of fairness helps no one. We thus
+introduce inter-category envy-freeness, which allows users to
+specify a set of categories that they “care” about, and guarantees
+that they see at least as many ads that they care about as any other
+individual.
+ness can be too weak to avoid discriminatory allocations and is
+therefore vulnerable to certain subversion attacks. For example, if
+Alice sees every high-paying job ad slightly less often than Bob and
+every low-paying job ad slightly more often than Bob, then for any
+single ad the two users obtain similar allocations, but across the set
+of all high-paying jobs, Alice may receive a far smaller share than
+Bob. We thus introduce total variation fairness, which offers pro-
+tection against these subversion attacks and captures fairness over
+all possible sets of substitutes.
+both across categories and within categories. More specifically, we
+demonstrate how to combine inter-category envy-freeness and
+total-variation fairness into a hybrid fairness notion that we call
+compositional fairness. For example, suppose two individuals,
+Alice and Bob, are equally qualified and interested in a particular
+type of job. Alice is also interested in the latest movie releases, while
+Bob is interested in buying a new car. We provide the guarantee that
+Alice and Bob see the same mix of ads for jobs, but are permitted
+to see job ads overall with different probabilities, so long as each
+sees their preferred categories in total at least as often as the other.
+Mechanism design with fairness constraints. In practice, fairness is
+obviously not the only consideration in mechanism design. Plat-
+forms typically aim to optimize for (1) short-term revenue, i.e. the
+sum of payments made by advertisers for displaying their ads, or
+(2) allocative efficiency a.k.a. social welfare, i.e. the sum of the per-
+ceived values of the user-ad matches, or a combination of these
+user-preferences and individual fairness.
+ment setting, there are many subtle properties which may be harder to articulate, e.g.,
+“commute time.” By protecting all sets of substitutes, we obviate the need to enumerate
+all possible attributes.
+objectives. As a proxy for these complex objectives, we use the sum
+of the bids of the ads displayed as a measure of the quality of an
+allocation. We call this objective platform utility. High platform
+utility correlates both with advertiser happiness (ads get matched
+with targeted “high bid” users) as well as with platform revenue
+(advertisers often pay their bid or an increasing function of their
+bid). While our goal is to design fair mechanisms that achieve high
+platform utility, we compare the performance of our mechanisms
+to the unfair optimum, following the intuition that platforms and
+advertisers are unlikely to adopt mechanisms which deviate wildly
+in utility from the status quo. In this respect, we show that our
+fairness desiderata are compatible with high platform utility.
+Apart from these fairness and utility objectives, from a mech-
+anism design perspective, it is desirable for our mechanisms to
+satisfy certain implementation properties. The first question that
+needs to be addressed is how to distribute the responsibility for
+ensuring fairness among the advertisers and the platform. In this
+work, we give a clear separation of responsibilities: the advertisers
+are required to bid “fairly”, and the platform is required to fairly
+allocate advertisements assuming the bids are fair.
+any perceived unfairness can be clearly tracked to the responsi-
+ble party. Moreover, we propose that the determination of what
+constitutes fairness in each category and auditing of advertiser
+bids be outsourced to a neutral third-party or governing body, so
+that the platform can be oblivious to the particulars of fairness re-
+quirements.
+encoded into the bids when the advertisers are required to satisfy
+fair bidding constraints.
+Allocation algorithms achieving high utility. In this work, we take a
+first step towards designing fair auction mechanisms for ad plat-
+forms. We focus on constructing fair allocation algorithms, where
+the allocation is fair so long as the bids are fair and that achieve a
+high platform utility. In particular, we do not consider incentives.
+Nonetheless, our allocation algorithms already achieve some of
+the nice properties that are needed for incentive compatibility, like
+monotonicity and individual rationality, though a full consideration
+of incentives would require considering how advertisers behave
+when their true values are not fair.
+Our main result is a family of allocation algorithms that achieve
+compositional fairness and utility close to optimalwithin the class of
+fair algorithms, while also being oblivious to fairness requirements.
+The nature of the fairness definitions enables us to compose an
+algorithm satisfying total-variation fairness within each category
+with an algorithm satisfying inter-category envy-freeness across
+categories to obtain a algorithm satisfying compositional fairness.
+Thus, we can separately design inter- and intra-category algorithms.
+platform to achieve fairness, potentially by changing advertiser bids. However, this
+would make it impossible for the platform to be oblivious to fairness requirements, and
+could also cause transparency issues in the bidding process. Moreover, the advertiser is
+generally in a better position than the platform to understand the nuances of fairness
+in their particular category. For example, a car insurance advertiser is more likely
+to be aware of the problems associated with using zip code to determine insurance
+rates than the advertising platform, which may have advertisers from thousands of
+different categories. For this reason, we argue for a separation where the advertisers
+are required to bid “fairly” and the platform is allowed to assume bids are fair.
+(or sensitive information may be leaked by the determination procedure), it may be
+desirable to avoid sharing this information with the platform.
+The inter-category algorithms that we propose are always envy-free
+regardless of the bids, and the intra-category algorithms that we
+propose are oblivious to fairness requirements: our intra-category
+algorithm implicitly uses fairness of advertiser bids to infer and
+provide the necessary fairness requirements. Unsurprisingly, if
+advertisers are allowed to bid very differently on similar individuals,
+it is impossible to simultaneously achieve fairness and high platform
+utility. As part of our study, we also explore upper and lower bounds
+on the strength of a bid fairness condition needed to achieve a high
+platform utility.
+Outline for the rest of the paper
+The remainder of this work is organized as follows: related work
+is discussed in Section 2; definitions and our formal model are in-
+troduced in Section 3; algorithms achieving intra-category fairness
+are discussed in Section 4, and algorithms achieving inter-category
+envy-freeness are discussed in Section 5; composing these algo-
+rithms is addressed in Section 6; finally future work is discussed in
+Section 7. We defer proofs and some discussion to the full version
+of the paper [11].
+2 RELATEDWORK
+Fairness in advertising is a topic of particular interest in the popular
+press, as well as the empirical and theoretical computer science
+and economics literature. There are number of compelling empir-
+ical studies and popular press articles demonstrating “skew” in
+advertisement delivery between groups, either due to advertiser
+targeting choices, platform delivery issues, or competition between
+advertisers [2–4, 7, 18].
+In the theoretical computer science literature, Dwork et al. [12]
+proposed the notion of individual fairness as a fairness concept
+for settings including advertising. Dwork and Ilvento [13] consider
+individual fairness (and group fairness) in advertising as a composi-
+tion problem, and pose a limited set of fair compositionmechanisms.
+Similar to this work, Kim et al. [17] propose “Preference Informed
+Individual Fairness” (PIIF) to capture the idea that deviation from
+individual fairness is acceptable as long as it is based on individuals’
+preferences. However, while PIIF is intended to expand the defi-
+nition of fairness within the context of task-specific metrics, our
+preferences-based envy-freeness concept applies across multiple
+categories independent of the metric for each category. Further-
+more, whereas Kim et al. focus primarily on optimizing user utility
+via offline optimization across all fair outcomes, we study online
+allocation algorithms and measure utility relative to the unfair
+optimum. We view our work as complementary to [17], and we an-
+ticipate that combining the insights from their perspective and ours
+will be useful for proposing alternative mechanisms and fairness
+relaxations.
+Other works on fair advertising and related problems employ
+different notions of fairness. With respect to group or statistical
+notions of fairness, Celis et al. [9] propose a mechanism for ad
+delivery while maintaining certain group level statistics. A variety
+of fairness notions have also been considered in related problems
+such as ranking [10, 14], recommendation systems [5], and news
+search engines [16].
+Finally, mostly disjoint from the work referenced above, there
+is an extensive literature in fair division concerning other notions
+of fairness [8]. The goal of one such notion, called “envy-freeness”,
+is to partition a limited shared resource among multiple agents
+with heterogenous preferences. A major difference between this
+literature and the fairness literature referenced above is that envy-
+freeness is defined exclusively based on agents’ preferences and
+not on their traits or qualifications. Two recent works, Balcan et al.
+[6] and Zafar et al. [20] seek to combine notions of envy-freeness
+with parity-based fairness in machine learning in the context of
+classification.
+3 ADVERTISING AND FAIRNESS MODELS
+We model the online advertising problem as follows. A universe U
+of users arrive in an online fashion. There are k advertisers indexed
+by i ∈ [k]. When a user u arrives, each advertiser i places a bid
+biu ≥ 0 on the user. The allocation algorithm then assigns allocation
+probabilities piu ∈ [0, 1] to the advertisers with
+∑k
+i=1 p
+i
+u ≤ 1. The
+allocation algorithm is an online algorithm, i.e. it assigns allocation
+probabilities without observing bids on users that arrive in the
+future or the ordering of future user arrivals. Moreover, we assume
+for simplicity that each user arrives at most once. We use p to
+denote the allocation rule output by the allocation algorithm.
+The goal of the allocation algorithm is to maximize the sum of
+the bids of the ads displayed. Formally, this is given by:
+Utility(p) =
+∑
+u ∈U
+∑
+i ∈[k ]
+piub
+i
+u .
+Wemeasure the utility of our algorithms against the best achievable
+in the absence of any fairness constraints. The utility is easy to
+maximize in the absence of any constraints on how allocations vary
+across users: the algorithm can simply assign a probability mass of
+1 to the highest bidder for every user.
+utility the unfair optimum:
+Unfair-OPT =
+∑
+u ∈U
+max
+i ∈[k ]
+biu .
+The Fair Value of an allocation algorithm is the ratio of its utility
+to the Unfair-OPT. Note that this ratio is always less than 1; the
+larger the fair value the better the utility of the allocation is.
+Why compare with the unfair optimal utility instead of the fair
+optimal (as do other related works [9, 17])? First, the utility of the
+fair optimal algorithm can be difficult to analyze due to the fairness
+requirements being revealed in an online fashion. Second, if there
+is a large gap between the utility of the algorithms we propose
+and the utility of the unfair-optimal algorithm, the platform and
+advertisers may be unwilling to adopt the algorithm, so it is critical
+that we compare with the platform’s status quo.
+3.1 Fairness of allocation
+Our fairness guarantees are based on the concept of individual
+fairness defined by [12] and the well-studied concept of envy-
+freeness [8]. At a high level, individual fairness guarantees that
+similar individuals are treated similarly. Similarity between individ-
+uals is captured through a fairness metric d overU and similarity
+between outcomes is captured by defining a metric D over distribu-
+tions over outcomes.
+Definition 3.1 (Individual Fairness [12]). A function f : U →
+∆(O) assigning users to distributions over outcomes is said to be
+individually fair with respect to distance metrics d overU and D
+over ∆(O), if for all u,v ∈ U we have D(f (u), f (v)) ≤ d(u,v).
+Dwork and Ilvento [13] proposed extending the notion of indi-
+vidual fairness to settings involving multi-dimensional allocations
+by ensuring fairness separately within each dimension or “task”.
+This gives rise to the notion of multiple-task fairness, which we
+now define in the context of online advertising. Let {C1, . . . ,Cc }
+denote a partition of the set [k] of advertisers into c categories. For
+1 ≤ j ≤ c , let dj denote a pseudometric over the users relevant to
+all advertisers in category j; dj : U × U → [0, 1]. In our setting,
+the outcome assigned to each user u corresponds to the advertiser
+who is assigned to the slot for user u. Our algorithm maps users
+to distributions over outcomes, i.e. to the allocation probabilities{
+piu
+}
+1≤i≤k . We use the absolute difference between these proba-
+bilities to capture the similarity of allocations, and multiple-task
+fairness becomes the following condition:
+tion p satisfies multiple-task fairness with respect to distance
+metrics {dj }j ∈[c] if for all u,v ∈ U , j ∈ [c], and i ∈ Cj , we have
+|piu − piv | ≤ dj (u,v).
+We will demonstrate that multiple-task fairness is too weak for
+fairness within a single category, and it results in suboptimal al-
+locations across categories from the perspective of envy-freeness.
+We propose two new multi-dimensional fairness notions, one ap-
+plying across different categories and the other to multiple adver-
+tisers within the same category, and combine these into the notion
+of compositional fairness that overcomes the shortcomings of
+multiple-task fairness.
+Intra-category fairness. First, we consider a setting in which all
+of the advertisers belong to a single category (i.e. c = 1) with a
+single metric that we denote by d (e.g., a tech job-search website
+containing advertisements only from tech employers). We observe
+that multiple-task fairness is insufficient to protect against two
+broad classes of problems.
+(1) Intentional unfairness: It is vulnerable to subversion by ma-
+licious advertisers. In particular, consider an advertiser that
+submits multiple different ads (pretending to be distinct adver-
+tisers) for the same job and bids separately on each user for
+each of those ads. The advertiser effectively poses as multiple
+sub-advertisers; let S denote the set of these sub-advertisers.
+In this case, the multiple-task fairness constraint only ensures
+|piu−p
+i
+v | ≤ d(u,v) for each i , and so it is possible that |
+∑
+i ∈S p
+i
+u−∑
+i ∈S p
+i
+v | = |S |d(u,v). As a result, the advertisers may be able
+to amplify the difference in probabilities of allocation between
+two users to an arbitrarily large extent.
+(2) Unintentional unfairness: Multiple-task fairness can also
+interact in undesirable ways with well-intentioned advertisers.
+{
+piu
+}
+1≤i≤k as a fractional allocation. In this case, the
+distance corresponds to the difference in the portion of allocation for each advertiser.
+Suppose that the set S consists of all high-paying job ads.
+on user v , and the algorithm sets |piu − piv | = d(u,v) for all
+i ∈ S (to maximize utility). Then, it would again be the case
+that |
+∑
+i ∈S p
+i
+u −
+∑
+i ∈S p
+i
+v | = |S |d(u,v), so the total allocation on
+high-paying job ads (i.e. advertisers in S) can be vastly different
+for u and v .
+To rectify these issues, we propose total variation fairness
+which requires that the allocation vectors pu and pv are not only
+close component-wise, but are also close in terms of ℓ1 distance or
+total variation distance.
+Definition 3.3 (Total Variation Fairness). An allocation function p
+satisfies total variation fairness with respect to a metric d if for
+allu,v ∈ U and all S ⊆ [k], we have |
+∑
+i ∈S p
+i
+u −
+∑
+i ∈S p
+i
+v | ≤ d(u,v).
+Equivalently, for all u,v ∈ U , ∥pu − pv ∥1 ≤ d(u,v).
+This stronger definition, which provides guarantees on all subsets of
+advertisers S , effectively mitigates the issues outlined above. First,
+it prevents the multiple bid attack by ensuring that |
+∑
+i ∈S p
+i
+u −∑
+i ∈S p
+i
+v | ≤ d(u,v). Second, it provides nice guarantees over substi-
+tutes in the following sense. Consider a user u who regards some
+arbitrary subset S of advertisers to be substitutes. In that case, the
+probability that the user observes an ad from this subset is
+∑
+i ∈S p
+i
+u
+and total variation fairness ensures that this sum is close to the
+corresponding sum for similar users.
+tiser belongs to a different category, i.e. where c = k . As the “jack
+of all trades” example in the introduction (formalized in Section 5)
+shows, multiple-task fairness can lead to outcomes that, although
+technically fair, are undesirable from every stakeholder’s perspec-
+tive – (1) users get low allocations in their desired categories, (2)
+advertisers reach far fewer qualified users and (3) the platform gets
+low utility owing to the poor quality of the matching produced. In
+this example, allocations available to the jack of all trades are con-
+strained by the limited attention of this single user (a single ad slot
+in our model). Multiple-task fairness combined with this constraint
+limits the allocations of all of the other users, thereby hurting their
+utility, without in turn providing any benefit to the jack of all trades.
+Within this context, we view the multiple task fairness objective to
+be unduly skewed in favor of a single individual over the collective
+good.
+Is it possible to achieve a better balance? It is if we slightly shift
+our viewpoint. Consider a platform where each user is allowed to
+select the category they are most interested in with the guarantee
+that they see at least as many ads in this category as any other user.
+In effect, no user is envious of other users given their own choice
+of preferred category.
+From a practical perspective, the platform generally has a good
+deal of information about their users based on their previous web
+browsing behavior and may also have existing interfaces to allow
+users to view and modify these imputed preferences.
+tice, we anticipate platforms would include a fixed set of sensitive
+fairness definitions put forth in [13]. The definition essentially provides OR-fairness
+over all possible subsets of advertisers.
+categories (e.g., housing, credit, employment) in every user’s pref-
+erences by default and augment this list with additional interests or
+preferences learned implicitly (or explicitly specified by the user)
+over time. This approach accounts for the importance of ensuring
+inter-category fairness for certain sensitive categories, either due
+to legal constraints or other ethical concerns, and allowing a more
+flexible approach for less critical categories.
+Now, we discuss the fairness implications of this definition. First,
+in the special case where every category has a single advertiser,
+user is much stronger than that guaranteed by individual fairness
+– the user does not just obtain an allocation close to that of other
+similar users, but rather obtains one that is as good or better than
+that of everyone else.
+fairness guarantee on non-chosen categories. However, note that
+from the user’s perspective those other categories are anyway not
+important. To take an example, suppose that Alice and Bob are
+identical in terms of their credit-worthiness as well as job qualifica-
+tions. Suppose Alice is looking for a job and Bob for a credit card.
+Then a platform that shows a job ad to Alice and a credit card ad to
+Bob makes both users happy and envy-free. In contrast, a platform
+that shows each user one of the two ads uniformly at random is
+multiple-task fair but makes both users worse off. Third, while our
+definitions focus on a single arrival of each user, one may envision
+a system where a user interacting with the platform multiple times
+can change their preferred category at each interaction and thereby
+obtain a fair allocation within the chosen category at each individ-
+ual interaction. Finally, observe that the envy-freeness guarantee
+is directional and entirely independent of distance metrics.
+More generally, we allow users to select multiple preferred cat-
+egories and provide an envy-freeness guarantee with respect to
+the total probability of seeing an ad within their set of preferred
+categories. Formally, each user u picks a preferred set Su ⊆ [c] of
+categories.
+∑
+i ∈Su p
+i
+u is at least as large as
+the corresponding sum for any other user v .
+Definition 3.4 (Inter-Category Envy-Freeness). An allocation func-
+tion p satisfies inter-category envy-freeness with respect to
+preferred sets {Su }u ∈U if for all u,v ∈ U , we have
+∑
+i ∈Su p
+i
+v ≤∑
+i ∈Su p
+i
+u .
+Compositional fairness. Now we consider the general setting where
+there can be multiple categories and multiple advertisers in each
+category. We discuss how to combine the two definitions above to
+provide hybrid fairness guarantees. We have two goals: (1) each
+user should be envy-free with respect to the categories of ads they
+see and (2) within each category, the mix of ads presented to each
+user should satisfy our strengthened notion of individual fairness.
+For example, suppose that two similarly qualified users Alice and
+Bob both select jobs as their preferred ad category. Not only should
+those advertisers in the subsection on compositional fairness.
+could obtain a large allocation at the expense of advertisers that don’t want to target
+such a user. Note that advertisers can bid 0 on users that are not targeted and thereby
+pay nothing for those users. Furthermore, it is rare for a user to be wholly unqualified
+for a category from the perspective of advertising. For example, an individual who is
+unqualified for a job is likely a good candidate for a job training ad.
+categories on a user profile.
+the two users then see job ads with the same total likelihood, but
+they should also see a similar mix of high-paying and low-paying
+job ads.
+This composition of definitions becomes subtle when users se-
+lect multiple preferred categories. Suppose that Alice continues to
+choose jobs as her preferred category, but Bob chooses both jobs
+and household product ads. Suppose, further, that Alice is allocated
+a job ad with probability 1 and Bob sees an ad in each of the two
+categories with probability 1/2 each. This allocation satisfies inter-
+category envy-freeness. However, within the job ads category there
+is no way to assign probabilities that satisfy unconditional total
+variation fairness simply because of the fact that we have different
+total probabilities to distribute. Intuitively, we want Bob to be able
+to see the same mix of ads as Alice even though Alice may see job
+ads more frequently overall. Accordingly, we enforce total variation
+fairness on the conditional distribution of allocation within each
+category.
+Formally, we define compositional fairness as follows. We use
+dj to denote the metric specific to category Cj and q
+j
+u =
+∑
+i ∈Cj p
+i
+u
+to denote the total allocation within category Cj for user u.
+Definition 3.5 (Compositional Fairness). An allocation function p
+satisfies compositional fairness with respect to distance metrics
+{dj }j ∈[c] if the assignments
+{
+q
+j
+u
+}
+u ∈U , j ∈[c]
+satisfy inter-category
+envy-freeness, and for each j ∈ [c] such that q
+j
+u > 0, the conditional
+probabilities
+{
+piu
+q ju
+}
+i ∈Cj
+satisfy total variation fairness with respect
+to dj .
+Multiplicative Relaxations. We can further refine each of the above
+notions by defining multiplicative relaxations parameterized by
+β ∈ [1,∞):
+• β total variation fairness: for allu,v ∈ U wehave ∥pu − pv ∥1 ≤
+βd(u,v).
+• β inter-category envy-freeness: for all u,v ∈ U we have∑
+i ∈Su p
+i
+v ≤ β
+∑
+i ∈Su p
+i
+u .
+• β compositional fairness:
+{
+q
+j
+u
+}
+u ∈U , j ∈[c]
+satisfies β inter-category
+envy-freeness, and for each j ∈ [c] such that q
+j
+u > 0,
+{
+piu
+q ju
+}
+i ∈Cj
+satisfies β total variation fairness.
+4 INTRA-CATEGORY FAIRNESS
+In this section, we focus on the case where advertisers are in a single
+category (c = 1), i.e. where advertisers face the same metric over
+users, in particular, d = d1 = d2 = . . . = dk . Our main result in this
+section is an allocation algorithm that is fair when advertiser bids
+are “fair” and achieves a high fair value. Our allocation algorithm
+also enjoys the property of metric-obliviousness. That is, the
+platform does not require knowledge of the fairness metric d.
+In Section 4.1, we describe the need for a fairness condition on
+advertiser bids, that we call a bid ratio condition. In Section 4.2,
+we investigate the special case of uniform metrics and establish
+impossibility results, i.e. upper bounds on the fair value of any allo-
+cation algorithm that satisfies multiple-task fairness as a function
+of the bid ratio condition. In Section 4.3, we consider settings with
+arbitrary distance metrics and exhibit an allocation algorithm that
+is metric-oblivious, history-oblivious, and achieves total variation
+fairness with respect to the given metric with an appropriate bid
+ratio condition. We then bound the fair value achieved by this algo-
+rithm as a function of k (the number of advertisers) and a parameter
+defining the bid ratio constraint. Moreover, we show that this algo-
+rithm achieves a near-optimal tradeoff between bid ratio condition
+and fair value within a restricted class of algorithms. In Section 4.4,
+we show that the fair value achieved by this algorithm is close to
+the upper bound established in Section 4.2 for allocation algorithms
+with a uniform metric. We emphasize that while our negative result
+in Section 4.2 applies to general online algorithms which satisfy
+multiple-task fairness with access to the underlying metric, our
+positive result applies to a algorithm that is metric-oblivious and
+satisfies the stronger notion of total variation fairness. All of the
+proofs can be found in the full version of the paper [11].
+4.1 Fairness in bids
+Our goal is to develop an allocation algorithm that simultaneously
+satisfies total variation fairness and achieves large fair value with
+respect to the Unfair-OPT. As one might expect, it is impossible
+to achieve this if advertisers are allowed to place arbitrary bids on
+users without regard to the relevant similarity metric over users.The
+question thus becomes: what kind of fairness constraint on bids
+enables a reasonable fair value? The following example illustrates
+the need for a fairness constraint that requires an advertiser’s bids
+on pairs of similar users to be close in ratio, even when allocations
+are merely required to satisfy the weaker condition of multiple-
+task fairness. In particular, being close in terms of their absolute
+difference is not sufficient to achieve a good fair value.
+Example 4.1. Suppose that there are k advertisers and exactly
+k users. Suppose that the metric is uniform: for some parameter
+d ∈ [0, 1], every pair of users is a distance of d apart. For each
+i ∈ [k], advertiser i bids bhigh on user i and blow(< bhigh) on all
+other users j , i . Observe that Unfair-OPT = kbhigh. On the other
+hand, due the symmetry of this instance and the fact that a fair
+allocation requires that |pii − p
+j
+i | ≤ d , for each user, it turns out the
+optimal fair allocation assigns an allocation probability of (1−d)/k
+to all advertisers with the low bid and a probability of (1−d)/k +d
+to the advertiser with the high bid. The fair value of this allocation
+turns out to be d + 1−d
+k + (1−d)
+(k−1)
+k
+b low
+bhigh
+. Observe that a fair value
+of d + (1 − d)/k is trivial to achieve via a fair allocation.
+d is very small, this trivial bound is tiny. If bhigh ≫ blow, then, in
+this example, no fair allocation can perform much better than the
+trivial algorithm. In order to be able to do better, bhigh/blow must
+be bounded.
+Motivated by the example above, we require that for every ad-
+vertiser and every pair of users, the ratio of the bids the advertiser
+places on the users is bounded by a function of the distance be-
+tween the users according to d. The closer the two users, the closer
+this ratio bound should be to 1; on the other hand, the ratio bound
+should be large between far apart users. We formally define this
+constraint as follows.
+the highest bidder and (1 − d )/k to all other advertisers achieves this bound.
+Figure 1: Bid ratio condition fl (d) =
+(
+1+d
+1−d
+)
+1/l
+Definition 4.2. A bid ratio constraint is a function f : [0, 1] →
+[1,∞]. We say that the bid function bi of advertiser i satisfies the
+bid ratio constraint f with respect to metric d if we have for all
+u,v ∈ U :
+b iu
+b iv
+≤ f (d(u,v)).
+How should we choose f ? On the one hand, the bid ratio con-
+straint needs to be sufficiently strict to provide meaningful fairness
+and utility guarantees and on the other hand it cannot be so overly
+restrictive as to prohibit reasonably expressive bidding strategies.
+We characterize f by boundary conditions for identical users and
+maximally distant users with the requirement that f is weakly in-
+creasing and f > 1 in the intermediate range. In the case of identical
+users, i.e. d(u,v) = 0, the advertiser is required to place identical
+bids, i.e., f (0) = 1. For maximally distant users, i.e. d(u,v) = 1, we
+choose f (1) = ∞, allowing advertisers to bid arbitrarily differently
+on this pair. For ease of analysis, we also make f continuous.
+In this work, we show that a specific parameterized class of bid
+ratio constraints that satisfy the above properties performs well
+in terms of fair value. The family is parameterized by l ≥ 1, and
+is defined as: fl (d) =
+(
+1+d
+1−d
+)l
+. Figure 1 displays some functions in
+this family. Note that as the parameter l increases, the bid ratio
+condition becomes more and more strict. A further discussion of
+the structural properties of fl (d) can be found in the full version
+[11].
+We emphasize that bid ratios are not required to satisfy the
+constraint exactly, but rather should lie at or below the imposed
+curve. From an algorithmic viewpoint, this means that if we design
+an algorithm based on the polynomial family described above but
+the actual bid ratio constraint imposed on bids, say д, does not
+belong to this family, it nevertheless suffices for the algorithm
+to find a value of the parameter l for which fl (d) ≥ д(d) for all
+d ∈ [0, 1] and use the function fl in making allocations.
+4.2 Upper bounds on fair value with uniform
+metrics
+We prove upper bounds on the fair value of any allocation al-
+gorithm that satisfies multiple-task fairness. Observe that these
+upper bounds apply also to total variation fairness, which is a
+stronger requirement. We use uniform metrics, i.e. metrics of the
+form d(u,v) = d for allu , v . We use Example 4.1 to show an upper
+bound on the fair value as a function of the bid ratio constraint.
+Lemma 4.3. Given d ∈ [0, 1] and α = f (d), there exists an in-
+stance of the online advertising problem for which the fair value of
+every offline allocation algorithm satisfying multiple-task fairness
+with respect to the uniform metric d(u,v) = d is at most d + 1−d
+k +
+(1−d )(k−1)
+kα ≤ 1
+k +
+Observe that as d increases, the upper bound on the fair value in-
+creases, due to a weaker fairness constraint on setting allocation
+probabilities. On the other hand, for any fixed d and k , as α in-
+creases, weakening the fairness constraint on bids, the algorithm’s
+performance becomes worse.
+In the online setting it is possible to prove even stronger bounds
+on the fair value.
+in the fair value to 1/α2. In the full version of the paper, we develop
+online allocation algorithms that are tailored to uniform metrics
+and achieve a fair value that nearly matches these lower bounds,
+demonstrating that stronger lower bounds for general online algo-
+rithms cannot be obtained through uniform metrics.
+Lemma 4.4. Given d ∈ [0, 1 − 1/k] and α = f (d), there exists
+an instance of the online advertising problem for which no online
+allocation algorithm satisfying multiple-task fairness with respect
+to the uniform metric d(u,v) = d can obtain fair value better than
+α−2
+(
+1 − 1
+k − d
+)
++ 1
+k + d ≤ 1
+k +
++ d .
+4.3 Algorithms for the general metric case
+We construct an allocation algorithm for a general fairness metric d
+that achieves total variation fairness and a large fair value. From a
+algorithm design standpoint, it is desirable for our algorithm to sat-
+isfy certain other properties. Most important ismetric-obliviousness,
+i.e. where the algorithm doesn’t require direct knowledge of d. In
+addition, the following other properties are desirable:
+(1) Identity-obliviousness: that is, the algorithm treats advertisers
+in a symmetric manner in each individual iteration — the allo-
+cation to an advertiser does not depend on their identity.
+(2) Monotonicity: that is, the allocation probabilities increase mono-
+tonically as functions of the advertisers’ bids, which means
+that we can make this algorithm truthful by setting the payoffs
+appropriately by Myerson’s lemma.
+(3) History-obliviousness, which has the nice implication that the
+memory required by the algorithm is independent of the number
+of users and the solution is independent of the ordering of the
+users so we don’t need to worry about impact of the order in
+which the users are given on advertiser strategies and/or utility.
+(4) Protecting against advertiser splitting: We would like the al-
+gorithm to disincentivize an advertiser from splitting up into
+sub-advertisers (or submitting multiple ads) in an attempt to
+obtain a higher probability allocation.
+We now describe a class of algorithms that satisfy these prop-
+erties. The key intuition is to convert the bids on a user into
+probabilities using a function that places higher probabilities on
+higher bids. Note that the first three properties (identity-oblivious,
+monotonic, and history-oblivious) mean that the algorithm must
+adversary is given access to the probabilities output by the algorithm when designing
+the next set of bids.
+be defined by a symmetric, coordinate-wise increasing function
+G :
+(
+R≥0
+)k
+→
+{
+(p1, . . . ,pk ) | pi ≥ 0,
+∑k
+i=1 p
+i ≤ 1
+}
+that maps bids
+into probabilities. We observe that the overall optimal solution
+(Unfair-OPT) can be placed in this framework: the algorithm that
+distributes the probability mass equally among the highest bid-
+ders for each user corresponds to the function that places the full
+mass on the highest bids. This function can be viewed as assigning
+allocation probabilities in proportion to their contribution to the
+ℓ∞-norm over the bids.
+Proportional allocation algorithms. One rich class of algorithms of
+this form are algorithms where the probabilities are proportional
+to some deterministic function д of the bids, i.e. where piu ∝ д(biu ),
+with appropriate normalization to make
+∑k
+i=1 p
+i
+u = 1. We call these
+algorithms proportional allocation algorithms, defined as follows:
+additive (i.e. д(x) + д(y) ≤ д(x + y)), increasing function. The pro-
+portional allocation algorithm with parameter д assigns piu =
+д(b iu )∑k
+j=1 д(b
+i
+u )
+for every user u ∈ U and advertiser i ∈ [k].
+It is straightforward to verify that proportional allocation algo-
+rithms are identity-oblivious, monotonic, history-oblivious, and
+protect against submitting multiple ads (this last property follows
+from the super-additivity of д). These algorithms bear similarity to
+position auctions
+highest probability regardless of their identity.
+A proportional allocation algorithm with high fair value. We con-
+struct a family of functions д where the fair value of the propor-
+tional allocation algorithms is high. More specifically, we show that
+д(x) = x l for l ≥ 1 can achieve fair value approaching 1 as l → ∞.
+This algorithm can be viewed as assigning allocations in propor-
+tion to each bid’s contribution to the ℓl -norm of the bid vector. We
+emphasize that our bound on the fair value does not require bids
+to satisfy the bid ratio constraint.
+Theorem 4.5. LetM be a proportional allocation algorithm with
+parameter д(x) = x l for a positive integer l . If k ≥ 9 and l ≥ 1, then
+the fair value ofM is at least (k − 1)−1/l k−1k +
+Observe that fair value is an increasing function of l , and as l → ∞
+(where M places the entire mass on the highest bid), the bound
+equals 1 as expected. This means that fair value can be made ar-
+bitrarily close to 1 by sufficiently strengthening the bid ratio con-
+straint. To achieve a fair value of r , we can set l ≥
+log(k−1)
+log(1/r ) .
+We show that with the bid ratio condition fl (d) =
+(
+1+d
+1−d
+)
+1/l
+shown in Figure 1, this algorithm satisfies total variation fairness.
+Theorem 4.6. LetM be a proportional allocation algorithm with
+parameter д(x) = x l for a positive integer l . If all advertisers in a
+category satisfy the bid ratio condition fl (d) =
+(
+1+d
+1−d
+)
+1/l
+,M satisfies
+total variation fairness in that category.
+ered in a different context in [1].
+not the bid values or advertiser identities) in determining the allocation. See the full
+version of the paper [11] for a discussion of why position auctions cannot achieve
+both fairness and a high fair value.
+Observe that the bid ratio condition becomes stronger as l increases.
+Thus, for a fixed number of advertisers, a higher fair value is ac-
+companied by a stronger bid ratio condition. Moreover, observe
+that to maintain a fair value of r , a stronger bid ratio condition is
+needed as the number of advertisers increases, since l =
+log(k−1)
+log(1/r )
+grows with k .
+Near-optimality within proportional allocation algorithms. A natural
+question is to ask is whether Algorithm 1 with a different function
+д can achieve a a much better fair value, potentially using a differ-
+ently shaped bid ratio condition. In fact, we show that Algorithm
+1 is nearly optimal within the family of proportional allocation
+algorithms. We specifically prove that any proportional allocation
+algorithm achieving a certain fair value will have a corresponding
+bid ratio condition that is point-wise stronger than fl (d) =
+(
+1+d
+1−d
+)
+1/l
+,
+where l within a constant factor of what is achieved by Algorithm 1
+with д(x) = x l . This result demonstrates that changing the shape of
+the bid ratio condition will not significantly improve the fair value.
+We show the following lower bound:
+Lemma 4.7. Suppose thatM is a proportional allocation algorithm
+achieves fair value r and achieves total variation fairness with a bid
+ratio condition of f . For l = log(k−1)
+2 log(1/r ) − 0.5, we have that f (d) ≤
+fl (d) =
+(
+1+d
+1−d
+)
+1/l
+for infinitely many points on f (more specifically,
+for d ∈ D :=
+{
+d | f (d) =
+(
+)m
+,m ∈
+{
+n, 1n | n ∈ N
+}}
+).
+How does the lower bound in Lemma 4.7 compare to the propor-
+tional allocation algorithms with parameter x l ? Lemma 4.7 shows
+that any proportional allocation algorithm will satisfy f (d) ≤ fl (d)
+where l =
+log(k−1)
+2 log(1/r ) − 0.5 for infinitely many points on the curve.
+Meanwhile, Theorem 4.5 and Theorem 4.6 show that to achieve a
+fair value r , it suffices to take fl (d) with l =
+log(k−1)
+log(1/r ) . Thus, there
+is essentially a constant factor difference in the lower and upper
+bounds on l .
+A consequence of Lemma 4.7 is in the family of proportional allo-
+cation algorithms, the fair value must necessarily degrade with the
+number of advertisers k if the bid ratio condition is fixed. Or equiv-
+alently, to maintain a fair value of r , a stronger bid ratio condition
+is needed as the number of advertisers increases. In fact, Lemma
+4.7 implies that that the proportional algorithm with parameter
+x l achieves the optimal rate of change of the bid ratio condition
+as a function of k : within the family of proportional allocation
+algorithms, a better dependence on k is not possible.
+4.4 Discussion
+In Section 4.3, we showed that Algorithm 1 with д(x) = x l is nearly
+optimal in the class of proportional allocation algorithms. Now, we
+compare Algorithm 1 with д(x) = x l to general online algorithms,
+using our negative results in Section 4.2. It is a little tricky to directly
+compare the fair value lower bounds achieved by Algorithm 1 with
+д(x) = x l with the upper bounds in Section 4.2, because the bounds
+depend on different parameters. In particular, the lower bounds hold
+for arbitrary metrics whereas the upper bounds are designed only
+for the uniform metric. To perform an apples-to-apples comparison,
+we fix parametersk , l , and some numberd ∈ (0, 1), and setα = fl (d).
+(a) l = 1 (b) l = 2
+(c) l = 3 (d) l = 5
+Figure 2: Illustrations of the ratio of upper and lower bounds
+on fair values for different values of l . Note that the z−axis
+scale for l = 1 differs from the others.
+Figure 2 displays the ratio of the upper bound and lower bound
+for various parameter settings. Observe that the ratio is bounded
+by a reasonably small constant except when l is very small. This
+indicates that Algorithm 1 with parameter д(x) = x l in general
+obtains a large fraction of the utility that can be obtained by any
+online algorithm satisfyingmultiple-task fairness, despite satisfying
+a stronger form of fairness and nice algorithm design properties.
+5 INTER-CATEGORY FAIRNESS
+We consider the setting where different product categories corre-
+spond to very different metrics. We specifically consider the setting
+where every category has exactly one advertiser (i.e. where c = k).
+We first show it is not possible to achieve the same tradeoff between
+multiple-task fairness and utility as in the case of identical metrics.
+We then show that with inter-category envy-freeness, significantly
+better tradeoffs are possible. We present tight upper and lower
+bounds on the fair value achievable as a function of upper bounds
+on the sizes of the preferred sets. In Section 5.1, we focus on the
+Unfair-OPT benchmark considered in the previous section. In Sec-
+tion 5.2, we argue in favor of a relaxed benchmark to evaluate the
+performance of fair allocation algorithms, and show that this bench-
+mark can be exactly met by algorithms that satisfy inter-category
+envy-freeness. Proofs are in the full version of the paper [11].
+5.1 Inter-category envy-freeness and fair value
+relative to Unfair-OPT
+First, we show a upper bound that demonstrates that multiple-task
+fairness is in conflict with utility, even in the offline setting, if the
+metrics are permitted to be different. The result is based on the
+“jack of all trades” example in the introduction. Formally:
+Example 5.1 (Jack-of-all-trades). Suppose that the universe has
+c + 1 users u1, . . . ,uc+1 and there are c categories (with one adver-
+tiser per category). The metric di is defined so that di (uc+1,ui ) = 0
+and all other distances are 1. Suppose that advertiser i bids 1 on ui
+and uc+1, and 0 on everybody else. Observe that the bids are fair
+assuming f (1) = ∞.
+Consider any allocation algorithm and suppose that this algo-
+rithm chooses an ad from distribution (q1, · · · ,qc ) to display for
+useruc+1. Then, in order to respect multiple task fairness as defined
+above, the algorithm cannot allocate ad i to user ui with probability
+greater than qi . As a result, most of the “specialists” necessarily
+obtain a low allocation within their desired categories: since the
+“jack of all trades” can only be served a single ad, the “specialists”
+are penalized. Multiple-task fairness thus limits the allocation of
+almost all of the users. Moreover, the utility of any fair allocation
+is bounded by some constant, whereas an unfair allocation can
+achieve utility c + 1. We obtain the following bound on fair value:
+Proposition 5.2. Suppose that bids satisfy the bid ratio constraint
+f , then no offline algorithm that satisfies multiple-task fairness across
+c categories can obtain a fair value more than 2
+c+1 .
+We now consider the weaker fairness notion of inter-category
+envy-freeness defined in Section 3 that limits the number of fair-
+ness constraints imposed by any given user. We assume that the
+platform obtains from each user u ∈ U a preferred set Su ⊆ [c] of
+categories as the user arrives (i.e. the preferences are not known to
+the allocation algorithm in advance). Inter-category envy-freeness
+requires that the total allocation of ads in Su to the user u should be
+at least as large as the total allocation of ads in Su to any other user.
+Observe that our definition of fairness doesn’t involve a metric over
+the users. Moreover, obtaining good utility requires that we place a
+reasonable amount of mass on the highest bid(s) for the user u.
+We develop an allocation algorithm that reserves some allocation
+mass for the category with the highest bid on each user u, and
+distributes the remaining allocation probability across categories
+in Su . In doing so, we must ensure that no subset of categories gets
+too much mass in total. This is because if such a set S exists, and
+a future user v sets Sv = S , then the algorithm is forced to give a
+high allocation to this set for user v . Unless S is small, this may
+then leave little probability mass for the highest bidder for v .
+We now formally define our algorithm and bound its fair value.
+Algorithm 2. The equal-spread algorithm with parame-
+ters β andC is defined as follows. We assume that every user u spec-
+ifies a subset Su ⊂ [c] with |Su | ≤ C . LetCu = argmax
+1≤j≤c {b
+j
+u } be
+a category with the highest bid. The algorithm assigns an allocation
+probability of phigh to Cu and pfairness to categories in Su \ {Cu },
+where phigh =
+β−1+...+β−|Su |
+( |Su |)(1+β−1+...+β−C )
+.
+The parameter β ≥ 1 allows the algorithm to trade-off between
+fairness and utility. By allowing the algorithm to achieve β-inter-
+category envy-freeness for larger β values, we obtain a better ap-
+proximation to the Unfair-OPT.
+Theorem 5.3. If every user’s preferred set contains ≤ C categories,
+then for any β ≥ 1, the equal-spread algorithm with parameters
+β and C (Algorithm 2) satisfies β-inter-category envy-freeness and
+achieves a fair value of ≥ 1
+1+β−1+...+β−C .
+We show amatching upper bound on the fair value, thus showing
+that Algorithm 2 is optimal. Our proof boils down to bounding the
+Figure 3: Fair value for inter-category envy-freeness
+amount of mass that can be placed on the highest bid. We construct
+a sequence of users with the property that bids in Su are always
+0 and each user has a category Cu < Su that bids 1. We adaptively
+construct the sets Su and Cu to minimize the fair value.
+Lemma 5.4. Suppose thatC < c , and every user’s preferred set can
+contain any number of categories ≤ C . Then, regardless of the bid ratio
+constraint f imposed on the advertisers (but assuming f (1) = ∞),
+any online algorithm that satisfies β-inter-category envy-freeness
+obtains a fair value of at most 1
+1+β−1+...+β−C .
+In the above construction, we consider a uniform metric with
+distance 1 (where the bid ratio conditions do not implicitly provide
+any guarantees). Nonetheless, even though the users are maximally
+distant, the inter-category envy-freeness still provides strong uni-
+dimensional guarantees between these users. A natural question
+to ask is: can we achieve a higher fair value by considering a re-
+laxed version of inter-category envy-freeness that reintroduces the
+metric? We show in the full version of the paper [11] that it is not
+possible to do better.
+We plot the tight bound on fair value obtained for inter-category
+envy-freeness as a function of β and C in Figure 3. Observe that as
+β increases, the weakened fairness guarantees cause the fair value
+to increase. For the dependence on C , observe that the algorithm
+must balance between allocating to a category with the highest bid
+to achieve high utility, and allocating to categories in Su to achieve
+inter-category envy-freeness. As C increases, the algorithm has a
+greater number of categories to consider for each user (and the
+highest bid can still be outside of Su ), thus causing the optimal fair
+value to decrease.
+5.2 Relaxing the utility benchmark
+The results in the previous section, for the strongest form of fairness,
+place an upper bound of 1/2 (or lower) on the fair value that can
+achieved by inter-category envy-freeness. In this section, we con-
+sider the setting where we restrict to algorithms that receive utility
+only for allocations in Su : that is, the utility is
+∑
+u ∈U
+∑
+i ∈Su p
+i
+ub
+i
+u .
+In this case, we assume that user-specified categories are aligned
+with interest, and in a click-through-rate based revenue/utility
+model, the platform only obtains benefit from allocations within
+the user-specified sets.
+It is straightforward to see that the best possible utility achieved
+by any (potentially unfair) algorithm in this restricted class is∑
+u ∈U maxi ∈Su b
+i
+u , which may be much smaller than unrestricted
+optimal utility of
+∑
+u ∈U maxi ∈[c] b
+i
+u . This motivates considering
+the relaxed fair value given by:
+∑
+u∈U
+∑
+i∈Su piub
+i
+u∑
+u∈U maxi∈Su b iu
+. When there can
+be more one advertiser per category, we define the relaxed fair
+value as
+∑
+u∈U
+∑
+i∈Su
+∑
+j∈Ci p
+j
+ub
+j
+u∑
+u∈U maxi∈Su , j∈Ci b
+j
+u
+.
+Returning to the case where there is at most one advertiser per
+category, we show a strong positive result: the simple highest-
+bidder-wins algorithm achieves inter-category envy-freeness and a
+relaxed fair value of 1 even when the sets |Su | are large.
+Algorithm 3. For each u ∈ U , the algorithm allocates a prob-
+ability of 1 to the category in Su with the highest bid. If there are
+multiple categories tied for the highest bid, then the algorithm splits
+the probability equally between these categories.
+Theorem 5.5. Algorithm 3 achieves inter-category envy-freeness
+with β = 1 and achieves a relaxed fair value of 1.
+Given the simplicity of Algorithm 3, a natural question is to ask is:
+can we obtain better fairness guarantees while still maintaining a
+high relaxed fair value? We show in the full version of the paper
+[11] that it is not possible to have multiple-task fairness guarantees
+and a high fair value even against the relaxed benchmark.
+6 COMPOSITIONAL FAIRNESS
+We now discuss how to combine our algorithms to handle the set-
+ting where there can be multiple categories and multiple advertisers
+in each category. Let {C1, . . . ,Cc } denote a partition of the set [k]
+of advertisers into c categories. We can compose our algorithms
+from Section 4 and Section 5 by running algorithms from Section 5
+to allocate probability between categories, and algorithms from Sec-
+tion 4 to distribute the probability assigned to a category between
+advertisers in that category.
+The intuition for fairness is that compositional fairness is implied
+by inter-category envy-freeness and intra-category total variation
+fairness.
+fair value, since the fair value of the composed algorithm is the
+product of the fair values of the individual algorithms. Finally, the
+composed algorithms are metric-oblivious, as a direct consequence
+of our intra-category and inter-category algorithms enjoying this
+property. Proofs are in the full version of the paper [11].
+Note that the two choices of category selection algorithms in Sec-
+tion 5 result in combined constructions that differ in terms of both
+utility guarantees (i.e. choice of benchmark) and category distribu-
+tion properties (i.e., concentrating or spreading probability between
+categories), which are important for practical considerations.
+High fair value compared to relaxed benchmark
+To achieve a high fair value compared to the relaxed utility bench-
+mark (taking user preferences as an indicator of click probability
+discussed in Section 5.2), we can compose Algorithm 3 with Algo-
+rithm 1. The idea is that we run Algorithm 3 to identify the category
+in Su with the highest bid, and then we run Algorithm 1 to divide
+the probability mass between advertisers in this category.
+∑
+i∈Cj p
+i
+u is actually the probability the first algorithm
+assigned to category Cl , we require that the second algorithm assigns the full 1
+probability mass to each user. This is true of proportional allocation (Algorithm 1).
+Algorithm 4. For each user u, the algorithm runs Algorithm 3
+to allocate probabilities between categories, where for 1 ≤ j ≤ c , the
+bid B ju is taken to be maxi ∈Cj b
+i
+u . The algorithm then determines the
+conditional probabilities for advertisers within each category using
+Algorithm 1 with parameter д(x) = x l .
+Theorem 6.1. Let k ′ = max1≤j≤c |Cj | be the maximum num-
+ber of advertisers in any category. If all advertisers 1 ≤ i ≤ k sat-
+isfy the bid ratio condition f i (d) ≤
+(
+1+d
+1−d
+)
+1/l
+, then Algorithm 4
+achieves compositional fairness and a relaxed fair value of at least
+(k ′ − 1)−1/l k
+′−1
+k ′ +
+High fair value compared to Unfair-OPT
+It is likewise possible to combine algorithms 1 and 2 to obtain
+bounds on the fair value against Unfair-OPT.
+Algorithm 5. For each user u, the algorithm runs Algorithm 2
+with parameters β and C to allocate probabilities between categories,
+where for 1 ≤ j ≤ c , the bid B
+j
+u is taken to be maxi ∈Cj b
+i
+u . The
+algorithm then determines the conditional probabilities for advertisers
+within each category using Algorithm 1 with parameter д(x) = x l .
+Theorem 6.2. Suppose that every user’s preferred set contains at
+most C categories. Let k ′ = max1≤j≤c |Cj | be the maximum number
+of advertisers in any category. If all advertisers 1 ≤ i ≤ k satisfy
+the bid ratio condition f i (d) ≤
+(
+1+d
+1−d
+)
+1/l
+, then Algorithm 5 achieves
+compositional fairness and a fair value of at least(
+) (
+(k ′ − 1)−1/l
+k ′ − 1
+k ′
++
+)
+.
+7 FUTUREWORK
+In this work, we give an initial framework for understanding the
+utility and fairness properties of a combination of individual fair-
+ness and envy-freeness. We highlight areas for future work below.
+• Advertiser incentives. In order to use implement our allocation
+algorithms as mechanisms, it is necessary to consider advertiser
+incentives. Our allocation algorithms satisfy nice properties such
+as monotonicity and individual rationality, which serves as a
+starting point. Nonetheless, a full consideration of incentives
+requires considering how the bid fairness constraints impact
+advertiser bidding strategies.
+• Closing the gaps and tighter upper bounds. In Section 4, we showed
+general fair value upper bounds using uniform metrics, and
+showed stronger upper bounds for proportional allocation al-
+gorithms. An interesting direction for future work would be to
+show upper bounds for general metric oblivious algorithms and
+compare these bounds to Algorithm 1 with parameter д(x) = x l .
+• Multiple slot auctions. In this work, we have focused on the case of
+single slot auctions. However, in practice multiple slot auctions,
+or auctions where each user appears at several times, are more
+common. This leaves open several considerations in defining fair-
+ness, such as how to account for the ordering of advertisements.
+• Different combinations of inter- and intra-category fairness. We
+give one combination of inter- and intra-category fairness, but it’s
+likely that other combinations (e.g., intra-category total variation
+fairness and inter-category PIIF) may be of interest.
+REFERENCES
+[1] Shipra Agrawal, Morteza Zadimoghaddam, and Vahab S. Mirrokni. 2018. Proportional
+allocation: Simple, distributed, and diverse matching with high entropy. In
+Proceedings of the 35th International Conference on Machine Learning, ICML 2018,
+Stockholmsmässan, Stockholm, Sweden, July 10-15, 2018, pages 99–108, 2018.
+[2] Muhammad Ali, Piotr Sapiezynski, Miranda Bogen, Aleksandra Korolova, Alan
+Mislove, and Aaron Rieke. 2019. Discrimination through optimization: How facebook’s
+ad delivery can lead to skewed outcomes. CoRR, abs/1904.02095, 2019.
+[3] Julia Angwin and Terry Perris. 2016. Facebook lets advertisers exclude users by race.
+ProPublica, October 28, 2016., 2016.
+[4] Julia Angwin, Noam Scheiber, and Ariana Tobin. 2017. Facebook job ads raise concerns
+about age discrimination. The New York Times in collaboration with ProPublica,
+December 20, 2017., 2017.
+[5] Arda Antikacioglu, Tanvi Bajpai, and R. Ravi. 2018. A new system-wide diversity
+measure for recommendations with efficient algorithms. CoRR, abs/1812.03030,
+2018.
+[6] Maria-Florina Balcan, Travis Dick, Ritesh Noothigattu, and Ariel D. Procaccia.
+2018. Envy-free classification. CoRR, abs/1809.08700, 2018.
+[7] Katie Benner, Glenn Thrush, and Mike Isaac. 2019. Facebook engages in housing
+discrimination with its ad practices, u.s. says. The New York Times, March 28,
+2019., 2019.
+[8] Ioannis Caragiannis, Christos Kaklamanis, Panagiotis Kanellopoulos, and Maria
+Kyropoulou. 2012. The efficiency of fair division. Theory of Computing Systems,
+50(4):589–610, 2012.
+[9] L. Elisa Celis, Anay Mehrotra, and Nisheeth K. Vishnoi. 2019. Toward controlling
+discrimination in online ad auctions. In Proceedings of the 36th International
+Conference onMachine Learning, ICML 2019, 9-15 June 2019, Long Beach, California,
+USA, pages 4456–4465, 2019.
+[10] L. Elisa Celis, Damian Straszak, and Nisheeth K. Vishnoi. 2018. Ranking with fairness
+constraints. In 45th International Colloquium on Automata, Languages, and Pro-
+gramming, ICALP 2018, July 9-13, 2018, Prague, Czech Republic, pages 28:1–28:15,
+2018.
+[11] Shuchi Chawla, Christina Ilvento, andMeena Jagadeesan. 2019. Multi-category fairness
+in sponsored search auctions. CoRR, abs/1906.08732, 2019.
+[12] Cynthia Dwork, Moritz Hardt, Toniann Pitassi, Omer Reingold, and Richard S.
+Zemel. 2012. Fairness through awareness. In 3rd Innovations in Theoretical Computer
+Science, ITCS 2012, Cambridge, MA, USA, January 8-10, 2012, pages 214–226, 2012.
+[13] Cynthia Dwork and Christina Ilvento. 2019. Fairness under composition. In 10th
+Innovations in Theoretical Computer Science Conference, ITCS 2019, January 10-12,
+2019, San Diego, California, USA, pages 33:1–33:20, 2019.
+[14] Cynthia Dwork, Michael Kim, Omer Reingold, Guy Rothblum, and Gal Yona.
+2019. Ranking with fairness constraints. In 60th Annual IEEE Symposium on Foundations
+of Computer Science November 9-12, 2019, Baltimore, Maryland, page to appear,
+2019.
+[15] Benjamin Edelman, Michael Ostrovsky, and Michael Schwarz. 2007. Internet advertis-
+ing and the generalized second-price auction: Selling billions of dollars worth of
+keywords. American Economic Review, 97(1):242–259, March 2007.
+[16] Sayash Kapoor, Vijay Keswani, Nisheeth K. Vishnoi, and L. Elisa Celis. 2018. Balanced
+news using constrained bandit-based personalization. In Proceedings of the 27th
+International Joint Conference on Artificial Intelligence, IJCAI’18, pages 5835–5837,
+2018.
+[17] Michael P. Kim, Aleksandra Korolova, Guy N. Rothblum, and Gal Yona.
+2020. Preference-informed fairness. In Proceedings of the 11th Innovations in Theo-
+retical Computer Science, ITCS 2020, Seattle, Washington, USA, January 12-14, 2020,
+page to appear, 2020.
+[18] Anja Lambrecht and Catherine Tucker. 2019. Algorithmic bias? an empirical study
+of apparent gender-based discrimination in the display of STEM career ads.
+Management Science, 65(7):2966–2981, 2019.
+[19] Hal Varian. 2007. Position auctions. International Journal of Industrial Organization,
+25(6):1163–1178, 2007.
+[20] Muhammad Bilal Zafar, Isabel Valera, Manuel Gomez-Rodriguez, Krishna P.
+Gummadi, and Adrian Weller. 2017. From parity to preference-based notions of fairness
+in classification. In Advances in Neural Information Processing Systems 30: NeurIPS
+2017, 4-9 December 2017, Long Beach, CA, USA, pages 229–239, 2017.

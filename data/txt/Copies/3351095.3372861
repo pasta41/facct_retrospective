@@ -1,0 +1,1262 @@
+The Disparate Equilibria of Algorithmic Decision Making
+when Individuals Invest Rationally
+Lydia T. Liu
+University of California, Berkeley
+Ashia Wilson
+Microsoft Research
+Nika Haghtalab
+Cornell University
+Adam Tauman Kalai
+Microsoft Research
+Christian Borgs
+Microsoft Research
+Jennifer Chayes
+Microsoft Research
+ABSTRACT
+The long-term impact of algorithmic decision making is shaped
+by the dynamics between the deployed decision rule and individu-
+als’ response. Focusing on settings where each individual desires
+a positive classi￿cation—including many important applications
+such as hiring and school admissions, we study a dynamic learning
+setting where individuals invest in a positive outcome based on
+their group’s expected gain and the decision rule is updated to max-
+imize institutional bene￿t. By characterizing the equilibria of these
+dynamics, we show that natural challenges to desirable long-term
+outcomes arise due to heterogeneity across groups and the lack of
+realizability. We consider two interventions, decoupling the deci-
+sion rule by group and subsidizing the cost of investment. We show
+that decoupling achieves optimal outcomes in the realizable case
+but has discrepant e￿ects that may depend on the initial conditions
+otherwise. In contrast, subsidizing the cost of investment is shown
+to create better equilibria for the disadvantaged group even in the
+absence of realizability.
+CCS CONCEPTS
+• Computing methodologies → Machine learning; • Applied
+computing→ Law, social and behavioral sciences; Economics;
+KEYWORDS
+fairness; machine learning; dynamics; statistical discrimination
+ACM Reference Format:
+Lydia T. Liu, Ashia Wilson, Nika Haghtalab, Adam Tauman Kalai, Christian
+Borgs, and Jennifer Chayes. 2020. The Disparate Equilibria of Algorithmic
+Decision Making, when Individuals Invest Rationally. In Conference on
+Fairness, Accountability, and Transparency (FAT* ’20), January 27–30, 2020,
+Barcelona, Spain. ACM, New York, NY, USA, 11 pages. https://doi.org/10.
+1145/3351095.3372861
+1 INTRODUCTION
+Automated decision-making systems that rely on machine learning
+are increasingly used for high-stakes applications, yet their long-
+term consequences have been controversial and poorly understood.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for pro￿t or commercial advantage and that copies bear this notice and the full citation
+on the ￿rst page. Copyrights for components of this work owned by others than the
+author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or
+republish, to post on servers or to redistribute to lists, requires prior speci￿c permission
+and/or a fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 978-1-4503-6936-7/20/02.
+https://doi.org/10.1145/3351095.3372861
+On one hand, deployed decision making models are updated peri-
+odically to assure high performance on the target distribution. On
+the other hand, deployed models can reshape the underlying popu-
+lations thus biasing how the model is updated in the future. This
+complex interplay between algorithmic decisions, individual-level
+responses, and exogeneous societal forces can lead to pernicious
+long term e￿ects that reinforce or even exacerbate existing social
+injustices [13, 44]. Harmful feedback loops have been observed in
+automated decision making in several contexts including recom-
+mendation systems [7, 11, 38], predictive policing [18], admission
+decisions [5, 35], and credit markets [1, 20]. These examples under-
+score the need to better understand the dynamics of algorithmic
+decision making, in order to align decisions made about people
+with desirable long-term societal outcomes.
+Automated decision-making algorithms rely on observable fea-
+tures to predict some variable of interest. In a setting such as hiring,
+decision making models assess features such as scores on standard-
+ized tests, resume, and recommendation letters, to identify individ-
+uals that are quali￿ed for the job. However, equally quali￿ed people
+from di￿erent demographic groups tend to have di￿erent features,
+due to implicit societal biases (e.g., letter writers describe compe-
+tent men and women di￿erently), gaps in resources (e.g., a￿uent
+students can a￿ord di￿erent extra-curriculars) and even distinct
+tendencies in self-description (e.g., gender can be inferred from
+biographies [16]). Therefore, a model’s ability to identify quali￿ed
+individuals can widely vary across di￿erent groups.
+The deployed model’s ability to identify quali￿ed members of a
+group a￿ects an individual’s incentive to invest in their quali￿cation.
+This is because one’s decision to acquire quali￿cation—not observed
+directly by the algorithm—comes at a cost. Moreover, individuals
+that are identi￿ed by the model as quali￿ed (whether or not they
+are truly quali￿ed) receive a reward. Consequently, people invest
+in acquiring quali￿cations only when their expected reward from
+the assessment model beats the investment cost.
+Rational individuals are aware that upon investing they would
+develop features that are similar to those of quali￿ed individuals
+in their group, so they gauge their own expected reward from in-
+vesting by the observed rewards of their group.1 If quali￿ed people
+from one group are not duly identi￿ed and rewarded, fewer people
+from that group are incentivized to invest in quali￿cations in the
+future. This reduces the overall fraction of quali￿ed people in that
+group, or the quali￿cation rate. As the assessment model is updated
+to maximize overall institutional pro￿t on the new population dis-
+tribution, it may perform even more poorly on quali￿ed individuals
+1Strong group identi￿cation e￿ects can also be seen in empirical studies [24].
+from a group with relatively low quali￿cation rate, further reducing
+the group’s incentive to invest.
+To understand and mitigate the challenges to long-term welfare
+and fairness posed by such dynamics, we propose a formal model
+of sequential learning and decision-making where at each round
+a new batch of individuals rationally decide whether to invest in
+acquiring quali￿cation and the institution updates its assessment
+rule (a classi￿er) for assessing and thus rewarding individuals. We
+study the long-term behavior of these dynamics by characterizing
+their equilibria and comparing these equilibria based on several
+metrics of social desirability. Our model can be seen as an extension
+of Coate and Loury [10]’s widely cited work to explicitly address
+heterogeneity in observed features across groups. While Coate
+and Loury [10]’s model focuses on a single-dimensional feature
+space, i.e., scores, and assessment rules that act as thresholds on
+the score, our model considers general, possibly high-dimensional,
+feature spaces and arbitrary assessment rules, which are typical in
+high-stakes domains such as hiring and admissions.
+We ￿nd that twomajor obstacles to obtaining desirable long-term
+outcomes are heterogeneity across groups and lack of realizability
+within a group. Realizability—the existence of a (near) perfect way
+to assess quali￿cations of individuals from visible features—leads
+to equilibria that are (near) optimal on several metrics, such as
+the resulting quali￿cation rates, their uniformity across groups,
+and the institution’s utility. We study (near) realizability and the
+lack thereof in Sections 3 and 5 respectively. Heterogeneity across
+groups, i.e., lack of a single assessment rule that perfectly assesses
+individuals from all groups, necessitates tradeo￿s in the quality of
+equilibria across di￿erent groups. We study heterogeneity, as well
+as interventions for mitigating its negative e￿ects, in Section 4. In
+Section 6, we empirically study a more challenging setting where
+the groups are heterogeneous as well as highly non-realizable, via
+simulations with a FICO credit score dataset [42] that has been
+widely used for illustration in the algorithmic fairness literature.
+Interventions. To mitigate the aforementioned tradeo￿s, we con-
+sider two common interventions: decoupling the decision policy by
+group and subsidizing the cost of investment, especially when the
+cost distribution inherently di￿ers by group. Our model of dynam-
+ics sheds a di￿erent light on these interventions, complementary to
+previous work. We show that decoupling [17]—using group-speci￿c
+assessment rules—achieves optimal outcomes when the problem
+is realizable within each group, but can signi￿cantly hurt certain
+groups when the problem is non-realizable and there exist multiple
+equilibria after decoupling. In particular, decoupling can hurt a
+group with low initial quali￿cation rate if the utility-maximizing
+assessment rule for a single group is more disincentivizing to indi-
+viduals than a joint assessment rule, thereby reinforcing the status
+quo and preventing the group from reaching an equilibrium with
+higher quali￿cation rate.
+We also study subsidizing individuals’ investment cost (e.g. sub-
+sidizing tuition for a top high school), especially when the cost
+distribution is varied across di￿erent groups. We ￿nd that these
+subsidies increase the quali￿cation rate of the disadvantaged group
+at equilibrium, regardless of realizability. We note that our sub-
+sidies, which a￿ect the quali￿cation of individuals directly, are
+di￿erent than those studied under strategic manipulation [26] that
+involve subsidizing individual’s cost to manipulate their features
+Y
+X
+ 
+A
+Figure 1: Causal graph for the individual investment model.
+The individual intervenes on the node for quali￿cation, Y—
+this corresponds to do(Y =  ))—which then a￿ects the distri-
+bution of their features X , depending on the group A.
+without changing the underlying quali￿cation (e.g. subsidizing SAT
+exam preparation without changing the student’s quali￿cation for
+college) and could have adverse e￿ects on disadvantaged groups.
+Instead, our theoretical ￿ndings resonates with extensive empirical
+work in economics on the e￿ectiveness of subsidizing opportunities
+for a disadvantaged group to directly improve their outcomes, such
+as moving to better neighborhoods to access better educational and
+environmental resources [8].
+Related work. Our work is related to a rich body of work on
+algorithmic fairness in dynamic settings [23, 25, 33, 37, 45], strate-
+gic classi￿cation [26, 31, 36], as well as statistical discrimination
+in economics [2, 3, 10]. We present a detailed discussion of the
+similarities and di￿erences in Section 7.
+2 A DYNAMIC MODEL OF ALGORITHMIC
+DECISION MAKING
+In this section we introduce a model of automated decision making
+with feedback. We ￿rst introduce the notation used throughout
+the paper and then describe the details of the interactions between
+individuals and an institution, and the resulting dynamical system.
+2.1 Notation
+We consider an instance spaceX, whereX 2 X denotes the features
+of an individual that are observable by the institution. We also
+consider a label space Y = {0, 1} where Y = 1 indicates that an
+individual has the quali￿cations desired by the institution andY = 0
+otherwise. We denote the set of all protected/group attributes by
+A where A 2 A denotes an individual’s protected attribute. We
+denote the group proportions by na B P(A = a) for all a 2 A.
+Furthermore, we denote the quali￿cation rate in group a 2 A by
+ a B P(Y = 1 | A = a). An individual from group A = a who
+has acquired label Y =   (to become quali￿ed or not)2 receives
+features X distributed according to P(X = x | Y =  ,A = a). This
+is illustrated in Figure 1.
+We also consider a set of parameters  that are used for assessing
+quali￿cations. We use Ŷ  2 Y parameterized by   2   to denote
+the assessed quali￿cation of an individual. We assume that Ŷ  only
+depends on the features X , which may or may not contain A or its
+proxies. In later sections, we will also discuss interventions that
+allow us to use Ŷ  that explicitly depends on group membership A.
+We respectively de￿ne the true positive rate and false positive rate
+2This can be seen as the individual performing a do-intervention on Y [see e.g., 39].
+Thus we may write do(Y = 1) for making the decision to acquire quali￿cations. Our
+model (Figure 1) assumes that Y is not the child of any node, so we have P( · | do(Y =
+  )) = P( · | Y =   ). Hence we drop the do-operator whenever we condition on Y .
+of   2   on group a 2 A by
+TPRa (  ) = P(Ŷ  = 1 | Y = 1,A = a), and
+FPRa (  ) = P(Ŷ  = 1 | Y = 0,A = a).
+2.2 Model Description
+Individual’s Rational Response. We consider a setting where an
+individual decides whether to acquire quali￿cations, that is, to
+invest in obtaining label Y = 1, prior to observing their feature X .
+The decision to acquire quali￿cation depends on the quali￿cation
+assessment rule   2   currently implemented by the institution.We
+will characterize the groups’ quali￿cation rates as the best-response
+to   by function  br (  ) = ( bra (  ))a2A .
+To get label Y = 1 an individual has to pay a cost C > 0. In
+any group, C is distributed randomly according to the cumulative
+distribution function (CDF), G (·).3 After deciding whether to ac-
+quire quali￿cations, an individual gets features X and is assessed
+by   . An individual (from any group and regardless of actual qual-
+i￿cation) receives a payo￿ of w > 0 if they are assessed to be
+quali￿ed and payo￿ of 0 otherwise. Therefore, the expected util-
+ity an individual from group a receives from acquiring quali￿ca-
+tion Y = 1 is wP[Ŷ  = 1|Y = 1,A = a]   C = wTPRa (  )   C
+whereas the expected utility for not acquiring the quali￿cation is
+wP[Ŷ  = 1|Y = 0,A = a] = wFPRa (  ). Given the quali￿cation
+assessment parameter   2  , an individual from group a acquires
+quali￿cation if and only if the bene￿t outweighs the costs, that is
+w (TPRa (  )   FPRa (  )) > C . (1)
+Then each group’s quali￿cation rate as a function of a quali￿ca-
+tion assessment parameter   is
+ bra (  ) B P(Y = 1 | A = a) = P(C < w (TPRa (  )   FPRa (  )))
+= G (w (TPRa (  )   FPRa (  ))).
+Institution’s Rational Response We consider an institution that
+has to choose a quali￿cation assessment parameter for accepting
+individuals to maximize its utility. We assume that the institution
+gains pTP > 0 for accepting a quali￿ed individual and loses cFP > 0
+for accepting an unquali￿ed individual. Then the expected utility
+of the institution for applying parameter   is
+pTPP(Ŷ  = 1,Y = 1)   cFPP(Ŷ  = 1,Y = 0)
+= pTP
+X
+a2A
+TPRa (  ) ana  
+X
+a2A
+cFPFPRa (  ) (1    a )na .
+This illustrates that the utility maximizing parameter is a function
+of   = ( a )a2A , i.e., the rate of quali￿cation in each group. We
+denote this function by  br (  ), de￿ned as follows:
+ br (  ) := argmax
+  2 
+pTP
+X
+a2A
+TPRa (  ) ana 
+X
+a2A
+cFPFPRa (  ) (1  a )na .
+To ensure the above object (and the resulting dynamics) are well-
+de￿ned, when multiple parameters   achieve the optimal utility
+we assume that  br (  ) is uniquely de￿ned using a ￿xed and well-
+de￿ned tie-breaking function.
+3For the rest of this work, unless otherwise stated, we assume that the distribution
+of costs, G , is the same for every group. In Section 4.3 and 6, we will consider the
+implications of having di￿erent cost distributions by group.
+Throughout this paper we assume that the institution has exact
+knowledge of many quantities such as TPRa (  ), FPRa (  ), and na .
+In a nutshell, we assume that we have in￿nitely many samples from
+the underlying distributions. We discuss this further in Section 8,
+and leave the ￿nite sample version of these results to future work.
+Although we choose not to focus on game-theoretical aspects
+in this work, we note that our model can be thought of as a large
+game [27] or a game with a continuum of players [41].
+Dynamical System and Equilibria. We are primarily interested in
+the evolution of quali￿cation rate,   , over time. Given a current rate
+of quali￿cation   the assessment parameter used by the institution
+in the next step is  br (  ), which in turn leads to a quali￿cation rate
+of  br ( br (  )) in the next step. Therefore, we de￿ne a dynamical
+system for a given initial state   (0) such that at time t we are in
+state   (t ) =  (  (t   1)), where   =  br    br .
+We say that the aforementioned dynamical system is at equi-
+librium if   =  (  ). Equivalently, we are at an equilibrium if
+  = limn!1  n (  (0)) is well-de￿ned for some   (0), where  n is
+an n-fold composition of  . We call such values of   equilibria, or
+equivalently, ￿xed points of  .
+In general,   may have multiple ￿xed points that demonstrate
+di￿erent characteristics. We therefore compare the ￿xed points of
+  on several metrics of societal importance.
+(1) Stability: We say that an equilibrium  ⇤ is stable if there is a
+non-zero measure set of initial states   (0) 2 [0, 1] for which
+ ⇤ = limn!1  n (  (0)). In particular, if there exists a neighbor-
+hood around  ⇤ such that all points converge to  ⇤ under the
+dynamics, we say that  ⇤ is locally stable. As such, stable ￿xed
+points are robust to small perturbations in the quali￿cation rate,
+which can occur due to random measurement errors.
+(2) Quali￿cation Rate of Group a: Recall that the quali￿cation rate,
+ a , is the fraction of individuals in group a who invested in
+quali￿cations. Since it is more desirable to have a high quali-
+￿cation rate in each group, we may compare equilibria based
+on  a . We refer to G (w ) as the optimal quali￿cation rate in
+group a, which is the maximum achievable quali￿cation rate
+corresponding to the perfect assessment rule.4
+(3) Balance:We may be interested in equilibria where the quali￿ca-
+tion rate is similar across groups, that is, to prioritize equilibria
+with smaller maxa1,a22A | ⇤a1    ⇤a2 |. When this quantity is 0
+we say that  ⇤ is fully balanced.
+(4) Institutional utility:We may compare equilibria based on their
+corresponding institution utility.
+2.3 Examples From the Real World
+Let us instantiate our model in the setting of two important appli-
+cations from the real world.
+College Admissions. Consider the college admission setting, where
+X corresponds to the features that the college can observe, e.g.,
+a candidate’s test scores and letters of recommendation. Y indi-
+cates whether the candidate meets the quali￿cations required to
+succeed in the program. C is the cost of investing in the qual-
+i￿cations, e.g., the money and opportunity cost of studying or
+taking additional courses to obtain the required quali￿cations. A
+4If group a has a group-speci￿c cost distribution, Ga , then we refer to Ga (w ) as the
+optimal quali￿cation rate in group a.
+candidate from group a will develop features from distribution
+P[X = x |Y =  ,A = a], where   = 1 indicates a quali￿ed candidate.
+The di￿erences in the feature distribution between groups can be
+attributed to several factors such as resources that are available
+to di￿erent groups, e.g., letters of recommendations for quali￿ed
+female and male candidates often emphasize di￿erent traits.   is
+the decision parameter used by the college, e.g., Ŷ  = 1 when the
+candidate has SAT score of > 1400 and an excellent recommenda-
+tion letter. The college accepts applicants by trading o￿ between
+the utility gain, pTP, of admitting quali￿ed candidates and utility
+cost, cFP, of admitting an unquali￿ed candidates. The candidate is
+incentivized to acquire the quali￿cations for the college based on
+the long term bene￿t (described in Equation (1)) that depends on
+their expected gainw from completing a college degree and how
+likely it is to be admitted to college for a quali￿ed or unquali￿ed
+member of the group the candidate belongs to.
+Hiring. Consider the hiring setting, where X corresponds to the
+features that the ￿rm can observe, e.g., a candidate’s CV.Y indicates
+whether the applicant meets the quali￿cations required by the ￿rm,
+e.g., having the required knowledge and the ability to work in
+a team. C is the cost of acquiring the quali￿cations required by
+the ￿rm, e.g., the (monetary and opportunity) cost of acquiring a
+college degree or working on a team project. Parameter   is the
+hiring parameter used by the ￿rm, e.g., Ŷ  = 1 when the applicant
+has a software engineering degree and two years of experience. The
+￿rm accepts candidates according to utility maximization involving
+pTP, the pro￿t from hiring a quali￿ed candidate, and cFP, the cost
+of hiring an unquali￿ed candidate e.g., the loss in productivity or
+the the cost to replace the employee. The candidate is incentivized
+to acquire the quali￿cations for the job based on factors including
+their expected salaryw and how likely it is to be hired by the ￿rm
+given how the ￿rm has hired quali￿ed or unquali￿ed candidates
+from the group the candidate belongs to (Eq. (1)).
+We also consider a stylized example of lending in Section 6.
+3 IMPORTANCE OF (NEAR) REALIZABILITY
+We start our theoretical investigation of dynamic algorithmic deci-
+sion making with the classical model of realizability. In the theory
+of machine learning, a distribution is called realizable if there is
+a decision rule in the set   whose error on the distribution is 0.
+Analogously, we call a setting realizable when there is a decision
+rule  opt 2   that perfectly classi￿es every individual from every
+group, that is TPRa ( opt) = 1 and FPRa ( opt) = 0 for all a 2 A.
+Realizability is a widely used assumption and is the basis of seminal
+works such as Boosting [19]. At a high level, realizability corre-
+sponds to the assumption that there is an unknown ground truth
+assessment rule, for example, in a hypothetical setting where x
+includes all the information that is su￿cient for assessing one’s
+quali￿cation, and the chosen set of decision rules is rich enough to
+contain it.
+In static realizable applications of machine learning, the goal is
+to (approximately) recover  opt from data. We show that in the our
+dynamic setting, under realizability, the unique non-zero equilib-
+rium of   is where individuals respond to  opt. Furthermore, each
+group attains their optimal quali￿cation rate at this equilibrium.
+P￿￿￿￿￿￿￿￿￿￿ 3.1 (P￿￿￿￿￿￿ ￿￿￿￿￿￿￿￿￿￿￿￿￿). If there exists   2  
+such that TPRa (  ) = 1 and FPRa (  ) = 0 for all a 2 A, then there is
+a unique non-zero equilibrium with  ⇤a = G (w ) for all a 2 A.
+While realizability is a common assumption in the theory of
+machine learning, it rarely captures the subtleties that exist in au-
+tomated decision making in practice. Next, we consider a mild
+relaxation of realizability and consider a setting where a near-
+perfect decision rule   2   exists such that TPRa (  )   1    
+and FPRa (  )    . As we show (and prove in Appendix A), when
+there is a single near-realizable group the main message of Proposi-
+tion 3.1 remains e￿ectively the same. That is, all equilibria that are
+reachable from initial points that are not too extreme approximately
+maximize the group’s quali￿cation rate.
+T￿￿￿￿￿￿ 3.2 (E￿￿￿￿￿￿￿￿ ￿￿￿￿￿ ￿￿￿￿￿￿￿￿￿￿￿￿￿￿￿￿￿￿). Let |A| =
+1 and assume that pTP = cFP = 1. Assume that for ￿xed   2 (0, 1) ,
+s 2 (0, 1/2), G is LG -Lipschitz with property that 1   s   G (w )  
+s + LGw 
+s , and there is   2   such that
+TPR(  )   1     and FPR(  )    .
+Then for any initial investment  (0) 2 [s, 1 s], ⇤ = limn!1  n (  (0))
+is such that
+ ⇤   G (w (1    /s )).
+A nice aspect of the above results is that the assumption of
+realizability or near-realizability can be validated from the data.
+That is, the decisionmaker can computewhether there is  2   such
+that TPR(  )   1     and FPR(  )    . If so, then the decision maker
+can rest assured that the dynamical system is on the path towards
+achieving near optimal investment by the individuals. Another nice
+aspect of these results is the characterization of the equilibria in
+terms of the CDF of the cost distribution. This allows us to use
+this framework for studying interventions that change the cost
+function directly. One such intervention is subsidizing the cost for
+individuals so that the cumulative distribution function of the cost,
+given byG (x ), is increased by a su￿cient amount at every cost level
+x . The following corollary, proved in Appendix B, shows that under
+this kind of subsidy, the equilibria reached by the dynamics will
+have higher quali￿cation rate than any ￿xed point of the dynamics
+before subsidy, as long as the initial points are not too extreme.
+As we are considering di￿erent cost distribution functions in the
+following corollary, we denote the dynamics corresponding to cost
+distribution function G as  G .
+C￿￿￿￿￿￿￿￿ 3.3 (S￿￿￿￿￿￿￿￿￿￿ ￿￿￿ ￿￿￿￿ ￿￿ ￿￿￿￿￿￿￿￿￿￿). Let
+|A| = 1 and assume that pTP = cFP = 1. Assume that for ￿xed
+  2 (0, 1) , s 2 (0, 1/2), G is LG -Lipschitz with property that 1   s  
+G (w )   s + LGw 
+s , and there is   2   such that
+TPR(  )   1     and FPR(  )    .
+Let  ⇤ > 0 be a ￿xed point of the dynamics  G . Suppose Ḡ is a strictly
+increasing, LḠ -Lipschitz CDF such that 1   s   Ḡ (x )   s +
+LḠw 
+s
+and Ḡ (x (1    /s ))   G (x ) for all x in the domain ofG . Then for any
+initial investment   (0) 2 [s, 1   s], there exists a  ̄    ⇤, such that
+ ̄ = limn!1  n
+Ḡ
+(  (0)).
+4 GROUP REALIZABILITY
+In this section, we investigate how the nature of equilibria evolves
+as the assumption of realizability is relaxed to allow for hetero-
+geneity across groups. Speci￿cally, we consider the case where
+there exists a perfect assessment rule for each group, but not when
+the groups are combined. We call this “group-realizability”. Our
+results illustrate that without realizability or near-realizability, the
+utility-maximizing assessment rule can be very sensitive to the
+relative quali￿cation rates in di￿erent groups, resulting in multiple
+equilibria, at which groups may experience disparate outcomes.
+In sections 4.1 and 4.2, we study group-realizability under two dif-
+ferent and complementary settings. The ￿rst setting considers fea-
+tures that are drawn from a multivariate Gaussian distribution and
+assumes that in each group the quali￿ed individuals are perfectly
+separated from unquali￿ed ones by a group-speci￿c hyperplane.
+This is a benign setting where no group is inherently disadvantaged
+— group features and performance of assessment rules are symmet-
+ric up to a reparameterization of the space. The second setting
+considers features that are uniformly distributed scalar scores and
+assumes that quali￿ed and unquali￿ed individuals in a group are
+separated by a group-speci￿c threshold, where one is higher than
+the other. - This model captures the natural setting where the fea-
+ture (score) and assessment rules inherently favor one group, e.g.,
+SAT scores are known to be skewed by race [6]. We use the afore-
+mentioned stylized settings to demonstrate the salient characteris-
+tics of equilibria that one might anticipate under group-realizability.
+We ￿nd that stable equilibria tend to favor one group or the other.
+This is especially surprising in themultivariate Gaussian case where
+the two groups are identical up to a change in the representation of
+the space. We also study the existence of balanced equilibria, where
+both groups acquire quali￿cation at the same rate. We ￿nd that
+when balanced equilibria exist they tend to be unstable, that is, no
+initial quali￿cation rate (except for the balanced equilibrium itself)
+will converge to the balanced equilibrium under the dynamics.
+We consider two natural interventions in overcoming the chal-
+lenges of group-realizability as outlined above. As group-realizability
+poses even greater challenges when the costs of investment are
+unequally distributed between groups, in Section 4.3 we consider
+the impact of subsidizing the cost of acquiring quali￿cation for one
+group. In Section 4.4, we consider the impact of decoupling, that
+is, we allow the institution to use di￿erent assessment rules for
+di￿erent groups assuming the group attributes are available. This is
+in contrast to the typical setting where institutions are constrained
+to using the same assessment rule across all groups, which may be
+the case when data on the protected attribute is not available or
+when the use of protected attributes for assessment is regulated.
+4.1 Uniformly Distributed Scalar X
+We considerX = [0, 1], the class of assessment paramters  = [0, 1],
+and assessment decision Ŷh = 1{X > h} for all h 2   that represent
+all threshold decision policies. Consider two groups a1,a2. Let X
+be a score that is uniformly distributed over [0, 1] where in group ai
+those with score more than hi are quali￿ed and those with score at
+mosthi are unquali￿ed. This is depicted in Figure 2 (right). Formally,
+P(X = x | Y =  ,A = ai ) =
+8><>:
+1{x > hi }/(1   hi ) for   = 1 and
+1{x  hi }/hi for   = 0
+.
+Figure 2: Equilibria in the Multivariate Gaussian case (left)
+and the Uniform case (right)
+We make the following assumption to simplify notation.
+A￿￿￿￿￿￿￿￿￿ 1. We assume na1 · pTP = na2 · cFP. We also assume
+that the cost for acquiring quali￿cations is uniformly distributed on
+[0, 1] (i.e. G (c ) = c) in both groups.5
+We show that whenw is in a certain range, there are two unbal-
+anced stable equilibria corresponding to assessment parameters h1
+or h2, which respectively lead to the optimal quali￿cation rate for
+groups a1 or a2 but low quali￿cation rate for the other group. There
+is also a more balanced but unstable equilibrium at some threshold
+hmid between h1 and h2. Outside of this range of w , there is only
+one equilibrium in which one of the groups achieves its optimal
+quali￿cation rate. These ￿ndings are summarized in the following
+two propositions.
+P￿￿￿￿￿￿￿￿￿￿ 4.1. De￿ne   B (1 h1 ) ( wh2
+2+h2 (1 h1 ) wh1 (1 h1 ))
+w ((1 h1 )2 h2
+2 ))
+.
+Note that   2 (0,h2   h1) for anyw . Letw 2 (wl ,wu ) where
+wl :=
+(1   h1)2
+(1   h2)h2 + (1   h1)2
+, wu :=
+h2 (1   h1)
+h22 + h1 (1   h1)
+. (2)
+Given Assumption 1, there exists two stable equilibria at
+h = h1,  a1 = w,  a2 = w ·
+h1
+h2
+, and (3)
+h = h2,  a1 = w ·
+1   h2
+1   h1
+,  a2 = w, . (4)
+and a unique non-zero unstable equilibrium at
+h = hmid := h1 +  ,  a1 = w ·
+1   h1    
+1   h1
+,  a2 = w ·
+h1 +  
+h2
+.
+Whenw = 1   h1, the unstable equilibrium is fully balanced.
+P￿￿￿￿￿￿￿￿￿￿ 4.2. Given Assumption 1 whenw < wl there exists
+one stable equilibrium de￿ned by Equation 4, and whenw > wu there
+exists one stable equilibrium de￿ned by Equation 3.
+The details of the proofs are presented in Appendix C. At a high
+level, if the wage is not too low or too high, both thresholds h1 and
+h2 correspond to stable equilibria, at which either group a1 or a2 is
+perfectly classi￿ed. The equilibrium corresponding to hmid, where
+the classi￿er has the same true positive and false positive rates in
+both groups, is unstable and subsequently harder to achieve.
+5Our results also generalize to the setting where the CDF for the cost G : [0, 1] !
+[0, 1] is an arbitrary strictly increasing function.
+In Table 1, we compare these equilibria in terms of metrics intro-
+duced in Section 2, under the assumptions of Proposition 4.1. We
+use standard notation   and ⇠ to denote preference and indi￿er-
+ence respectively. For example, we ￿nd that in terms of balance in
+quali￿cation rates, the stable equilibrium associated withh1 is more
+balanced that the stable equilibrium associated with h2, but both
+are always less balanced unstable equilibrium associated with hmid.
+Details of the computation are deferred to Table C.1 in Appendix C.
+Ranking of Equilibria
+Stability h1,h2 are stable.
+hmid is unstable
+Quali￿cation rate of group a1 h1   hmid   h2
+Quali￿cation rate of group a2 h2   hmid   h1
+Balance of quali￿cation rates hmid   h1   h2
+Institution’s Utility no ranking
+Table 1: Comparison of equilibria for uniform features. In
+this table we refer to each equlibria using the associated
+threshold decision policy.
+4.2 Multivariate Gaussian X
+We consider X = Rd and   = Sd 1, where Sd 1 is the set of d-
+dimensional unit vectors. Let Ŷh = 1{X>h   0} for all h 2   denote
+separating hyperplane policies and \h,h0 B 1
+  arccos( h>h0
+kh k kh0 k )
+denote the angle between two vectors, normalized by the constant   .
+We consider two groups a1 and a2 associated respectively with
+vectors h1 and h2, such that \h1,h2 , 0. We assume the groups have
+equal size, i.e., na1 = na2 . For each group, the feature distribution
+is a d-dimensional spherical Gaussian centered at the origin such
+that the quali￿ed individuals are in halfspace 1{X>hi   0} and
+the unquali￿ed individuals in halfspace 1{X>hi < 0}. Formally, for
+x 2 Rd and i 2 {1, 2},
+P(X = x | Y =  ,A = ai ) =
+8><>:
+2  (x )1{x>hi   0} for   = 1 and
+2  (x )1{x>hi < 0} for   = 0,
+where   (x ) is the density of the spherical d-dimensional Gaussian.
+This is depicted in Figure 2 (left).
+A￿￿￿￿￿￿￿￿￿ 2. We assume that the CDF for the cost of acquiring
+quali￿cations is a strictly increasing function G : [0, 1]! [0, 1] and
+is the same in both groups.
+As we will see, the relative gain (loss) of the institution for
+accepting a quali￿ed (unquali￿ed) individual, that is pTP/cFP, plays
+a role in the nature of the equilibria. The following proposition
+characterizes the equilibria when this value is strictly positive, that
+is, when the bene￿t of true positives outweighs the cost of false
+positives. Notably, similar to the previous setting of uniform scores,
+the current setting also has two stable equilibria that each favor one
+group at the expense of the other, as well as a balanced equilibrium
+that is unstable.
+P￿￿￿￿￿￿￿￿￿￿ 4.3. Given Assumption 2 and pTP > cFP, there exists
+two stable equilibria, at
+h = h1,  a1 = G (w )  a2 = G
+⇣
+w · (1   2\h1,h2 )
+⌘
+,
+h = h2,  a1 = G
+⇣
+w (1   2\h1,h2 )
+⌘
+ a2 = G (w ).
+There is a unique non-zero unstable equilibrium at
+h = hmid,  a1 = G
+⇣
+w (1   \h1,h2 )
+⌘
+ a2 = G
+⇣
+w (1   \h1,h2 )
+⌘
+,
+where hmid := h1+h2
+kh1+h2 k .
+Let us brie￿y comment on the high level proof idea and defer
+the full argument to Appendix D. Since pTP > cFP, the institution
+cares more about accepting true positives than avoiding false pos-
+itives. Therefore, the utility-maximizing h is determined by the
+group that has a higher quali￿cation rate and thus has a higher
+fraction of positives — this is h1 (resp. h2) whenever  a1 >  a2
+(resp.  a1 <  a2 ). When quali￿cation rates are equal between the
+two groups, the institution maximizes its utility at any h that is
+a convex combination of h1 and h2, but the unique h that would
+induce equal quali￿cation rate is h = hmid, where the classi￿er has
+the same true positive and false positive rates in both groups.
+An unfortunate implication of this result is that the dynamics will
+always converge to an unbalanced quali￿cation rate, except when
+the initial levels of investment are exactly the same. Even though a
+fully balanced equilibrium exists, it is unstable and therefore not
+robust to small perturbations in either the quali￿cation rates or the
+classi￿er, which in practice is unavoidable given sampling noise.
+In Table 2, we compare these equilibria in terms of metrics intro-
+duced in Section 2. For example, we ￿nd that in terms of institutional
+utility, the stable equilibria associated with h1 and h2 are equally
+preferred, and are both strictly preferred to the unstable equilibrium
+associated with hmid. This implies that the institution has no incen-
+tive at all to keep the dynamics at the unstable equilibrium, even
+though it induces balanced investment. Exact values are deferred
+to Table D.1 in Appendix D.
+Ranking of Equilibria
+Stability h1,h2 are stable.
+hmid is unstable
+Quali￿cation rate of group a1 h1   hmid   h2
+Quali￿cation rate of group a2 h2   hmid   h1
+Balance of quali￿cation rate hmid   h1 ⇠ h2
+Institution’s Utility h1 ⇠ h2   hmid
+Table 2: Comparison of equilibria for Multivariate Gaussian
+features. In this table we refer to each equlibria using the
+associated hyperplane.
+Interestingly, when pTP < cFP, there are no stable equilibria;
+instead there exists a stable limit cycle between h1 and h2. This is
+stated informally in the following proposition.
+P￿￿￿￿￿￿￿￿￿￿ 4.4. Given Assumption 2 and pTP < cFP, there exists
+no stable equilibria. Instead there exists a limit cycle and one non-
+trivial unstable equilibrium.
+Intuitively, the cycle is caused by misaligned incentives between
+the institution and the individuals. Since the institution ￿nds false
+positives more costly than false negatives, it prefers the hyperplane
+that classi￿es more false positives correctly. At each time step,
+it will choose the hyperplane associated with the group that has
+a lower quali￿cation rate, prompting that group to invest more
+in the next time step. Strikingly, even a simple group-realizable
+model involving multivariate Gaussian distributions demonstrates
+a large range of limiting behaviors. In Section 6, we also observe the
+existence of limit cycles in simulations with real data distributions.
+4.3 Di￿erent Costs of Investment by Group
+Thus far we have assumed that all groups have the same distribution
+of the cost of investment, G. In reality, the cost of investment may
+be distributed di￿erently in each group; a disadvantaged group
+might on average experience higher (monetary or opportunity)
+costs. For example, low income families who may have to take out
+loans to pay for college tuition incur high interest rates. This is
+a compelling setting that re￿ects deep-seated disparities in access
+to opportunity between demographic groups in the real world;
+an analogous setting has been considered by works on strategic
+classi￿cation, where the costs for manipulating features is posited
+to di￿er across groups [26, 36].
+In this section, we consider the rami￿cations of di￿erences in
+investment cost across groups, focusing on the setting of Section 4.2.
+We show that the disadvantage from having higher costs is ampli-
+￿ed under group-realizability. Speci￿cally, suppose that group a1
+(resp. a2) has costs distributed according to cumulative distribution
+functionG1 (resp.G2), and that group a1 is disadvantaged in terms
+of costs. The following result observes that if G1 su￿ciently domi-
+nates G2, then there exists no stable equilibrium that encourages
+optimal investment from group a1 and no equilibrium that is bal-
+anced for both groups, in sharp contrast to the characterization in
+Proposition 4.3. The proof is deferred to Appendix E.
+P￿￿￿￿￿￿￿￿￿￿ 4.5. Consider the multi-variate Gaussian setting of
+Section 4.2. Suppose G1 and G2 are such that G1 (w ) < G2 (w (1  
+2\h1,h2 )), then there exists a single non-trivial equilibrium at h2,
+which is also stable. The level of investment by group a1 (resp. a2) is
+G1 (w (1   2\h1,h2 ) (resp. G2 (w )).
+E￿ect of subsidies. In this situation, an intervention that would
+e￿ectively raise the equilibrium level of investment by the disadvan-
+taged group is to subsidize the cost of investment. In particular, as
+long as we replaceG1 with a stochastically dominated distribution
+Ḡ1 such that Ḡ1 > G2 (w (1   2\h1,h2 )), under the new dynamics
+ sub, h1 will again be a stable equilibrium, and there will also exist
+a more balanced, unstable equilibrium at h = h̄mid, which is some
+convex combination of h1 and h2. At all equilibria of  sub, group
+a1 will have higher levels of investment than G1 (w (1   2\h1,h2 )).
+However, this improvementmay come at a cost to the advantaged
+group, since  sub has multiple equilibria and some of them have
+group a2 investing less than G2 (w ). Still one might argue that the
+equilibria of  sub are more equitable, since the dynamics without
+subsidies always result in optimal investment by group a2 and low
+investment by group a1.
+4.4 Decoupling the Assessment Rule by Group
+The models we studied in Sections 4.2 and 4.1 suggest that apply-
+ing the same, or “joint”, assessment rule to heterogeneous groups
+results in undesirable trade-o￿s—between balance, stability, and
+other metrics—at all equilibria, even though there exists a perfect
+assessment rule for each group separately.
+Decoupling the classi￿er by group is a natural intervention in
+this setting. Namely, the institution may choose a group-speci￿c
+ a 2   to assess individuals from group a 2 A, assuming that
+the group attribute information is available. This corresponds to
+choosing  a that maximizes the utility that the institution derives
+from each group separately. Thus we now consider the decoupled
+dynamics  dec where the institution uses group-speci￿c assessment
+rules, i.e., for all a 2 A
+ bra ( a ) B argmax
+ a 2 
+pTPTPRa ( a ) a  cFPFPRa ( a ) (1  a ).6 (5)
+As in the standard joint setting individuals still acquire quali￿-
+cation according to their group utility as follows
+ bra ( a ) B G (w (TPRa ( a )   FPRa ( a ))).
+We denote by  dec 2 [0, 1] |A | the equilibria of the decoupled
+dynamics,  dec =
+⇣
+ bra    bra
+⌘
+a2A . It is not hard to see that decou-
+pling is helpful in a group-realizable setting. That is, the quali￿ca-
+tion rates of the decoupled equilibrium  dec Pareto-dominates the
+quali￿cation rates of all equilibria   under a joint assessment rule,
+whenever group-realizability holds.
+P￿￿￿￿￿￿￿￿￿￿ 4.6 (D￿￿￿￿￿￿￿￿￿). Consider a group-realizable set-
+ting, that is, for every a 2 A, there exists a perfect assessment rule
+ 
+opt
+a 2   such that TPRa ( 
+opt
+a )   FPRa ( opta ) = 1. Then  dec has a
+unique stable equilibrium  dec, where  dec
+a = G (w ). Moreover, for
+any equilibrium   of the joint dynamics  ,  dec
+a    a for all a 2 A.
+Furthermore, if there is no perfect assessment rule, i.e.,
+max
+  2 
+X
+a2A
+na (TPRa (  )   FPRa (  )) < 1,
+then for some a 2 A,  dec
+a >  a .
+This proposition directly follows from Proposition 3.1.
+Indeed, decoupling always helps in the group-realizable setting—
+not only does it not decrease any group’s equilibrium quali￿cation
+rate, it also increases the equilibrium quali￿cation rate of at least
+one group when realizability across all groups does not hold. In
+Sections 5 and 6 we examine decoupling in the absence of group-
+realizability and see that those cases are not as clear-cut. When
+group-realizability does not hold, in some cases decoupling is still
+helpful while in others it can signi￿cantly harm one group.
+5 BEYOND GROUP-REALIZABILITY:
+MULTIPLE EQUILIBRIA WITHIN GROUP
+We have so far considered settings where the learning problem is
+realizable (or almost realizable) within each group. This is a common
+assumption in various prior works, such as Hu et al. [26]. As we
+saw in Section 4, there may be multiple undesirable equilibria when
+a joint assessment rule is used in a group-realizable setting, but
+these undesirable equilibria disappear in the decoupled dynamics.
+In many application domains, realizability does not hold even
+at a group level. That is to say, no assessment rule in   can per-
+fectly separate quali￿ed and unquali￿ed individuals even within
+one group. This may be due to the fact that mapping individuals
+to the visible feature space X involves loss of information or there
+may be other sources of stochasticity in the domain [12], making it
+impossible to provide a high accuracy assessment of individuals’
+quali￿cations. A key consequence of the lack of realizability is that
+even for a single group, the optimal classi￿er now can vary greatly
+with  a , the group’s quali￿cation rate. As a result, our guarantees
+6As when we de￿ned the joint dynamics (Section 2), when the argmax is not unique,
+we assume ties are broken according to a ￿xed and well-de￿ned order.
+about the near-optimality of stable equilibria (Theorem 3.2) no
+longer hold, and there could exist multiple stable equilibria each
+corresponding to a di￿erent quali￿cation rate within a group. In
+this section, we investigate the existence of bad equilibria for a
+single group and its implications on decoupling when the learning
+problem is not group-realizable. For the rest of this section, we
+consider a single group, i.e., |A| = 1 and suppress a in the notation.
+In the following proposition (proved in Appendix F), we charac-
+terize conditions under whichmultiple equilibria exists for arbitrary
+feature spaces and assessment rules. This is a generalization of a
+classical result from Coate and Loury [10] that considers a one-
+dimensional feature space; we restate and prove the classical result
+as a consequence of Proposition 5.1 in Appendix F.
+P￿￿￿￿￿￿￿￿￿￿ 5.1 (M￿￿￿￿￿￿￿ ￿￿￿￿￿￿￿￿￿ ￿￿ ￿￿￿￿￿￿￿￿￿ ￿￿￿￿￿￿￿
+￿￿￿￿￿￿). Let   be as de￿ned in Section 2. For any quali￿cation rate
+  , let
+  (  ) B TPR( br (  ))   FPR( br (  )),
+be the di￿erence between true and false positive rates of the institu-
+tion’s utility maximizing assessment rule with respect to   . Assume
+  (  ) is continuous, the CDF of the cost G is continuous and that
+there exists   2   such that P(Ŷ  = 1) = 0 and   0 2   such that
+P(Ŷ  0 = 1) = 1, i.e., there is a assessment rule that accepts every-
+one and an assessment rule that rejects everyone. Also suppose the
+likelihood ratio   (x ) := P(X=x |Y=0)P(X=x |Y=1) is strictly positive on X.
+If x < G (w  (x )) for some x 2 (0, 1), then there exists at least
+two distinct non-zero equilibria where   =  (  ). If in addition
+  is di￿erentiable, an equilibrium at   is locally stable whenever
+G 0(w  (  )) < |  0(  ) |, where G 0 and   0 denote the derivatives of G
+and   respectively.
+Proposition 5.1 describes conditions under which there exists
+more than one equilibrium in the dynamics modeled in Section 2.
+Given a di￿erentiable   (  ), one can always construct a monoton-
+ically increasing G, such that the dynamics   has any number of
+locally stable equilibria. The implication of having multiple equi-
+libria is that the dynamics may converge to di￿erent equilibrium
+quali￿cation rates depending on the initial investment, even for a
+single group. This makes the setting particularly hard to analyze.
+Nevertheless, the following result, proved in Appendix F, shows
+that even in the non-realizable setting, subsidizing the cost of invest-
+ment by changing the distribution G to a stochastically dominant
+distribution Ḡ will create a new equilibrium that has a higher quali-
+￿cation rate. In other words, subsidies in the non-realizable setting
+also improve the quality of equilibria. However, the new equilibrium
+is not guaranteed to be locally stable. We see some rami￿cations of
+this empirically in the next section.
+P￿￿￿￿￿￿￿￿￿￿ 5.2 (S￿￿￿￿￿￿￿￿ ￿￿￿￿￿￿￿ ￿￿￿￿￿￿￿￿￿￿￿￿￿). Suppose
+ ⇤ > 0 is an equilibrium for the dynamics  G , where the cost of
+investment is distributed according to G on [0, 1]. Let Ḡ be a CDF
+that is stochastically dominated by G, that is, Ḡ (x ) > G (x ) for all
+x 2 (0, 1), and both G and Ḡ are strictly increasing. Then there exists
+ ̄ >  ⇤ such that  ̄ is an equilibrium for  Ḡ .
+6 SIMULATIONS WITH NON-REALIZABILITY
+In this section we present results from numerical experiments ex-
+amining the e￿ects of decoupling and subsidies under our model of
+dynamics, in the absence of group-realizability. We consider a styl-
+ized semi-synthetic experiment, based on a widely used FICO credit
+score dataset from a 2007 Federal Reserve report [42]. Importantly,
+only aggregate statistics were reported and the data we accessed
+does not contain sensitive or private information. Our modeling
+assumptions may not be realistic for this dataset (see Section 8) and
+our simulations should not be interpreted as policy recommenda-
+tions. Instead, these experiments help us illustrate qualitatively the
+types of dynamics one may ￿nd using real world data.
+Stylized Model. We describe how our model can be instantiated
+to a highly stylized example of credit scoring and lending. Assume
+a loan applicant either has the means to repay a loan or not. If they
+have the means to repay, they always repay (Y = 1); otherwise
+they always default (Y = 0). In order to have the means to repay,
+applicants must make an ex ante investment at the cost ofC , whose
+distribution is P(C < c ) = G (c ). This represents costly actions an
+individual has to take in order to acquire the ￿nancial ability to
+repay loans, e.g. working at a stable job or taking job preparation
+classes. Applicants from group a who have the means to repay
+receive credit scores X drawn from f a1 and those who don’t receive
+credit scores drawn from f a0 . The decision of the bank is to approve
+or reject a loan applicant, given their credit scores.
+Dataset. FICO scores are widely used in the United States to
+predict credit worthiness. The dataset, which contains aggregate
+statistics, is based on a sample of 301,536 TransUnion TransRisk
+scores from 2003 [42] and has been preprocessed by Hardt et al.
+[22]. These scores, corresponding toX in our model, range from 300
+to 850. For simplicity, we rescale the scores so that they are between
+0 and 1. Individuals were labeled as defaulted if they failed to pay
+a debt for at least 90 days on at least one account in the ensuing
+18-24 month period. The data is also labeled by race, which is the
+group attribute A that we use. We compute empirical conditional
+feature distributions P(X = x | A = a,Y =  ) from the available
+data and ￿t Beta distributions7 to these to obtain f a0 , f
+a
+1 .
+We treat these distributions as if they came from our model as
+shown in Figure 1, for the sole purpose of illustration. This is not
+to claim that our modeling assumptions hold on this dataset, as dis-
+cussed earlier. Given the lending domain is complex, our aim is not
+to faithfully represent this particular domain with our model, but
+to simulate feature distributions that exhibit group heterogeneity
+and non-realizability, hence extending our consideration beyond
+the idealized settings of Sections 3 and 4.
+Figure 3 shows the histograms as well as the ￿tted Beta distri-
+butions for f a0 , f
+a
+1 , where a is the race attribute. It is clear that
+group-realizability does not hold even approximately, since there
+is signi￿cant overlap in the distributions of credit scores for people
+who repaid and for people who did not repay.
+6.1 Decoupling and Multiple Stable Equilibria
+Although decoupling is guaranteed to improve the quali￿cation
+rate at equilibrium over using a joint decision rule for every group
+(Sections 3 and 4), this is not necessarily true in the non-realizable
+setting. In fact, even when G is the uniform distribution on [0, 1]
+in all groups (i.e. the cost of investment C is uniformly distributed
+on [0, 1], as we considered in Section 4), decoupling did not bene￿t
+7We simulate 100,000 samples from the empirical PDF (see Figure 3) and ￿t a Beta
+distribution by maximum likelihood estimation.
+Figure 3: Score distributions conditioning on repayment out-
+come (Y ) for di￿erent race groups
+Improvement in final qualification rate after decoupling
+Initial qualification rate
+Improvement in final qualification rate after decoupling
+Initial qualification rate
+Figure 4: E￿ects of decoupling in presence of multiple equi-
+libria. We vary the initial quali￿cation rate in the x-axis.
+all groups. As can be seen from Figure G.1 in Appendix G, while
+the White and Asian groups had a higher quali￿cation rate after
+decoupling, the Black and Hispanic groups saw their equilibrium
+quali￿cation rate decrease. On the other hand, the e￿ects of decou-
+pling were small in this case (less than 3 percent points di￿erence
+in the ￿nal quali￿cation rate).
+We now show that the e￿ect of decoupling can be drastic de-
+pending on G. Recall that in Section 5, we showed that multiple
+equilibria, with possibly vastly di￿erent quali￿cation rates, may
+exist under the non-realizable setting even when there is a only
+single group. In general the existence of multiple equilibria depends
+on properties ofG , that is, how the cost of investment is distributed
+in a group. In Figure 4, we show the change in equilibrium invest-
+ment level after decoupling for an experiment with two groups,
+Asian and Hispanic. The two plots each correspond to a di￿erent
+bimodal Gaussian distribution for G, truncated to [0, 1], that have
+been chosen such that the decoupled dynamics have multiple stable
+equilibria for the Hispanic (right) and the Asian (left) respectively8.
+In both plots, we can see that the e￿ects of decoupling depend on
+the initial quali￿cation rate. If the initial quali￿cation rate was too
+low, or too high, the decoupled dynamics converge to an equilibrium
+where one of the groups invest in quali￿cations at a much lower
+level than they would under the joint dynamics.9
+8The right (resp. left) plot is generated using a bimodal normal distribution forG with
+modes at 0.57 and 0.74 (resp. at 0.57 and 0.63).
+9See Figure G.2 in Appendix G for the converged quali￿cation rates of both groups.
+Fi
+na
+l q
+ua
+lifi
+ca
+tio
+n 
+ra
+te
+ 
+Subsidizing one group under joint and decoupled dynamics
+Black (joint)
+Black (decoupled)
+White (joint)
+White (decoupled)
+Asian (joint)
+Asian (decoupled)
+Hispanic (joint)
+Hispanic (decoupled)
+Figure 5: E￿ects of raising the average cost of investment, by
+varying the mean of G on the x-axis.
+6.2 Subsidizing the Cost of Investment
+In this experiment, we consider if subsidizing the cost of investment
+of one group by changing G improves their new equilibrium quali-
+￿cation rate, under both decoupled and joint dynamics. Speci￿cally,
+we vary the cost of investment in the Black group.
+We use a truncated normal distribution for G and vary its mean
+(on the x-axis) for a single group, while keeping the other groups’
+G unchanged (mean of 0.6).
+Figure 5 shows that subsidizing the cost of investment is e￿ective
+in raising the equilibrium investment level of a group, both in the
+joint learning and decoupled learning case. Interestingly, large
+amounts of subsidy for a single group reduced the equilibrium
+investment levels of other groups. As also suggested by theoretical
+results in section 4.3, subsidizing the quali￿cation rate of one group
+does sometimes entail a tradeo￿ in the quali￿cation rates of other
+possibly more advantaged groups.
+Interestingly, lowering the mean cost of investment in the Black
+group below 0.35 caused the ￿nal quali￿cation rate to decrease.
+This is not a contradiction of Proposition 5.2, which argues that
+equilibria improve under subsidies but does not guarantee that the
+dynamics will converge to the improved equilibrium. In this case,
+the decoupled dynamics for the Black group (where the mean cost
+of investment is 0.30) actually converged to a limit cycle and the
+￿nal quali￿cation rate in the plot is an average of the points in
+the limit cycle. Limit cycles are a challenging object to study in
+dynamical systems and game theory. While we have commented
+on their existence in a simple model in group-realizable setting of
+Section 4.2, we leave their implications in the general non-realizable
+setting to future work.
+7 RELATEDWORK
+Our work follows a growing line of work on how machine learning
+algorithms interact with human actors in a dynamic setting, with
+the goal of understanding and mitigating disparate impact.
+Recent work examine the long-term impact of group fairness cri-
+teria [see e.g., 4, Chapter 2] on automated decision making systems:
+Liu et al. [33] show that static fairness criteria fail to account for the
+delayed impact that decisions have on the welfare of disadvantaged
+groups. In the context of hiring, however, Hu and Chen [25] ￿nd
+that applying the demographic parity constraint in a temporary
+labor market achieves an equitable long-term equilibrium in the
+permanent labor market by raising worker reputations.
+Prior work on the fairness of machine learning has examined
+tradeo￿s between fairness criteria [9, 32], as well as the incompati-
+bility between risk minimization and fairness criteria [34], assum-
+ing that the quali￿cation rates di￿er across groups. These results
+concern the static setting, whereas we highlight the fact that quali-
+￿cation rates tend to change in response to the decision rules.
+Another line of work [23, 45] analyzes a dynamic model where
+users respond to errors made by an institution by leaving the
+user base uniformly at random, and demonstrate how the risk-
+minimizing approach to machine learning can amplify representa-
+tion disparity over time. This is complementary to our work which
+models individuals as rational decision makers who may or may
+not have the incentive to acquire the positive label. In particular,
+Hashimoto et al. [23] show that equilibria with equal user represen-
+tation from all groups can be unstable, and that robust learning can
+stabilize such equilibria. Unlike in our model, the user represen-
+tation model does not distinguish between positive and negative
+labels, and thus do not distinguish between false negative and false
+positive errors. This is a crucial distinction in high-stakes decision
+making as di￿erent error types present asymmetric incentives for
+individuals, as explained in Section 2; for example, a high false pos-
+itive rate in hiring would encourage under-quali￿ed job applicants.
+Hu et al. [26] and Milli et al. [36] study the disparate impact of
+being robust towards strategic manipulation [see e.g., 21], where
+individuals respond to machine learning systems by manipulating
+their features to get a better classi￿cation. In contrast to our model
+(Figure 5), their setting models the individual as intervening directly
+on their features, X , and this is assumed to have no e￿ect on their
+quali￿cation Y . This assumption applies to features that are easy
+to ‘game’ (e.g. scores on standardized tests can be improved by
+test preparation classes) but is less applicable to features that more
+directly correspond to investment in one’s quali￿cations (e.g. taking
+AP courses in high school). Hu et al. [26] also show that subsidizing
+the costs of the disadvantaged group to strategically manipulate
+their features can sometimes lead to harmful e￿ects. Kleinberg and
+Raghavan [31] and Khajehnejad et al. [29] study decision policies
+that incentivize individuals to directly manipulate their features X
+to optimize particular notions of utility.
+Our work is also related to the topic of statistical discrimination
+in economics [2, 3, 40], which studies how disparate market out-
+comes at equilibrium can arise from imperfect information. This
+line of work often involves wage discrimination, whereas we as-
+sume the wage is ￿xed and standard for all groups. Coate and Loury
+[10] proposed a model of rational individual investment in the labor
+market under a ￿xed wage and showed that a￿rmative action may
+lead to an undesirable equilibrium where one group still invests
+sub-optimally. The model in our work is most closely related to
+their model, with two key distinctions: 1) We allow features X to be
+multi-dimensional, whereas Coate and Loury [10] assumes thatX is
+a one-dimensional ‘noisy signal’. 2) We consider the case where the
+conditional feature distributions, P(X = x | Y =  ,A = a), di￿er by
+groups whereas Coate and Loury [10] assumes that the groups are
+identically distributed. Under our models, if the conditional feature
+distributions were shared across groups, then any hiring policy
+will result in fully balanced equilibria where all groups have the
+same quali￿cation rate and are hired at the same rate. This does not
+corroborate with reality, where conditional feature distributions do
+in fact di￿er across groups and we routinely observe institutions
+applying the same model to all individuals only to see obviously
+discriminatory outcomes [14]. By modeling feature heterogeneity
+across groups, we ￿nd it necessarily leads to disparate equilibria.
+Recently, Mouzannar et al. [37] studied the equilibria of quali￿ca-
+tion rates under a generic class of dynamics, focusing on contractive
+maps and the e￿ects of a￿rmative action. In contrast, our work mo-
+tivates a model of dynamics based on rational investment, and this
+typically leads to non-contractive dynamics. We are both interested
+in balanced equilibria, which they termed ‘social equality’.
+Finally, our work studies two interventions for ￿nding more
+desirable equilibria: decoupling the classi￿er and subsidizing the
+cost of investment. Several works, including Dwork et al. [17] and
+Ustun et al. [43], have studied decoupled classi￿ers in the static clas-
+si￿cation setting. Our work sheds light on when such interventions
+are useful in the dynamic decision making setting.
+8 DISCUSSION AND FUTUREWORK
+In this work, we have made the following contributions:
+(1) We proposed a dynamic model of decision making where indi-
+viduals invest rationally based on the current assessment rule.
+We studied the properties of equilibria under these dynamics.
+(2) We showed that common properties of real data, namely het-
+erogeneity across groups and the lack of realizability, lead to
+undesirable tradeo￿s at equilibria, resulting in long term out-
+comes that disadvantage one or more groups.
+(3) We considered two interventions—decoupling and subsidizing
+the cost of investment—and showed that they have a signi￿-
+cant impact on the nature of equilibria both in theory and in
+numerical experiments.
+We now discuss the limitations of the current work and avenues
+for future research. Questions related to sampling and its rami￿-
+cations for the nature of equilibria are challenging and warrant
+further study. This work assumed that the institution can estimate
+the true and false positive rates over the entire population, even
+though it really can only observe the quali￿cation of candidates
+after hiring them. This is known as the selective labeling problem,
+which could introduce bias. In theory, unbiased estimates can be
+achieved by a small degree of random sampling and appropriate
+reweighting [see e.g., 30], but this is still a large problem in practice
+that requires domain-speci￿c knowledge and solutions [15, 28].
+Our model assumed that individuals make a rational decision to
+invest and can a￿ect their quali￿cation Y directly. This assumption
+could be reasonable in settings like hiring, for example, where
+investing to acquire skills usually leads to increased competence.
+In some settings, however, individuals may be unable to e￿ectively
+intervene onY . For example, a business loan applicant who is a good
+business operator could still default on their loan due to external
+economic shocks or other forms of disadvantage that have not
+been taken into account. In this case, the current model does not
+fully capture the complex societal processes that lead to a positive
+outcome. Our work nonetheless shows that even in an idealized
+setting where individuals can e￿ectively and rationally intervene
+on their outcome labels Y , underlying factors such as heterogeneity
+across groups and non-realizability already lead to undesirable
+tradeo￿s at equilibrium. We leave the extensions of the current
+model beyond rational individual investment to future work.
+REFERENCES
+[1] Abhay P. Aneja and Carlos F. Avenancio-Leon. 2019. No Credit For Time Served?
+Incarceration and Credit-Driven Crime Cycles.
+[2] Kenneth J. Arrow. 1973. The Theory of Discrimination. In Discrimination in Labor
+Markets. Princeton University Press, 3–33.
+[3] Kenneth J. Arrow. 1998. What Has Economics to Say about Racial Discrimination?
+Journal of Economic Perspectives 12, 2 (Spring 1998), 91–100.
+[4] Solon Barocas, Moritz Hardt, and Arvind Narayanan. 2018. Fairness and Machine
+Learning. fairmlbook.org. http://www.fairmlbook.org.
+[5] Solon Barocas and Andrew D Selbst. 2016. Big Data’s Disparate Impact. California
+Law Review 104, 671 (2016).
+[6] David Card and Jesse Rothstein. 2007. Racial segregation and the black-ĂŞwhite
+test score gap. Journal of Public Economics 91, 11 (2007), 2158 – 2184.
+[7] Allison J. B. Chaney, Brandon M. Stewart, and Barbara E. Engelhardt. 2018. How
+Algorithmic Confounding in Recommendation Systems Increases Homogeneity
+and Decreases Utility. In Proceedings of the 12th ACM Conference on Recommender
+Systems (RecSys ’18). ACM, New York, NY, USA, 224–232. https://doi.org/10.
+1145/3240323.3240370
+[8] Raj Chetty, Nathaniel Hendren, and Lawrence F. Katz. 2016. The E￿ects of
+Exposure to Better Neighborhoods on Children: New Evidence from the Moving
+to Opportunity Experiment. American Economic Review 106, 4 (2016), 855–902.
+[9] A. Chouldechova. 2017. Fair Prediction with Disparate Impact: A Study of Bias
+in Recidivism Prediction Instruments. Big Data 5 (2017), 153–163. Issue 2.
+[10] Stephen Coate and Glenn C. Loury. 1993. Will A￿rmative-Action Policies Elimi-
+nate Negative Stereotypes? The American Economic Review 83, 5 (1993), 1220–
+1240.
+[11] Michael Conover, Jacob Ratkiewicz, Matthew R Francisco, Bruno Goncalves,
+Filippo Menczer, and Alessandro Flammini. 2011. Political polarization on twitter.
+ICWSM 133 (2011), 89Ð96.
+[12] Sam Corbett-Davies and Sharad Goel. 2018. The Measure and Mismeasure of
+Fairness: A Critical Review of Fair Machine Learning. CoRR abs/1808.00023
+(2018).
+[13] Kate Crawford. 2017. The Trouble with Bias. NeurIPS Keynote.
+[14] Je￿rey Dastin. 2019. Amazon scraps secret AI recruiting tool that showed bias
+against women. Reuters (10 2019).
+[15] Maria De-Arteaga, Artur Dubrawski, and Alexandra Chouldechova. 2018. Learn-
+ing under selective labels in the presence of expert consistency. Workshop on
+Fairness, Accountability, and Transparency in Machine Learning (FAT/ML) (2018).
+[16] Maria De-Arteaga, Alexey Romanov, Hanna Wallach, Jennifer Chayes, Chris-
+tian Borgs, Alexandra Chouldechova, Sahin Geyik, Krishnaram Kenthapadi, and
+Adam Tauman Kalai. 2019. Bias in Bios: A Case Study of Semantic Representa-
+tion Bias in a High-Stakes Setting. In Proceedings of the Conference on Fairness,
+Accountability, and Transparency (FAT* ’19). ACM, New York, NY, USA, 120–128.
+https://doi.org/10.1145/3287560.3287572
+[17] Cynthia Dwork, Nicole Immorlica, Adam Tauman Kalai, and Max Leiserson.
+2018. Decoupled Classi￿ers for Group-Fair and E￿cient Machine Learning. In
+Proceedings of the 1st Conference on Fairness, Accountability and Transparency
+(Proceedings of Machine Learning Research), Sorelle A. Friedler and ChristoWilson
+(Eds.), Vol. 81. PMLR, New York, NY, USA, 119–133.
+[18] Danielle Ensign, Sorelle A. Friedler, Scott Neville, Carlos Scheidegger, and Suresh
+Venkatasubramanian. 2018. Runaway Feedback Loops in Predictive Policing. In
+Conference on Fairness, Accountability and Transparency, FAT 2018, 23-24 February
+2018, New York, NY, USA. 160–171.
+[19] Yoav Freund and Robert E Schapire. 1997. A decision-theoretic generalization
+of on-line learning and an application to boosting. J. Comput. System Sci. 55, 1
+(1997), 119–139.
+[20] Andreas Fuster, Paul Goldsmith-Pinkham, Tarun Ramadorai, and Ansgar Walther.
+2017. Predictably Unequal? The E￿ects of Machine Learning on Credit Markets.
+Technical report, CEPR Discussion Papers (2017).
+[21] Moritz Hardt, Nimrod Megiddo, Christos Papadimitriou, and Mary Wootters.
+2016. Strategic Classi￿cation. In Proceedings of the 2016 ACM Conference on
+Innovations in Theoretical Computer Science (ITCS ’16). ACM, New York, NY, USA,
+111–122.
+[22] M. Hardt, E. Price, and N. Srebo. 2016. Equality of Opportunity in Supervised
+Learning. In Advances in Neural Information Processing Systems. 3315–3323.
+[23] Tatsunori Hashimoto, Megha Srivastava, Hongseok Namkoong, and Percy Liang.
+2018. Fairness Without Demographics in Repeated Loss Minimization. In Pro-
+ceedings of the 35th International Conference on Machine Learning (Proceedings
+of Machine Learning Research), Jennifer Dy and Andreas Krause (Eds.), Vol. 80.
+PMLR, Stockholm, Sweden, 1929–1938.
+[24] Caroline Hoxby and Christopher Avery. 2013. The Missing “One-O￿”: The
+Hidden Supply of High-Achieving, Low-Income Students. Brookings Papers on
+Economic Activity 1 (2013), 1–65.
+[25] Lily Hu and Yiling Chen. 2018. A Short-term Intervention for Long-term Fairness
+in the LaborMarket. In Proceedings of the 2018WorldWideWeb Conference (WWW
+’18). International World Wide Web Conferences Steering Committee, Republic
+and Canton of Geneva, Switzerland, 1389–1398.
+[26] Lily Hu, Nicole Immorlica, and Jennifer Wortman Vaughan. 2019. The Disparate
+E￿ects of Strategic Manipulation. In Proceedings of the Conference on Fairness,
+Accountability, and Transparency (FAT* ’19). ACM, New York, NY, USA, 259–268.
+https://doi.org/10.1145/3287560.3287597
+[27] Ehud Kalai. 2004. Large Robust Games. Econometrica 72, 6 (2004), 1631–1665.
+[28] Nathan Kallus and Angela Zhou. 2018. Residual Unfairness in Fair Machine
+Learning from Prejudiced Data. In Proceedings of the 35th International Conference
+on Machine Learning (Proceedings of Machine Learning Research), Jennifer Dy and
+Andreas Krause (Eds.), Vol. 80. PMLR, Stockholmsmässan, Stockholm Sweden,
+2439–2448.
+[29] Moein Khajehnejad, Behzad Tabibian, Bernhard Schölkopf, Adish Singla, and
+Manuel Gomez-Rodriguez. 2019. Optimal Decision Making Under Strategic
+Behavior. CoRR abs/1905.09239 (2019). arXiv:1905.09239
+[30] Niki Kilbertus, Manuel Gomez-Rodriguez, Bernhard Schölkopf, Krikamol Muan-
+det, and Isabel Valera. 2019. Improving Consequential Decision Making under
+Imperfect Predictions. CoRR abs/1902.02979 (2019). arXiv:1902.02979
+[31] Jon Kleinberg and Manish Raghavan. 2019. How Do Classi￿ers Induce Agents
+to Invest E￿ort Strategically?. In Proceedings of the 2019 ACM Conference on
+Economics and Computation (EC ’19). ACM, New York, NY, USA, 825–844.
+[32] Jon M. Kleinberg, Sendhil Mullainathan, and Manish Raghavan. [n. d.]. Inherent
+Trade-O￿s in the Fair Determination of Risk Scores. Proceedings of the 8th
+Innovations in Theoretical Computer Science Conference (ITCS 2017) ([n. d.]).
+[33] Lydia T. Liu, Sarah Dean, Esther Rolf, Max Simchowitz, and Moritz Hardt. 2018.
+Delayed Impact of Fair Machine Learning. In Proceedings of the 35th International
+Conference on Machine Learning (Proceedings of Machine Learning Research),
+Jennifer Dy and Andreas Krause (Eds.), Vol. 80. PMLR, Stockholm, Sweden, 3150–
+3158.
+[34] Lydia T. Liu, Max Simchowitz, and Moritz Hardt. 2019. The Implicit Fairness
+Criterion of Unconstrained Learning. In Proceedings of the 36th International
+Conference on Machine Learning (Proceedings of Machine Learning Research),
+Vol. 97. PMLR, Long Beach, California, USA, 4051–4060.
+[35] Stella Lowry and Gordon Macpherson. 1988. A blot on the profession. British
+Medical Journal 296, 6623 (1988), 657–658.
+[36] Smitha Milli, John Miller, Anca D. Dragan, and Moritz Hardt. 2019. The Social
+Cost of Strategic Classi￿cation. In Proceedings of the Conference on Fairness,
+Accountability, and Transparency (FAT* ’19). ACM, New York, NY, USA, 230–239.
+[37] Hussein Mouzannar, Mesrob I. Ohannessian, and Nathan Srebro. 2019. From Fair
+Decision Making To Social Equality. In Proceedings of the Conference on Fairness,
+Accountability, and Transparency (FAT* ’19). ACM, New York, NY, USA, 359–368.
+[38] Eli Pariser. 2011. The Filter bubble: What the Internet is hiding from you. Penguin,
+UK.
+[39] Judea Pearl. 2009. Causality: Models, Reasoning and Inference (2nd ed.). Cambridge
+University Press, New York, NY, USA.
+[40] Edmund Phelps. 1972. The Statistical Theory of Racism and Sexism. American
+Economic Review 62 (02 1972), 659–61.
+[41] David Schmeidler. 1973. Equilibrium points of nonatomic games. Journal of
+Statistical Physics 7, 4 (01 Apr 1973), 295–300.
+[42] US Federal Reserve. 2007. Report to the congress on credit scoring and its e￿ects
+on the availability and a￿ordability of credit.
+[43] Berk Ustun, Yang Liu, and David Parkes. 2019. Fairness without Harm: Decoupled
+Classi￿ers with Preference Guarantees. In Proceedings of the 36th International
+Conference on Machine Learning (Proceedings of Machine Learning Research),
+Kamalika Chaudhuri and Ruslan Salakhutdinov (Eds.), Vol. 97. PMLR, Long
+Beach, California, USA, 6373–6382.
+[44] Meredith Whittaker, Kate Crawford, Genevieve Fried Roel Dobbe, Elizabeth
+Kaziunas, Varoon Mathur, Sarah Myers West, Rashida Richardson, Jason Schultz,
+and Oscar Schwartz. 2018. AI Now Report 2018.
+[45] Xueru Zhang, Mohammad Mahdi Khalili, Cem Tekin, and Mingyan Liu. 2019.
+Long term impact of fair machine learning in sequential decision making:
+representation disparity and group retention. CoRR abs/1905.00569 (2019).
+arXiv:1905.00569

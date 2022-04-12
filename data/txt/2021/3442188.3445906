@@ -1,0 +1,1469 @@
+Socially Fair k-Means Clustering
+Mehrdad Ghadiri
+Georgia Tech
+USA
+ghadiri@gatech.edu
+Samira Samadi
+∗
+MPI for Intelligent Systems
+Germany
+ssamadi@tuebingen.mpg.de
+Santosh Vempala
+Georgia Tech
+USA
+vempala@gatech.edu
+ABSTRACT
+We show that the popular k-means clustering algorithm (Lloyd’s
+heuristic), used for a variety of scientific data, can result in out-
+comes that are unfavorable to subgroups of data (e.g., demographic
+groups). Such biased clusterings can have deleterious implications
+for human-centric applications such as resource allocation. We
+present a fair k-means objective and algorithm to choose cluster
+centers that provide equitable costs for different groups. The algo-
+rithm, Fair-Lloyd, is a modification of Lloyd’s heuristic for k-means,
+inheriting its simplicity, efficiency, and stability. In comparison with
+standard Lloyd’s, we find that on benchmark datasets, Fair-Lloyd
+exhibits unbiased performance by ensuring that all groups have
+equal costs in the output k-clustering, while incurring a negligi-
+ble increase in running time, thus making it a viable fair option
+wherever k-means is currently used.
+ACM Reference Format:
+Mehrdad Ghadiri, Samira Samadi, and Santosh Vempala. 2021. Socially
+Fair k-Means Clustering. In Conference on Fairness, Accountability, and
+Transparency (FAccT ’21), March 3–10, 2021, Virtual Event, Canada. ACM,
+New York, NY, USA, 12 pages. https://doi.org/10.1145/3442188.3445906
+1 INTRODUCTION
+Clustering, or partitioning data into dissimilar groups of similar
+items, is a core technique for data analysis. Perhaps the most widely
+used clustering algorithm is Lloyd’s k-means heuristic [29, 30, 40].
+Lloyd’s algorithm starts with a random set of k points (“centers”)
+and repeats the following two-step procedure: (a) assign each data
+point to its nearest center; this partitions the data into k disjoint
+groups (“clusters”); (b) for each cluster, set the new center to be the
+average of all its points. Due to its simplicity and generality, the k-
+means heuristic is widely used across the sciences, with applications
+spanning genetics [27], image segmentation [34], grouping search
+results and news aggregation [38], crime-hot-spot detection [19],
+crime pattern analysis [32], profiling road accident hot spots [3],
+and market segmentation [8].
+Lloyd’s algorithm is a heuristic to minimize the k-means objec-
+tive: choose k centers such that the average squared distance of a
+point to its closest center is minimized. Note that, these k centers
+∗
+Work done while the author was a Ph.D. student at Georgia Tech.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+© 2021 Association for Computing Machinery.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+https://doi.org/10.1145/3442188.3445906
+automatically define a clustering of the data simply by assigning
+each point to its closest center. To better describe the k-means ob-
+jective and the Lloyd’s algorithm in the context of human-centric
+applications, let us consider two applications. In crime mapping
+and crime pattern analysis, law enforcement would run Lloyd’s al-
+gorithm to partition areas of crime. This partitioning is then used as
+a guideline for allocating patrol services to each area (cluster). Such
+an assignment reduces the average response time of patrol units
+to crime incidents. A second application is market segmentation,
+where a pool of customers is partitioned using Lloyd’s algorithm,
+and for each cluster, based on the customer profile of the center of
+that cluster, a certain set of services or advertisements is assigned
+to the customers in that cluster.
+In such human-centric applications, using thek-means algorithm
+in its original form, can result in unfavorable and even harmful
+outcomes towards some demographic groups in the data. To illus-
+trate bias, consider the Adult dataset from the UCI repository [17].
+This dataset consists of census information of individuals, includ-
+ing some sensitive attributes such as whether the individuals self
+identified as male or female. Lloyd’s algorithm can be executed
+on this dataset to detect communities and eventually summarize
+communities with their centers.
+Figure 1a shows the average k-means clustering cost for the
+Adult dataset [17] for males vs females. The standard Lloyd’s al-
+gorithm results in a clustering which incurs up to 15% higher cost
+for females compared to males. Figure 1b shows that this bias is
+even more noticeable among the five different racial groups in this
+dataset. The average cost for an Asian-Pac-Islander individual is
+up to 4 times worse than an average cost for a white individual.
+A similar bias can be observed in the Credit dataset [43] between
+lower-educated and higher-educated individuals (Figure 1c).
+In this paper, we address the critical goal of fair clustering, i.e., a
+clustering whose cost is more equitable for different groups. This
+is, of course, an important and natural goal, and there has been
+substantial work on fair clustering, including for the k-means objec-
+tive. Prior work has focused almost exclusively on proportionality,
+i.e., ensuring that sensitive attributes are distributed proportionally
+in each cluster [7, 10, 14, 21, 37]. In many application scenarios,
+including the ones illustrated above, one can view each setting of a
+sensitive attribute as defining a subgroup (e.g., gender or race), and
+the critical objective is the cost of the clustering for each subgroup:
+are one or more groups incurring a significantly higher average
+cost?
+In light of this consideration, we consider a different objective.
+Rather than minimizing the average clustering cost over the entire
+dataset, the objective of socially fairk-means is to find ak-clustering
+that minimizes the maximum of the average clustering cost across
+different (demographic) groups, i.e., minimizes the maximum of the
+average k-means objective applied to each group.
+438
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Mehrdad Ghadiri, Samira Samadi, and Santosh Vempala
+(a) Adult census dataset (b) Adult census dataset (c) Credit dataset
+Figure 1: The standard Lloyd’s algorithm results in a significant gap in the average clustering costs of different subgroups of the data.
+Can social fairness be achieved efficiently, while preserving the
+simplicity and generality of standard k-means algorithm?
+Applying existing algorithms for fair clustering with proportion-
+ality constraints leads to poor solutions for social fairness (see
+Figure 10 for comparison on standard datasets), so we need a differ-
+ent solution. Our objective is similar to the recent line of work on
+minmax fairness through multi-criteria optimization [31, 35, 41].
+1.1 Our results
+We answer the above question affirmatively, with an algorithm
+we call Fair-Lloyd. Similar to Lloyd’s algorithm, it is a two-step
+iteration with the only difference being how the centers are updated:
+(a) assign each data point to its nearest center to form clusters
+(b) choose k new fair centers such that the maximum average
+clustering cost across different demographic groups is minimized.
+This step is particularly easy for k-means — average the points in
+each cluster. We prove that, the fair centers can also be computed
+efficiently: using a simple one-dimensional line search when the
+data consists of two (demographic) groups, and using standard
+convex optimization algorithmswhen the data consists ofmore than
+two groups. Furthermore, when the data consists of two groups,
+the convergence of our algorithm is independent of the original
+dimension of the data and the number of clusters.
+We prove convergence, stability and approximability guarantees
+and apply our method to multiple real-world clustering tasks. The
+results show clearly that Fair-Lloyd generates a clustering of the
+data with equal average clustering cost for individuals in different
+demographic groups. Moreover, its computational cost remains
+comparable to Lloyd’s method. Each iteration, to find the next set of
+centers, is a convex optimization problem and can be implemented
+efficiently using Gradient Descent. For two groups, we give a line-
+search method which is significantly faster. This extends to a fast
+heuristic for m > 2 groups whose distance to optimality can be
+tracked. This approach might be of independent interest as a very
+efficient heuristic for similar optimization problems.
+Due to the simplicity and efficiency of the Fair-Lloyd algorithm,
+we suggest it as an alternative to the standard Lloyd’s algorithm
+in human-centric and other subgroup-sensitive applications where
+social fairness is a priority.
+1.2 Fair k-means: Objective and Algorithm
+To introduce the fair k-means objective, we define a more general
+notion: the k-means cost of a set of pointsU with respect to a set of
+centers C = {c1, . . . , ck } and a partitionU = {U1, . . . ,Uk } ofU is
+∆(C,U) :=
+k∑
+i=1
+∑
+p∈Ui
+| |p − ci | |
+2.
+For a set of centersC , letUC be a partition ofU such that if p ∈ Ui
+then ∥p − ci ∥ = min
+1≤j≤k ∥p − c j ∥. Then the standard k-means
+objective is
+min
+C={c1, ...,ck }
+∆(C,UC ),
+i.e., to find a set of k centers C = {c1, . . . , ck } that minimizes
+∆(C,UC ).
+For an illustrative example of the potential bias for different
+subgroups of data, see Figure 2 left. The two centers selected by
+minimizing the k-means objective are both close to one subgroup,
+and therefore the other subgroup has higher average cost. Note
+that the notion of fairness based on proportionality also prefers
+this clustering which imposes a higher average cost on the purple
+subgroup. To introduce our fair k-means objective and algorithm,
+in this section we focus on the case of two (demographic) groups.
+In Section 3, we discuss how to generalize our framework to more
+than two groups.
+k-means Fair k-means
+Figure 2: Two demographic groups are shown with blue and pur-
+ple. The 2-means objective minimizing the average clustering cost
+prefers the clustering (and centers) shown in the left figure. This
+clustering incurs a much higher average clustering cost for purple
+than for blue. The clustering in the right figure has more equitable
+clustering cost for the two groups.
+439
+Socially Fair k -Means Clustering FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+The fair k-means objective for two groups A,B such that U =
+A ∪ B is the larger average cost:
+Φ(C,U) := max{
+∆(C,U ∩A)
+|A|
+,
+∆(C,U ∩ B)
+|B |
+},
+whereU ∩A = {U1 ∩A, . . . ,Uk ∩A}. The goal of fair k-means is
+to minimize Φ(C,UC ), so as to minimize the higher average cost.
+As illustrated in Figure 2 right, minimizing this objective results in
+a set of centers with equal average cost to individuals of different
+groups. In fact, as we will soon see, the solution to this problem
+equalizes the average cost of both groups in most cases. Next we
+present the fair k-means algorithm (or Fair-Lloyd) in Algorithm 1.
+Algorithm 1: Fair-Lloyd
+Input: A set of pointsU = A ∪ B , and k ∈ N
+Initialize the set of centers C = {c1, . . . , ck }.
+repeat
+1. Assign each point to its nearest center in C to form a partition
+U = {U1, . . . ,Uk } ofU .
+2. Pick a set of centers C that minimizes Φ(C , U).
+C ← Line Search(U , U)
+until convergence;
+return C = {c1, . . . , ck }
+The second step of each iteration uses a minimization procedure
+to assign centers fairly to a given partition of the data.While this can
+be done via a gradient descent algorithm, we show in Section 2 that
+it can be solved very efficiently using a simple line search procedure
+(see Algorithm 2) due to the structure of fair centers (Section 2.1).
+In Section 2.3, we discuss some other properties of the fair k-means
+and Fair-Lloyd (Algorithm 1). More specifically, we discuss the
+stability of the solution found by Fair-Lloyd, the convergence of
+Fair-Lloyd, and approximation algorithms that can be used for fair
+k-means (e.g., to initialize the centers). In summary, our fair version
+of the k-means inherits its attractive properties while making the
+objective and outcome more equitable to subgroups of data.
+1.3 Related Work
+k-means objective and Lloyd’s algorithm. The k-means objec-
+tive is NP-hard to optimize [2] and even NP-hard to approximate
+within a factor of (1 + ϵ) [5]. The best known approximation al-
+gorithm for the k-means problem finds a solution within a factor
+ρ + ϵ of optimal, where ρ ≈ 6.357 [1]. The running time of Lloyd’s
+algorithm can be exponential even on the plane [42].
+As for the quality of the solution found, Lloyd’s heuristic con-
+verges to a local optimum [39], with no worst-case guarantees
+possible [24]. It has been shown that under certain assumptions on
+the existence of a sufficiently good clustering, this heuristic recov-
+ers a ground truth clustering and achieves a near-optimal solution
+to the k-means objective function [6, 28, 33]. For all the difficulties
+with the analysis, and although many other techniques has been
+proposed over the years, Lloyd’s algorithm is still the most widely
+used clustering algorithm in practice [23].
+Fairness. During the past years, machine learning has seen a
+huge body of work on fairness. Many formulations of fairness
+have been proposed for supervised learning and specifically for
+classification tasks [18, 20, 25, 44]. The study of the implications
+of bias in unsupervised learning started more recently [11, 12, 14,
+26, 35, 36]. We refer the reader to [9] for a summary of proposed
+definitions and algorithmic advances.
+Majority of the literature on fair clustering have focused on
+the proportionality/balance of the demographical representation
+inside the clusters [14] — a notion much in the nature of the widely
+known disparate impact doctrine. Proportionality of demographical
+representation has initially been studied for the k-center and k-
+median problems when the data comprises of two demographic
+groups [14], and later on for the k-means problem and for multiple
+demographic groups [7, 10, 22, 37]. Among other notions of fairness
+in clustering, one could mention proportionality of demographical
+representation in the set of cluster centers [26] or in large subsets
+of a cluster [13].
+Our proposed notion of a fair clustering is different and comes
+from a broader viewpoint on fairness, aiming to enforce any objective-
+based optimization task to output a solution with equitable objective
+value for different demographic groups. Such an objective-based
+fairness notion across subgroups could be defined subjectively e.g.,
+by equalizing misclassification rate in classification tasks [15] or
+by minimizing the maximum error in dimensionality reduction
+or classification [31, 35, 41]. We define a socially fair clustering as
+the one that minimizes the maximum average clustering cost over
+different demographic groups. To the best of our knowledge, our
+work is the first to study fairness in clustering from this viewpoint.
+2 AN EFFICIENT IMPLEMENTATION OF FAIR
+k-MEANS
+The Fair-Lloyd algorithm (Algorithm 1) is a two-step iteration,
+where the second step is to find a fair set of centers with respect to
+a partition. A set of centers C∗ is fair with respect to a partitionU
+if C∗ = argminC Φ(C,U). In this section, we show that a simple
+line search algorithm can be used to find C∗ efficiently.
+2.1 Structure of Fair Centers
+We start by illustrating some properties of fair centers. A partition
+of the data induces a partition of each of the two groups, and hence
+a set of means for each group . Formally, for a set of pointsU = A∪B
+and a partitionU = {U1, . . . ,Uk } ofU , let µAi and µBi be the mean
+of A ∩Ui and B ∩Ui respectively for i ∈ [k]. Our first observation
+is that the fair center of each cluster must be on the line segment
+between the means of the groups induced in the cluster.
+Lemma 1. Let U = A ∪ B and U = (U1, . . . ,Uk ) be a partition
+of U . Let C = (c1, . . . , ck ) be a fair set of centers with respect toU.
+Then ci is on the line segment connecting µAi and µBi .
+Proof. For the sake of contradiction, assume that there exists
+an i ∈ [k] such that ci is not on the line segment connecting µAi
+and µBi . Note that (see [24] or Lemma 4 in the Appendix for a proof
+of the following equation)∑
+p∈A∩Ui
+∥p − ci ∥
+2 =
+∑
+p∈A∩Ui
+∥p − µAi ∥
+2 + |A ∩Ui |∥µ
+A
+i − ci ∥
+2
+(1)∑
+p∈B∩Ui
+∥p − ci ∥
+2 =
+∑
+p∈B∩Ui
+∥p − µBi ∥
+2 + |B ∩Ui |∥µ
+B
+i − ci ∥
+2
+440
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Mehrdad Ghadiri, Samira Samadi, and Santosh Vempala
+Let c ′i be the projection of ci to the line segment connecting µAi
+and µBi . Then by Pythagorean theorem for convex sets, we have
+∥µAi − ci ∥
+2 ≥ ∥µAi − c
+′
+i ∥
+2 + ∥c ′i − ci ∥
+2
+∥µBi − ci ∥
+2 ≥ ∥µBi − c
+′
+i ∥
+2 + ∥c ′i − ci ∥
+2
+Therefore since ∥c ′i − ci ∥
+2 > 0, we have ∥µAi − c
+′
+i ∥ < ∥µ
+A
+i − ci ∥
+and ∥µBi − c
+′
+i ∥ < ∥µ
+B
+i − ci ∥. Thus, replacing ci with c ′i decreases
+the fair k-means objective. □
+The above lemma implies that, in order to find a fair set of centers,
+we only need to search the intervals [µAi , µ
+B
+i ]. Therefore we can
+find a fair set of centers by solving a convex program. The following
+definition will be convenient.
+Definition 1. GivenU = A∪B and a partitionU = {U1, . . . ,Uk }
+ofU , for i = 1, . . . ,k , let
+αi =
+|A ∩Ui |
+|A|
+, βi =
+|B ∩Ui |
+|B |
+and li = ∥µAi − µ
+B
+i ∥.
+Also letMA = {µA
+1
+, . . . , µAk } andM
+B = {µB
+1
+, . . . , µBk }.
+Since [µAi , µ
+B
+i ] is a line segment, for the i’th cluster, we only need
+to find the distance xi of its center ci from µAi . Then the distance
+of the center from µBi is li − xi where li is the length of the line
+segment [µAi , µ
+B
+i ]. By (1), the average cost of group A with respect
+to a partitionU in terms of xi ’s is∑k
+i=1
+∑
+p∈A∩Ui ∥p − µ
+A
+i ∥
+2
+|A|
++
+∑k
+i=1 |A ∩Ui |∥µ
+A
+i − ci ∥
+2
+|A|
+=
+∆(MA,U ∩A)
+|A|
++
+k∑
+i=1
+αixi
+2
+Similarly, the average cost of group B is
+∆(MB ,U ∩ B)
+|B |
++
+k∑
+i=1
+βi (li − xi )
+2
+Hence, our goal is to solve the following optimization problem.
+max{
+∆(MA,U ∩A)
+|A|
++
+k∑
+i=1
+αixi
+2,
+∆(MB ,U ∩ B)
+|B |
++
+k∑
+i=1
+βi (li −xi )
+2}
+subject to 0 ≤ xi ≤ li ,∀i ∈ [k]. Note that this is a convex program
+because the maximum of two convex functions is a convex function.
+One can see that the point on the line segment [µAi , µ
+B
+i ] that has
+distance xi from µAi is
+(li−xi )µAi +xi µ
+B
+i
+li
+, where li is the length of
+[µAi , µ
+B
+i ]. Using a standard trick to write the objective function as a
+linear function, we can state the problem as the following.
+Corollary 1. LetU = {U1, . . . ,Uk } be a partition ofU = A∪B.
+Then C = {c1, . . . , ck } is a fair set of centers with respect to U if
+ci =
+(li−x ∗i )µ
+A
+i +x
+∗
+i µ
+B
+i
+li
+, where (x∗
+1
+, . . . , x∗k , θ
+∗) is an optimal solution
+to the following convex program.
+min θ (2)
+s.t.
+∆(MA,U ∩A)
+|A|
++
+∑
+i ∈[k ]
+αixi
+2 ≤ θ
+∆(MB ,U ∩ B)
+|B |
++
+∑
+i ∈[k ]
+βi (li − xi )
+2 ≤ θ
+0 ≤ xi ≤ li ,∀i ∈ [k]
+We can solve this convex program with standard convex opti-
+mization methods such as gradient descent. However, as we show
+in the next section, we can solve it with a much faster algorithm.
+2.2 Computing Fair Centers via Line Search
+We first need to review a couple of facts about subgradients. For a
+convex continuous function f , we say that a vector u is a subgradi-
+ent of f at point x if f (y) ≥ f (x) +uT (y − x) for any y. We denote
+the set of subgradients of f at x by ∂ f (x).
+Fact 1. Let f be a convex function. Then point x∗ is a minimum
+for f if and only if ®0 ∈ ∂ f (x∗).
+Fact 2. Let f1, . . . , fm be smooth functions and
+F (x) = max
+j ∈[m]
+fj (x).
+Let Sx = {j ∈ [m] : fj (x) = F (x)}. Then the set of subgradients of
+F at x is the convex hull of union of the subgradients of fj ’s at x for
+j ∈ Sx .
+Let
+fA(x) :=
+∆(MA,U ∩A)
+|A|
++
+∑
+i ∈[k]
+αixi
+2,
+fB (x) :=
+∆(MB ,U ∩ B)
+|B |
++
+∑
+i ∈[k ]
+βi (li − xi )
+2.
+Then we can view the convex program (2) as minimizing
+f (x) := max{ fA(x), fB (x)} s.t. 0 ≤ xi ≤ li ,∀i ∈ [k]. (3)
+Note that f (x) is convex since the maximum of two convex func-
+tions is convex. Therefore by Fact 1, our goal is to find a point
+x∗ such that ®0 ∈ ∂ f (x∗). Note that fA and fB are differentiable.
+Hence by Fact 2, we only need to look at points x for which there
+exists a convex combination of ∇fA(x) and ∇fB (x) that is equal to
+®0. As we will see, this set of points is only a one-dimensional curve
+in [0, l1] × · · · × [0, lk ]. When fA(x) > fB (x), f (x) has a unique
+gradient and it is equal to ∇fA(x). Similarly, when fA(x) < fB (x),
+we have ∇f (x) = ∇fB (x). By Fact 2, in the case that fA(x) = fB (x),
+for any γ ∈ [0, 1],
+u(γ , x) := γ∇fA(x) + (1 − γ )∇fB (x)
+is a subgradient of f (x) — and these are the only subgradients of f
+at x . Now consider the set
+Z := {x ∈ [0, l1] × · · · × [0, lk ] : ∃γ ∈ [0, 1],u(γ , x) = ®0}.
+In words, set Z is the set of all points for which there exist a convex
+combination of gradients of fA and fB that is equal to ®0. If we find
+x∗ ∈ Z such that fA(x
+∗) = fB (x
+∗) then any convex combination
+of ∇fA(x
+∗) and ∇fB (x
+∗) is a subgradient of f at x∗ and therefore
+®0 ∈ ∂ f (x∗). Hence x∗ is an optimal solution. We first describe Z
+and show that there exists an optimal solution in Z .
+Lemma 2. Let γ ∈ [0, 1] and u(γ , x) = ®0. Then xi =
+(1−γ )βi li
+γ αi+(1−γ )βi
+.
+441
+Socially Fair k -Means Clustering FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Proof. We have
+∂
+∂xi
+fA(x) = 2αixi and
+∂
+∂xi
+fB (x) = 2βi (xi − li ).
+Using the fact that u(γ , x) = ®0, we have
+γ (2αixi ) + (1 − γ )(2βi (xi − li )) = 0.
+Hence, xi =
+(1 − γ )βi li
+γαi + (1 − γ )βi
+.
+□
+The previous lemma gives a complete description of set Z . One
+example of set Z is shown in Figure 3 left for the case of k = 2. The
+following is an immediate result of Lemma 2.
+Lemma 3. Z = {x : xi =
+(1−γ )βi li
+γ αi+(1−γ )βi
+,γ ∈ [0, 1]}.
+Note that when γ = 1, this recovers the all-zero vector and when
+γ = 0, x = (l1, . . . , lk ). Therefore these extreme points are also
+in Z . As we mentioned before if there exists x∗ ∈ Z such that
+fA(x
+∗) = fB (x
+∗), then x∗ is an optimal solution. Therefore suppose
+such an x∗ does not exist. One can see that
+d
+dγ
+(
+(1 − γ )βi li
+γαi + (1 − γ )βi
+) =
+−αiβi li
+(γαi + (1 − γ )βi )2
+.
+Therefore, for 1 ≤ i ≤ k , xi is decreasing in γ . Also one can see
+that fA is increasing in xi and fB is decreasing in xi . Therefore fA
+is decreasing in γ and fB is increasing in γ . Figure 3 right shows
+an example that illustrates the change of fA and fB with respect
+to γ . This implies that if there does not exist any x∗ ∈ Z such that
+fA(x
+∗) = fB (x
+∗), then either fA(®0) > fB (®0) or fB (ℓ) > fA(ℓ), where
+ℓ = (l1, . . . , lk ). In the former case, the optimal solution to (2) is ®0
+which means that the fair centers are located on the means of points
+for groupA. In the latter case the optimal solution is ℓ which means
+that the fair centers are located on the means of points for group B.
+In these extreme cases, there does not exist a set of centers with
+equal average cost with respect to the particular chosen partition
+of points.
+The above argument asserts that we only need to search the
+set Z to find an optimal solution. Each element of Z is uniquely
+determined by the corresponding γ ∈ [0, 1]. Our goal is to find an
+element x∗ ∈ Z such that fA(x
+∗) = fB (x
+∗). Since fA is decreasing
+in γ and fB is increasing in γ , we can use line search to find such a
+point in Z . If such a point does not exist in Z , then the line search
+converges to γ = 0 or γ = 1. Two steps of such a line search
+are shown in Figure 3. See Algorithm 2 for a precise description.
+Using this line search algorithm, we can solve the convex program
+described in (3) to ϵ error in O(
+∑k
+i=1 log
+li
+ϵ ) time.
+2.3 Fair k-means is well-behaved
+In this section, we discuss the stability, convergence, and approx-
+imability of Fair-Lloyd for 2 groups. As we will show in Section 3,
+these results can be extended tom > 2 groups.
+Stability. The line search algorithm finds the optimal solution to
+(2). This means that for a fixed partition of the points (e.g., the last
+clustering that the algorithm outputs), the returned centers are opti-
+mal in terms of the maximum average cost of the groups. However,
+one important question is whether we can improve the cost for
+the group with the smaller average cost. The following proposition
+shows that this is not possible; assuring that the solution is pareto
+optimal.
+Algorithm 2: Line Search(U ,U)
+Input: A set of pointsU = A ∪ B and a partition U = {U1, . . . ,Uk } ofU .
+Compute αi , βi , µAi , µ
+B
+i , li ,M
+A ,MB // See Definition 1.
+γ ← 0.5
+for t = 1, . . . ,T do
+xi ←
+(1−γ )βi li
+γ αi +(1−γ )βi
+, for i = 1, . . . k
+Compute fA(x ) and fB (x )
+if fA(x ) > fB (x ) then
+γ ← γ + (1/2)−(t+1)
+else if fA(x ) < fB (x ) then
+γ ← γ − (1/2)−(t+1)
+else
+break
+end
+end
+ci ←
+(li −xi )µ
+A
+i +xi µ
+B
+i
+li
+, for all i = 1, . . . , k
+return C = (c1, . . . , ck )
+Proposition 1. Let x∗ be the optimal solution for a fixed partition
+U = {U1, . . . ,Uk } ofU . Then there does not exist any other optimal
+solution with an average cost better than fA(x
+∗) or fB (x∗) for groups
+A and B, respectively.
+Proof. Let y be another optimal solution. Without loss of gen-
+erality, suppose fA(x
+∗) ≥ fB (x
+∗). If fA(x
+∗) > fB (x
+∗), then by our
+discussion on the line search algorithm, x∗ = ®0 and it is the only
+optimal solution. Therefore y = x∗. Now suppose fA(x
+∗) = fB (x
+∗).
+For the sake of contradiction and without loss of generality, assume
+fA(x
+∗) = fA(y), but fB (x
+∗) > fB (y). Therefore fA(y) > fB (y). First
+note that y , ®0 because if fA(®0) > fB (®0), then for any other x in
+the feasible region, fA(x) > fB (x) which is a contradiction because
+fA(x
+∗) = fB (x
+∗). Hence we can decrease one of the coordinates of
+y by a small amount to get a point y′ in the feasible region. If the
+change is small enough, we have fA(y) > fA(y
+′) > fB (y
+′) > fB (y)
+but this is a contradiction because it implies f (x∗) = f (y) > f (y′)
+which means x∗ was not an optimal solution. □
+Convergence. Lloyd’s algorithm for the standard k-means prob-
+lem converges to a solution in finite time, essentially because the
+number of possible partitions is finite [29]. This also holds for the
+Fair-Lloyd algorithm for the fair k-means problem. Note that for
+any fixed partition of the points, our algorithm finds the optimal
+fair centers. Also, note that there are only a finite number of par-
+titions of the points. Therefore, if our algorithm continues until a
+step where the clustering does not change afterward, then we say
+that the algorithm has converged and indeed the solution is a local
+optimum. However, note that, in the case where there is more than
+one way to assign points to the centers (i.e., there exists a point
+that have more than one closest center), then we should exhaust all
+the cases, otherwise the output is not necessarily a local optimal.
+This is not a surprise because the same condition also holds for
+the Lloyd’s algorithm for the k-means problem. For example, see
+Figure 4. Adjacent points have unit distance from each other. The
+centers are optimum for the illustrated clustering. However, they
+do not form a local optimum because moving c2 and c3 to the left
+by a small amount ϵ decreases the k-means objective from 2 to
+2(1 − ϵ)2 + ϵ2 = 2 − 4ϵ + 3ϵ2 < 2.
+Initialization. An important consideration is how to initialize
+the centers. While a random choice is often used in practice for
+442
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Mehrdad Ghadiri, Samira Samadi, and Santosh Vempala
+Figure 3: Left: an example of the one-dimensional curve for k = 2. Right: the functions fA and fB with respect to γ , and two steps of the line
+search algorithm. We can use a line search to find the optimal value of γ and an optimal solution to (3).
+c2
+A A
+c1 c3
+A A
+Figure 4: An example of k-means problem where the current clus-
+tering is not a local optimal and we need to check all the possible
+partitions with the current centers. c1, c2, c3 are the centers and the
+points are marked with the letter A on top of them.
+the k-means algorithm, another choice that has better provable
+guarantees [28] is to use a set of centers with objective value that
+is within a constant factor of the minimum. We will show that a c-
+approximation for the k-means problem implies a 2c-approximation
+for the fair k-means problem, and so this method could be used to
+initialize centers for Fair-Lloyd as well. The best known approxi-
+mation algorithm for the k-means problem finds a solution within
+a factor ρ + ϵ of optimal, where ρ ≈ 6.357 [1].
+Theorem 1. If the k-means problem admits a c-approximation
+in polynomial time then the fair k-means problem admits a 2c-
+approximation in polynomial time.
+Proof. Let
+д(C) =
+∆(C,UC ∩A)
+|A|
++
+∆(C,UC ∩ B)
+|B |
+.
+This is basically the k-means objective when we consider a weight
+of
+1
+|A | for the points in A and a weight of
+1
+|B | for the points in B.
+Let O be an optimal solution to д and S be a c-approximation
+solution to д (i.e., д(S) ≤ cд(O)). Moreover
+Φ(S,US ) = max{
+∆(S,US ∩A)
+|A|
+,
+∆(S,US ∩ B)
+|B |
+}
+≤
+∆(S,US ∩A)
+|A|
++
+∆(S,US ∩ B)
+|B |
+= д(S).
+Hence Φ(S,US ) ≤ cд(O). Now let O ′ be an optimal solution for Φ.
+Then
+д(O ′) =
+∆(O ′,UO ′ ∩A)
+|A|
++
+∆(O ′,UO ′ ∩ B)
+|B |
+≤ 2max{
+∆(O ′,UO ′ ∩A)
+|A|
+,
+∆(O ′,UO ′ ∩ B)
+|B |
+}
+= 2Φ(O ′,UO ′) ≤ 2Φ(S,US ).
+Also by optimality of O for д, we have д(O) ≤ д(O ′). Therefore
+д(O) ≤ 2Φ(O ′,UO ′) ≤ 2Φ(S,US ) ≤ 2cд(O).
+This implies that
+Φ(S ,US )
+Φ(O ′,UO′ )
+≤ 2c . □
+3 GENERALIZATION TOm > 2 GROUPS
+Let U = A1 ∪ · · · ∪ Am . Then the objective of fair k-means form
+demographic groups is to find a set of centersC that minimizes the
+following
+Φ(C,UC ) := max{
+∆(C,UC ∩A1)
+|A1 |
+, . . . ,
+∆(C,UC ∩Am )
+|Am |
+},
+Let U = {U1, . . . ,Uk } be a partition of U , and µ
+j
+i be the mean of
+Ui ∩Aj (i.e., the mean of members of subgroup j in cluster i). Then
+by a similar argument to Lemma 1, one can conclude that for a
+fair set of centers C = {c1, . . . , ck } with respect toU, ci is in the
+convex hull of {µ1i , . . . , µ
+m
+i }. Then we can generalize the convex
+program in Equation 2 tom demographic groups as the following:
+min θ (4)
+s.t.
+∆(M j ,U ∩Aj )
+|Aj |
++
+∑
+i ∈[k ]
+α
+j
+i ∥ci − µ
+j
+i ∥
+2 ≤ θ ,∀j ∈ [m]
+ci ∈ Conv(µ
+1
+i , . . . , µ
+m
+i ) ,∀i ∈ [k]
+where α
+j
+i =
+|Ui∩Aj |
+|Aj |
+and M j = {µ
+j
+1
+, . . . , µ
+j
+k }. In (4), the same stan-
+dard trick (as for the case of two groups) is used to make the ob-
+jective function linear and
+∆(M j ,U∩Aj )
+|Aj |
++
+∑
+i ∈[k] α
+j
+i ∥ci − µ
+j
+i ∥
+2
+is
+the average cost of group j. The set of ci ’s found by solving the
+above convex programwill be a fair set of centers with respect toU.
+We can solve this using standard convex optimization algorithms
+including gradient descent. However, similar to the case of two
+groups, we can find a fair set of centers by searching a standard
+(m − 1)-simplex. Namely, we only need to search the following set
+to find a fair set of centers.
+Z = {C = (c1, . . . , ck ) : ci =
+m∑
+j=1
+γjα
+j
+i
+γ1α
+1
+i + · · · + γmαmi
+µ
+j
+i ,
+m∑
+j=1
+γj = 1}
+The following notations will be convenient. For C = (c1 . . . , ck ),
+and j ∈ [m], let
+fj (C) =
+∆(M j ,U ∩Aj )
+|Aj |
++
+∑
+i ∈[k ]
+α
+j
+i ∥ci − µ
+j
+i ∥
+2,
+443
+Socially Fair k -Means Clustering FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+and F (C) = maxj ∈[m] fj (C). Then the convex program represented
+in (4) is equivalent to min F (C) : ci ∈ Conv(µ
+1
+i , . . . , µ
+m
+i ) ∀i ∈ [k].
+Similar to the case of two groups, set Z is the set of points for which
+there exist a convex combination of the gradients of fj ’s that is
+equal to ®0.
+Letu
+j
+i = ci −µ
+j
+i . For a vectorv , letv(s) denote its s’th component.
+Then we have
+∥ci − µ
+j
+i ∥
+2 =
+d∑
+s=1
+u
+j
+i (s)
+2
+Theorem 2. Any optimum solution of (4) is in Z .
+Proof. We can view a set of centers as a point in a k × d dimen-
+sional space. Let {ei ,s : i ∈ [k], s ∈ [d]} be the set of standard basis
+of this space. Then we have
+d
+dei ,s
+fj (C) = 2α
+j
+iu
+j
+i (s).
+By Fact 1 and 2, we only need to show that set Z is the set of all
+points for which there exists a convex combinations of ∇f1(C), . . . ,
+∇fm (C) that is equal to ®0. Let 0 ≤ γ1, . . . ,γm ≤ 1 such that∑m
+t=1 γt = 1. We want to find a C such that
+∑m
+j=1 γj∇fj (C) =
+®0.
+Therefore for each i, s , we have
+0 =
+m∑
+j=1
+γj
+d
+dei ,s
+fj (C) =
+m∑
+j=1
+γj (2α
+j
+iu
+j
+i (s)) =
+m∑
+j=1
+2γjα
+j
+i (ci (s) − µ
+j
+i (s)).
+Thus, ci (s) =
+m∑
+j=1
+γjα
+j
+i
+γ1α
+1
+i + · · · + γmαmi
+µ
+j
+i (s),
+and ci =
+m∑
+j=1
+γjα
+j
+i
+γ1α
+1
+i + · · · + γmαmi
+µ
+j
+i
+This shows that the set of centers that satisfy
+∑m
+j=1 γj∇fj (C) = 0,
+for some γ1, . . . ,γm , are exactly the members of Z . □
+Note that any element inZ is identified by a point in the standard
+(m − 1)-simplex, i.e., (γ1, . . . ,γm ) such that
+∑m
+j=1 γj = 1. However,
+the function defined on the (m−1)-simplex is not necessarily convex.
+Indeed, as we will show in Figure 11 in the Appendix, it is not even
+quasiconvex. Thus, one can either use standard convex optimization
+algorithms to solve the original convex program in (4), or other
+heuristics to only search the set Z . For our experiments, we use a
+variant of the multiplicative weights update algorithm on set Z —
+see Algorithm 3.
+To certify the optimality of the solution, one can use Fact 1 and
+show that ®0 is a subgradient. However, the iterative algorithms
+usually do not find the exact optimum, but rather converge to the
+optimum solution. To evaluate the distance of a solution from the
+optimum, we propose a min/max theorem for set Z in Section 3.2.
+This theorem allows us to certify that the solutions found by our
+heuristic in the experiments are within a distance of 0.01 from the
+optimal.
+3.1 Multiplicative Weights Update Heuristic
+Note that the original optimization problem given in (4) is convex.
+However we can use a heuristic to solve the problem in the γ space.
+One such heuristic is the multiplicative weights update algorithm
+[4], precisely defined as Algorithm 3.
+Algorithm 3:Multiplicative Weights Update
+Input: Integersm and k , numbers α j
+i , and centers µ ji for i ∈ [k ] and
+j ∈ [m], and
+∆(Mj ,U∩Aj )
+|Aj |
+for j ∈ [m].
+γj ← 1
+m , for j ∈ [m]
+for t = 1, . . . ,T do
+ci ←
+∑m
+j=1
+γj α
+j
+i
+γ
+1
+α 1
+i +···+γmαmi
+µ ji , for i ∈ [k ]
+C ← (c1, . . . , ck )
+Compute fj (C) for all j ∈ [m]
+F (C) ← maxj∈[m] fj (C)
+dj ← F (C) − fj (C), for j ∈ [m]
+γj ← γj (1 −
+dj
+√
+t+1maxj∈[m] dj
+)
+Normalize γj ’s such that
+∑m
+j=1 γj = 1
+end
+return C
+3.2 Certificate of Optimality
+Next, we give a min/max theorem that can be used to find a lower
+bound for the optimum value. Using this theorem, we can certify
+that, in practice, the multiplicative weights update algorithm finds
+a solution very close to the optimum.
+Theorem 3. Let S ⊆ [m] and
+ZS ={C = (c1, . . . , ck ) : ci =
+m∑
+j=1
+γjα
+j
+i
+γ1α
+1
+i + · · · + γmαmi
+µ
+j
+i ,
+m∑
+j=1
+γj = 1, and γj = 0,∀j < S}.
+Then, max
+C ∈ZS
+min
+j ∈S
+fj (C) ≤ min
+C ∈ZS
+max
+j ∈S
+fj (C).
+Moreover, max
+C ∈ZS
+min
+j ∈S
+fj (C) ≤ min
+C ∈Z[m]
+max
+j ∈[m]
+fj (C).
+Proof. Let C,C ′ ∈ ZS and let γ ,γ ′ be the corresponding pa-
+rameters for C,C ′, respectively. Note that ZS ⊆ Z . Therefore∑
+j ∈[m] γj∇fj (C) = ®0. Hence because γj = 0 for any j < S , we
+have
+∑
+j ∈S γj∇fj (C) = ®0. Hence (
+∑
+j ∈S γj∇fj (C)) · (C
+′ − C) = 0.
+Therefore there exists a j∗ ∈ S such that ∇fj∗ (C) · (C
+′ − C) ≥ 0.
+Thus because fj∗ is convex, we have
+fj∗ (C
+′) ≥ fj∗ (C) + ∇fj∗ (C) · (C
+′ −C) ≥ fj∗ (C)
+Therefore maxj ∈S fj (C
+′) ≥ minj ∈S fj (C). Note that this holds for
+any C,C ′ ∈ Z and this implies the first part of the theorem.
+Let C ′ be the optimum solution to minC ∈ZS maxj ∈S fj (C). Note
+that by Theorem 2, this is an optimum solution to the problem of
+finding a fair set of centers for the groups in S . Moreover for any
+set of centersC ′′ outside the convex hull of the centers of groups in
+S , we have maxj ∈S fj (C
+′) ≤ maxj ∈S fj (C
+′′) — proof of this is simi-
+lar to Lemma 1. Hence maxj ∈S fj (C
+′) ≤ minC ∈Z[m] maxj ∈S fj (C).
+Thus we have
+max
+C ∈ZS
+min
+j ∈S
+fj (C) ≤ min
+C ∈ZS
+max
+j ∈S
+fj (C) = max
+j ∈S
+fj (C
+′)
+≤ min
+C ∈Z[m]
+max
+j ∈S
+fj (C) ≤ min
+C ∈Z[m]
+max
+j ∈[m]
+fj (C)
+□
+444
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Mehrdad Ghadiri, Samira Samadi, and Santosh Vempala
+Note that we can use Theorem 3, to get a lower bound on the op-
+timum solution of the convex program in (4). For example, suppose
+C ′ is a solution returned by a heuristic. Then
+min
+j ∈[m]
+fj (C
+′) ≤ max
+C ∈Z[m]
+min
+j ∈[m]
+fj (C) ≤ min
+C ∈Z[m]
+max
+j ∈[m]
+fj (C).
+Therefore minj ∈[m] fj (C
+′) is a lower bound for the optimum solu-
+tion. Hence the difference of the solution returned by the heuristic
+with the optimum solution is at most
+(max
+j ∈[m]
+fj (C
+′)) − ( min
+j ∈[m]
+fj (C
+′)).
+This will be very useful for the case where fj (C
+∗) = F (C∗) for
+all j ∈ [m], where C∗ is the optimum solution. The reason is
+that in this case, Theorem 3 implies maxC ∈Z[m] minj ∈[m] fj (C) =
+minC ∈Z[m]maxj ∈[m] fj (C). However this might not be the case and
+we might have fj (C
+∗) < F (C∗) for some j. In this case we can use
+S ⊂ [m]. For example an S that gives a larger lower bound and for
+which maxC ∈ZS minj ∈S fj (C) = minC ∈ZS maxj ∈S fj (C).
+3.3 Stability and Approximability
+We conclude this section by a discussion on the stability and the
+approximability of fair k-means form groups.
+Our stability results generalizes tom demographic groups. Let
+C∗ = {c∗
+1
+, . . . , c∗k } be an optimal solution, and S ⊆ [m]. Also let
+fj (C
+∗) = maxi ∈[m] fi (C
+∗) for j ∈ S , and fj (C
+∗) < maxi ∈[m] fi (C
+∗)
+for j < S . Then one can see that, for all i ∈ [k], c∗i ∈ Conv({µ
+j
+i : j ∈
+S}). This uniquely determines the location of the optimal solution,
+and thus we cannot improve the value of functions fj where j <
+S . Moreover, with an argument similar to Proposition 1, one can
+deduce that we cannot improve the value of functions fj where
+j ∈ S .
+Moreover, the Fair-Lloyd algorithm form demographic groups
+converges to a solution in finite time, essentially because the num-
+ber of possible partitions of points is finite. Finally, if the k-means
+problem admits a c-approximation then the fair k-means problem
+form demographic groups admits anmc-approximation — the proof
+is similar to the proof of Theorem 1.
+4 EXPERIMENTAL EVALUATION
+We consider a clustering to be fair if it has equal clustering costs
+across different groups. We compare the average clustering cost for
+different demographic groups on multiple benchmark datasets, us-
+ing Lloyd’s algorithm and Fair-Lloyd algorithm (Code is accessible
+here: https://github.com/samirasamadi/SociallyFairKMeans).
+We used three datasets: 1) Adult dataset [17], consists of records
+of 48842 individuals collected from census data, with 103 features.
+The demographic groups considered are female/male for the 2-
+group setting and five racial groups of “Amer-Indian-Eskim”, “Asian-
+Pac-Islander”, “Black”, “White”, and “Other” for the multiple-groups
+setting; 2) Labeled faces in the wild (LFW) dataset [21], consists of
+13232 images of celebrities. The size of each image is 49 × 36 or a
+vector of dimension 1764. The demographic groups are female/male;
+and 3) Credit dataset [43], consists of records of 30000 individu-
+als with 21 features. We divided the multi-categorical education
+attribute to “higher educated” and “lower educated”, and used these
+as the demographic groups.
+As different features in any dataset have different units of mea-
+surements (e.g., age versus income), it is standard practice to normal-
+ize each attribute to have mean 0 and variance 1. We also converted
+any categorical attribute to numerical ones. For both Lloyd’s and
+Fair-Lloyd we tried 200 different center initialization, each with 200
+iterations. We used random initial centers (starting both algorithms
+with the same centers in each run).
+For clustering high-dimensional datasets with k-means, Princi-
+pal Component Analysis (PCA) is often used as a pre-processing
+step [16, 28], reducing the dimension to k . We evaluate Fair-Lloyd
+both with and without PCA. Since PCA itself could induce represen-
+tational bias towards one of the (demographic) groups, Fair-PCA
+[35] has been shown to be an unbiased alternative, and we use it as a
+third pre-processing option. We refer to these three pre-processing
+choices as w/o PCA, w/ PCA, and w/ Fair-PCA respectively.
+Results. Figure 5 shows the average clustering cost for different
+demographic groups. In the first row, all datasets are evaluated
+in their original dimension with no pre-processing applied (w/o
+PCA). In the second and third rows (w/ PCA and w/ Fair-PCA), the
+PCA/Fair-PCA dimension is equal to the target number of clusters k .
+Our first observation is that the standard Lloyd’s algorithm re-
+sults in a significant gap between the clustering cost of individuals
+in different groups, with higher clustering cost for females in the
+Adult and LFW datasets, and for lower-educated individuals in the
+Credit dataset. The average clustering cost of a female is up to 15%
+(11%) higher than a male in the Adult (LFW) dataset when using
+standard Lloyd’s. A similar bias is observed in the Credit dataset,
+where Lloyd’s leads up to 12% higher average cost for a lower-
+educated individual compared to a higher-educated individual.
+Our second observation is that the Fair-Lloyd algorithm effec-
+tively eliminates this bias by outputting a clustering with equal
+clustering costs for individuals in different demographic groups.
+More precisely, for the Credit and Adult datasets the average costs
+of two demographic groups are identical, represented by the yel-
+low line in Figure 5. For the LFW dataset, we observe a very small
+difference in the average clustering cost over the two groups in
+the fair clustering (0.4%, 1% and 0.6% difference for without PCA,
+with PCA, and with Fair-PCA respectively). Notably, Fair-Lloyd
+mitigates the bias of the output clustering independent of whether
+it is applied on the original data space, on the PCA space, or on the
+Fair-PCA space. In Figure 7, we show a snapshot of performance of
+Fair-Lloyd versus Lloyd’s on the Adult dataset for all three different
+pre-processing choices.
+Figure 6 shows the maximum ratio of average cost between any
+two racial groups in the Adult dataset, which comprised of five
+racial groups “Amer-Indian-Eskim”, “Asian-Pac-Islander”, “Black”,
+“White”, and “Other”. Note that, the max cost ratio of one indicates
+that all groups have the same average cost in the output clustering.
+As we observe, the standard Lloyd algorithm results in a significant
+gap between the cost of different groups resulting in a high max
+cost ratio overall. As for the Fair-Lloyd algorithm, as the number
+of clusters increases, it outputs a clustering of the data with same
+average cost for all the demographic groups.
+The price of fairness. Does requiring fairness come at a price,
+in terms of either running time or overall k-means cost? Figure 8
+445
+Socially Fair k -Means Clustering FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+w
+/
+o
+P
+C
+A
+LFW dataset Adult dataset Credit dataset
+w
+/
+P
+C
+A
+w
+/
+F
+a
+i
+r
+-
+P
+C
+A
+Figure 5: Average clustering cost of different groupswhenusing Fair-Lloyd algorithmversus the standard Lloyd’s. Rows correspond to different
+pre-processing methods and columns to the datasets. Note that the fair clustering costs for the two groups are identical or nearly identical in
+all datasets.
+shows the running time of Lloyd’s versus Fair-Lloyd for 200 it-
+erations. Running time for all three datasets is measured in the
+k-dimensional PCA space, where k is the number of clusters. As
+we observe, Fair-Lloyd incurs a very small overhead in the run-
+ning time, with only 4%, 4%, and 8% increase (on average over k)
+for the Adult, Credit, and LFW dataset respectively. Moreover, as
+illustrated in Figure 9, the convergence rate of Lloyd and Fair-lloyd
+are essentially the same in practice. Finally, the increase in the stan-
+dard k-means cost of Fair-Lloyd solutions (averaged over the entire
+population ) was at most 4.1%, 2.2% and 0.3% for the LFW, Adult,
+Figure 6: Adult dataset: The maximum ratio of average clustering
+cost between any two racial groups: “Amer-Indian-Eskim”, “Asian-
+Pac-Islander”, “Black”, “White”, and “Other”.
+and Credit datasets, respectively. Arguably, this is outweighed by
+the benefit of equal cost to the two groups.
+Socially fair versus proportionally fair. The first introduced notion
+of fairness for k-means clustering considered the proportionality
+of the sensitive attributes in each cluster [14]. We emphasize that
+improving the proportionality is at odds with improving the maxi-
+mum average cost of the groups. This can be seen in Figure 2. To
+illustrate this more, we compared our method to one of the pro-
+posed methods that guarantees the proportionality of the clusters
+Figure 7: Adult dataset: comparison of the standard Lloyd’s and Fair-
+Lloyd algorithm for the three different pre-processing choices of
+w/o PCA, w/ PCA, and w/ Fair-PCA.
+446
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Mehrdad Ghadiri, Samira Samadi, and Santosh Vempala
+LFW dataset Adult dataset Credit dataset
+Figure 8: Running time (seconds) of Fair-Lloyd algorithm versus the standard Lloyd’s algorithm on the k-dimensional PCA space for 200
+iterations.
+LFW dataset Adult dataset Credit dataset
+Figure 9: Convergence rate of Fair-Lloyd algorithm versus the standard Lloyd’s algorithm for k = 10. The plotted objective value for the
+standard Lloyd is the average cost of clustering over the whole population, and the objective value for Fair-Lloyd is the maximum average
+cost of the demographic groups. The reported objective values are averaged over 20 runs and the shaded areas are the standard deviations.
+Credit Adult
+Figure 10: Comparison of socially fair k-means (Fair-Lloyd) to pro-
+portionally fair k-means (Fairlet) on the Credit and Adult dataset
+in terms of proportionality and clustering cost.
+on the credit and adult datasets. We used the code provided in [10].
+As illustrated in Figure 10, the proportionally fair method fails to
+achieve an equal average cost for different populations and our
+methods do not achieve proportionally fair clusters.
+5 DISCUSSION
+Fairness is an increasingly important consideration for Machine
+Learning, including classification and clustering. Our work shows
+that the most popular clustering method, Lloyd’s algorthm, can be
+made fair, in terms of average cost to each subgroup, with minimal
+increase in the running time or the overall average k-means cost,
+while maintaining its simplicity, generality and stability. Previous
+work on fair clustering focused on proportional representation of
+sensitive attributes within clusters, while we optimize the maxi-
+mum cost to subgroups. As Figure 2 suggests, and Figure 10 shows
+on benchmark data sets, these criteria lead to different solutions.
+We believe that both perspectives are important, and the choice of
+which clustering to use will depend on the context and application,
+e.g., proportional representation might be paramount for partition-
+ing electoral precincts, while minimizing cost for every subgroup
+is crucial for resource allocation.
+6 ACKNOWLEDGEMENT
+This work was supported in part by NSF awards AF-1909756 and
+AF-2007443. We thank Mohit Singh for helpful discussions, and
+Saeid Naderiparizi and the anonymous reviewers for comments.
+447
+Socially Fair k -Means Clustering FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+REFERENCES
+[1] Ahmadian, S., Norouzi-Fard, A., Svensson, O., and Ward, J. Better guarantees
+for k-means and euclidean k-median by primal-dual algorithms. In 58th IEEE
+Annual Symposium on Foundations of Computer Science, FOCS 2017, Berkeley, CA,
+USA, October 15-17, 2017 (2017), C. Umans, Ed., IEEE Computer Society, pp. 61–72.
+[2] Aloise, D., Deshpande, A., Hansen, P., and Popat, P. Np-hardness of euclidean
+sum-of-squares clustering. Machine learning 75, 2 (2009), 245–248.
+[3] Anderson, T. K. Kernel density estimation and k-means clustering to profile
+road accident hotspots. Accident Analysis & Prevention 41, 3 (2009), 359–364.
+[4] Arora, S., Hazan, E., and Kale, S. The multiplicative weights update method: a
+meta-algorithm and applications. Theory of Computing 8, 1 (2012), 121–164.
+[5] Awasthi, P., Charikar, M., Krishnaswamy, R., and Sinop, A. K. The hardness
+of approximation of euclidean k-means. arXiv preprint arXiv:1502.03316 (2015).
+[6] Awasthi, P., and Sheffet, O. Improved spectral-norm bounds for clustering. In
+Approximation, Randomization, and Combinatorial Optimization. Algorithms and
+Techniques. Springer, 2012, pp. 37–49.
+[7] Backurs, A., Indyk, P., Onak, K., Schieber, B., Vakilian, A., and Wagner, T.
+Scalable fair clustering. arXiv preprint arXiv:1902.03519 (2019).
+[8] Balakrishnan, P. S., Cooper, M. C., Jacob, V. S., and Lewis, P. A. Comparative
+performance of the fscl neural net and k-means algorithm for market segmenta-
+tion. European Journal of Operational Research 93, 2 (1996), 346–357.
+[9] Barocas, S., Hardt, M., and Narayanan, A. Fairness and Machine Learning.
+fairmlbook.org, 2019. http://www.fairmlbook.org.
+[10] Bera, S., Chakrabarty, D., Flores, N., and Negahbani, M. Fair algorithms
+for clustering. In Advances in Neural Information Processing Systems (2019),
+pp. 4954–4965.
+[11] Celis, L. E., Keswani, V., Straszak, D., Deshpande, A., Kathuria, T., and
+Vishnoi, N. K. Fair and diverse dpp-based data summarization. arXiv preprint
+arXiv:1802.04023 (2018).
+[12] Celis, L. E., Straszak, D., and Vishnoi, N. K. Ranking with fairness constraints.
+arXiv preprint arXiv:1704.06840 (2017).
+[13] Chen, X., Fain, B., Lyu, L., and Munagala, K. Proportionally fair clustering. In
+International Conference on Machine Learning (2019), pp. 1032–1041.
+[14] Chierichetti, F., Kumar, R., Lattanzi, S., and Vassilvitskii, S. Fair clustering
+through fairlets. In Advances in Neural Information Processing Systems (2017),
+pp. 5029–5037.
+[15] Dieterich, W., Mendoza, C., and Brennan, T. Compas risk scales: Demonstrat-
+ing accuracy equity and predictive parity. Northpointe Inc (2016).
+[16] Ding, C., and He, X. K-means clustering via principal component analysis. In
+Proceedings of the twenty-first international conference on Machine learning (2004),
+p. 29.
+[17] Dua, D., and Graff, C. UCI machine learning repository, 2017.
+[18] Dwork, C., Hardt, M., Pitassi, T., Reingold, O., and Zemel, R. Fairness through
+awareness. In Proceedings of the 3rd innovations in theoretical computer science
+conference (2012), ACM, pp. 214–226.
+[19] Grubesic, T. H. On the application of fuzzy clustering for crime hot spot detection.
+Journal of Quantitative Criminology 22, 1 (2006), 77.
+[20] Hardt, M., Price, E., and Srebro, N. Equality of opportunity in supervised
+learning. In Advances in neural information processing systems (2016), pp. 3315–
+3323.
+[21] Huang, G. B., Mattar, M., Berg, T., and Learned-Miller, E. Labeled faces in
+the wild: A database for studying face recognition in unconstrained environments.
+In Workshop on Faces in ’Real-Life’ Images: Detection, Alignment, and Recognition
+(2008).
+[22] Huang, L., Jiang, S., and Vishnoi, N. Coresets for clustering with fairness
+constraints. InAdvances in Neural Information Processing Systems (2019), pp. 7589–
+7600.
+[23] Jain, A. K. Data clustering: 50 years beyond k-means. Pattern recognition letters
+31, 8 (2010), 651–666.
+[24] Kanungo, T., Mount, D. M., Netanyahu, N. S., Piatko, C. D., Silverman, R.,
+and Wu, A. Y. A local search approximation algorithm for k-means clustering.
+In Proceedings of the eighteenth annual symposium on Computational geometry
+(2002), pp. 10–18.
+[25] Kleinberg, J., Mullainathan, S., and Raghavan, M. Inherent trade-offs in the
+fair determination of risk scores. arXiv preprint arXiv:1609.05807 (2016).
+[26] Kleindessner, M., Samadi, S., Awasthi, P., and Morgenstern, J. Guarantees
+for spectral clustering with fairness constraints. In Proceedings of the 36th Interna-
+tional Conference on Machine Learning (Long Beach, California, USA, 09–15 Jun
+2019), K. Chaudhuri and R. Salakhutdinov, Eds., vol. 97 of Proceedings of Machine
+Learning Research, PMLR, pp. 3458–3467.
+[27] Krishna, K., and Murty, M. N. Genetic k-means algorithm. IEEE Transactions
+on Systems, Man, and Cybernetics, Part B (Cybernetics) 29, 3 (1999), 433–439.
+[28] Kumar, A., and Kannan, R. Clustering with spectral norm and the k-means
+algorithm. In 2010 IEEE 51st Annual Symposium on Foundations of Computer
+Science (2010), IEEE, pp. 299–308.
+[29] Lloyd, S. Least squares quantization in pcm. IEEE transactions on information
+theory 28, 2 (1982), 129–137.
+[30] MacQueen, J. Some methods for classification and analysis of multivariate
+observations. In Proceedings of the fifth Berkeley symposium on mathematical
+statistics and probability (1967), vol. 1, Oakland, CA, USA, pp. 281–297.
+[31] Martinez, N., Bertran, M., and Sapiro, G. Minimax pareto fairness: A multi
+objective perspective. In International Conference on Machine Learning (ICML
+2020) (2020).
+[32] Nath, S. V. Crime pattern detection using data mining. In 2006 IEEE/WIC/ACM
+International Conference on Web Intelligence and Intelligent Agent Technology
+Workshops (2006), IEEE, pp. 41–44.
+[33] Ostrovsky, R., Rabani, Y., Schulman, L. J., and Swamy, C. The effectiveness of
+lloyd-type methods for the k-means problem. Journal of the ACM (JACM) 59, 6
+(2013), 1–22.
+[34] Ray, S., and Turi, R. H. Determination of number of clusters in k-means clus-
+tering and application in colour image segmentation. In Proceedings of the 4th
+international conference on advances in pattern recognition and digital techniques
+(1999), Calcutta, India, pp. 137–143.
+[35] Samadi, S., Tantipongpipat, U. T., Morgenstern, J. H., Singh,M., and Vempala,
+S. S. The price of fair PCA: one extra dimension. In Advances in Neural Informa-
+tion Processing Systems 31: Annual Conference on Neural Information Processing
+Systems 2018, NeurIPS 2018, 3-8 December 2018, Montréal, Canada (2018), S. Bengio,
+H. M. Wallach, H. Larochelle, K. Grauman, N. Cesa-Bianchi, and R. Garnett, Eds.,
+pp. 10999–11010.
+[36] Schmidt, M., Schwiegelshohn, C., and Sohler, C. Fair coresets and streaming
+algorithms for fair k-means clustering. arXiv preprint arXiv:1812.10854 (2018).
+[37] Schmidt, M., Schwiegelshohn, C., and Sohler, C. Fair coresets and streaming
+algorithms for fair k-means. In International Workshop on Approximation and
+Online Algorithms (2019), Springer, pp. 232–251.
+[38] Sculley, D. Web-scale k-means clustering. In Proceedings of the 19th international
+conference on World wide web (2010), pp. 1177–1178.
+[39] Selim, S. Z., and Ismail, M. A. K-means-type algorithms: A generalized con-
+vergence theorem and characterization of local optimality. IEEE Transactions on
+pattern analysis and machine intelligence, 1 (1984), 81–87.
+[40] Steinhaus, H. Sur la division des corps materiels en parties. Bull. Acad. Polon.
+Sci. C1. III vol IV (1956), 801–804.
+[41] Tantipongpipat, U., Samadi, S., Singh, M., Morgenstern, J. H., and Vempala, S.
+Multi-criteria dimensionality reduction with applications to fairness. In Advances
+in Neural Information Processing Systems (2019), pp. 15135–15145.
+[42] Vattani, A. K-means requires exponentially many iterations even in the plane.
+Discrete & Computational Geometry 45, 4 (2011), 596–616.
+[43] Yeh, I., and Lien, C. The comparisons of datamining techniques for the predictive
+accuracy of probability of default of credit card clients. Expert Systems with
+Applications 36, 2 (2009), 2473–2480.
+[44] Zafar, M. B., Valera, I., Rodriguez, M. G., and Gummadi, K. P. Fairness
+constraints: Mechanisms for fair classification. arXiv preprint arXiv:1507.05259
+(2015).
+448

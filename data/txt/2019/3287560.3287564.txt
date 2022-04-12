@@ -1,0 +1,1120 @@
+Fairness through Causal Awareness: Learning Causal Latent-Variable Models for Biased Data
+David Madras, Elliot Creager, Toniann Pitassi, Richard Zemel
+University of Toronto, Vector Institute
+{madras,creager,toni,zemel}@cs.toronto.edu
+ABSTRACT
+How do we learn from biased data? Historical datasets often reflect
+historical prejudices; sensitive or protected attributes may affect
+the observed treatments and outcomes. Classification algorithms
+tasked with predicting outcomes accurately from these datasets
+tend to replicate these biases. We advocate a causal modeling ap-
+proach to learning from biased data, exploring the relationship
+between fair classification and intervention. We propose a causal
+model in which the sensitive attribute confounds both the treat-
+ment and the outcome. Building on prior work in deep learning
+and generative modeling, we describe how to learn the parameters
+of this causal model from observational data alone, even in the
+presence of unobserved confounders. We show experimentally that
+fairness-aware causal modeling provides better estimates of the
+causal effects between the sensitive attribute, the treatment, and
+the outcome. We further present evidence that estimating these
+causal effects can help learn policies that are both more accurate
+and fair, when presented with a historically biased dataset.
+CCS CONCEPTS
+•Mathematics of computing→ Causal networks; • Comput-
+ingmethodologies→Latent variablemodels; Neural networks;
+KEYWORDS
+causal inference, variational inference, fairness in machine learning
+ACM Reference Format:
+David Madras, Elliot Creager, Toniann Pitassi, Richard Zemel. 2019. Fairness
+through Causal Awareness: Learning Causal Latent-Variable Models for
+Biased Data. In FAT* ’19: Conference on Fairness, Accountability, and Trans-
+parency, January 29–31, 2019, Atlanta, GA, USA. ACM, New York, NY, USA,
+Article 4, 12 pages. https://doi.org/10.1145/3287560.3287564
+1 INTRODUCTION
+In this work, we consider the problem of fair decision-making from
+biased datasets. Much work has been done recently on the problem
+of fair classification [1, 4, 15, 50], yielding an abundant supply of
+definitions, models, and algorithms for the purposes of learning
+classifiers whose outputs satisfy distributional constraints. Some
+of the canonical problems for which these algorithms have been
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+https://doi.org/10.1145/3287560.3287564
+proposed are loan assignment [15], criminal risk assessment [7], and
+school admissions [13]. However, none of these problems are fully
+specified by the classification paradigm. Rather, they are decision-
+making problems: each problem requires an action (or “treatment”)
+to be taken in the world, which in turn yields an outcome. In other
+words, the central question is how to intervene in an ongoing and
+evolving process, rather than predict outcomes alone [3].
+Decision-making, i.e. learning to intervene, requires a funda-
+mentally different approach from learning to classify: historical
+training data are the product of past interventions and thus provide
+an incomplete view of all possible outcomes. Only actions which
+were previously chosen yield observable outcomes in the training
+data, while the implicit counterfactual outcomes (the outcome that
+would have occurred had another action been taken) are never
+observed. The incompleteness of this data can have great impact
+on learning and inference [41].
+It has been widely argued that biased data yields unfair machine
+learning systems [12, 16, 20]. In this work we examine dataset bias
+through the lens of causal inference. To understand how past deci-
+sions may bias a dataset, we first must understand how sensitive
+attributes may have affected the generative process which created
+the dataset, including the (historical) decisionmakers’ actions (treat-
+ments) and results (outcomes). Causal inference is well suited to
+this task: since we are interested in decision-making rather than
+classification, we should be interested in the causal effects of actions
+rather than correlations. Causal inference has the added benefit of
+answering counterfactual queries: What would this outcome have
+been under another treatment? How would the outcome change if
+the sensitive attribute were changed, all else being equal? These
+questions are core to the mission of learning fair systems which
+aim to inform decision-making [27].
+While there is much that causal inference can offer to the field
+of fair machine learning, it also poses several significant challenges.
+For example, the presence of hidden confounders—unobserved fac-
+tors that effect both the historical choice of treatment and the
+outcome—often prohibits the exact inference of causal effects. Ad-
+ditionally, understanding effects at the individual level can be espe-
+cially complex, particularly if the outcome is non-linear in the data
+and treatments. These technical difficulties are often amplified by
+the problem scope of modern machine learning, where large and
+high-dimensional datasets are commonplace.
+To address these challenges, we propose a model for fairly es-
+timating individual-level causal effects from biased data, which
+combines causal modeling [38] with approximate inference in deep
+latent variable models [26, 30]. Our focus on individual-level causal
+effects and counterfactuals provides a natural fit for application
+areas requiring fair policies and treatments for individuals, such as
+X Y
+T
+(a) Pearl [38] no hidden con-
+founders
+X
+Z
+Y
+T
+(b) Louizos et al. [30] Causal
+Effect VAE (CVAE)
+XA
+Z
+Y
+T
+(c) CVAE with sensitive at-
+tribute
+X
+ZA
+Y
+T
+(d) Proposed model: Fair
+Causal VAE (FCVAE)
+Figure 1: Various approaches causally modeling data features X , treatment T , and outcome Y . 1a assumes no hidden con-
+founders; 1b models hidden confounders via a latent variable Z to be inferred by an inference neural network (not pictured);
+1c naively extends 1b to include a sensitive attribute A as an additional observation, not as a confounder. 1d, the Fair Causal
+VAE (ours), explicitly models the sensitive attribute as confounding the treatment T and the label Y in historical data.
+finance, medicine, and law. Specifically, we incorporate the sensi-
+tive attribute into our model as a confounding factor, which can
+possibly influence both the treatment and the outcome. This is a
+first step towards achieving “fairness through awareness” [10] in
+the interventional setting.
+Our model also leverages recent advances in deep latent-variable
+modeling to model potential hidden confounders as well as complex,
+non-linear functions between variables, which greatly increases the
+class of relationships which it can represent. Through experimental
+analysis, we show that our model can outperform non-causal mod-
+els, as well as causal models which do not consider the sensitive
+attribute as a confounder. We further explore the performance of
+this model, showing that fair-aware causal modeling can lead to
+more accurate, fairer policies in decision-making systems.
+2 BACKGROUND
+2.1 Causal Inference
+We employ Structural Causal Models (SCMs), which provide a gen-
+eral theory for modeling causal relationships between variables
+[38]. An SCM is defined by a directed graph, containing vertices
+and edges, which respectively represent variables in the world
+and their pairwise causal relationships. There are two types of
+vertices: exogenous variables U and endogenous variables V . Ex-
+ogenous variables are unspecified by the model; we model them
+as unexplained noise distributions, and they have no parents. En-
+dogenous variables are the objects we wish to understand; they are
+descendants of endogenous variables. The value of each endoge-
+nous variable is fully determined by its ancestors. Each V ∈ V has
+some function fV which maps the values of its immediate parents
+to its own. This function fV is deterministic; any randomness in
+an SCM is due to its exogenous variables.
+In this paper, we are primarily concerned with three endogenous
+variables in particular: X , the observable features (or covariates)
+of some example; T , a treatment which is applied to an example;
+and Y , the outcome of a treatment. Our decision problem is: given
+an example with particular values for its features, X = x , what
+value should we assign to treatment T in order to produce the best
+outcome Y? This is fundamentally different from a classification
+problem, since typically we observe the result of only one treatment
+per example
+To answer this decision problem, we need to understand the
+value Y will take if we intervene on T and set it to value t . Our first
+instinct may be to estimate P(Y |T = t ,X = x). However, this is
+unsatisfactory in general. If we are estimating these probabilities
+from observational data, then the fact that x received treatment t
+in the past may have some correlation with the historical outcome
+Y . This “confounding” effect—the fact that X has an effect on both
+T and Y is depicted in Figure 1a, by the arrows pointing out of X
+into T and Y . For instance, in an observational medical trial, it is
+possible that young people are more likely to choose a treatment,
+and also that young people are more likely to recover. A supervised
+learning model, given this data, may then overestimate the average
+effectiveness of the treatment on a test population. Broadly, to
+understand the effect of assigning treatment t , supervised learning
+is not enough; we need to model the functions { fV } of the SCM.
+Once we have a fully defined SCM, we can use the do operation
+[38] to simulate the distribution over Y given that we assign some
+treatment t—we denote this as P(Y |do(T = t),X = x). We do the do
+through graph surgery: we assign the value t to T by removing all
+arrows going into T from the SCM and setting the corresponding
+structural equation output to the desired value regardless of its
+input fT (·) = t . We then set X = x and continue with inference of
+Y as we normally would.
+A common assumption in causal modelling is the “no hidden
+confounders” assumption, which states that there are no unob-
+served variables affecting both the treatment and outcome. We
+follow Louizos et al. [30], and use variational inference to model
+confounders that are not directly observed but can be abstracted
+from proxies. In Sec. 4 we consider the implications of this approach
+and discuss alternative assumptions.
+2.2 Approximate Inference
+Individual and population-level causal effects can be estimated via
+the do operationwhen the values of all confounding variables are ob-
+served [38], which motivates the common no-hidden-confounders
+made/action taken and its result, respectively. These terms are associated with an
+alternative theory of causal inference [42] which can also be used to describe the
+methods we propose, but which we will not discuss in this paper.
+assumption in causal inference. However this assumption is rather
+strong and precludes classical causal inference in many situations
+relevant to fair machine learning, e.g., where ill-quantified and hard-
+to-observe factors such socio-economic status (SES) may signifi-
+cantly confound the observable data. Therefore we follow Louizos
+et al. [30] in modeling unobserved confounders using a high di-
+mensional latent variable Z to be inferred for each observation
+(X ,T ,Y ). They prove that if the full joint distribution is success-
+fully recovered, individual treatment effects are identifiable, even in
+the presence of hidden confounders. In other words, causal effects
+are identifiable insofar as exact inference can be carried out, and
+the observed covariates are sufficiently informative.
+Because exact inference of Z is intractable for many interesting
+models, we approximately infer Z by variational inference, spec-
+ifying q(Z |X ,T ,Y ) using a parametric family of distributions and
+learning the parameters that best approximate the true posterior
+p(Z |X ,T ,Y ) bymaximizing the evidence lower bound (ELBO) of the
+marginal data likelihood [49]. In particular, we amortize inference
+by training a neural network (whose functional form is specified
+separately from the causal model) to predict the parameters of q
+given (X ,T ,Y ) [25]. Amortized inference is much faster but less op-
+timal than local inference [22]; alternate inference strategies could
+be explored for applications where the importance of accuracy in
+individual estimation justifies the additional computational cost.
+2.3 TARNets
+TARNets [44] are a class of neural network architectures for esti-
+mating outcomes of a binary treatment. The network comprises
+two separate arms—each predicts the outcomes associated with a
+separate treatment—that share parameters in the lower layers. The
+entire network is trained end to end using gradient-based optimiza-
+tion, but with only one arm (the one with the treatment which was
+actually given) receiving error signal for any given example. The
+TARNet prediction of result R and input variables V and potential
+intervention I is expressed by combining the shared representa-
+tion function Φ with the two functions h0,h1 corresponding to the
+separate prediction arms. This yields two composed functions,
+дI=0R (V , I ) = h0(Φ(V ))
+дI=1R (V , I ) = h1(Φ(V ))
+(1)
+with h0,h1,Φ realized as neural networks. Shalit et al. [44] explore
+a group-wise MMD penalty on the outputs of Φ; we do not use this.
+3 FAIR CAUSAL INFERENCE
+As stated in Sec. 2.1, we are interested in modeling the causal effects
+of treatments on outcomes. However, when attempting to learn
+fairly from a biased dataset, this problem takes on an extra dimen-
+sion. In this context, we become concerned with understanding
+causal effects in the presence of a sensitive attribute (or protected at-
+tribute). Examples include race, gender, age, or SES. When learning
+from a historical data, we may believe that one of these attributes
+affected the observable treatments and outcomes, resulting in a
+biased dataset.
+Lum and Isaac [32] give an example in the domain of predictive
+policing of how a dataset of drug crimes may become biased with
+respect to race through unfair policing practices. They note that it is
+impossible to collect a dataset of all drug crimes in some area; rather,
+these datasets are really tracking drug arrests. Due to a higher level
+of police presence in heavily Black than heavily White commu-
+nities, recorded drug arrests will by nature over-represent Black
+communities. Therefore, a predictive policing algorithm which at-
+tempts to fit this data will continue the pattern of over-policing
+Black communities. Lum and Isaac [32] provide experimental vali-
+dation of this hypothesis through simulation, contrasting the out-
+put of a common predictive policing algorithm with independent,
+demographic-based estimates of drug use by neighborhood. Their
+work shows that wrongly specifying a learning problem as one of
+supervised classification can lead to replicating past biases. In order
+to account for this in the learning process, we should be aware of
+the biases which shaped the data — which may include sensitive
+attributes that historically affected the treatment and/or outcome.
+Using the above example for concreteness, we specify the vari-
+ables at play. The decision-making problem is: should police be sent
+to neighborhood X at a given time? The variables are:
+• A ∈ {0, 1}: a sensitive attribute. For example the majority
+race of a neighborhood.
+• T ∈ {0, 1}: a treatment. For example the presence or absence
+of police in a certain neighborhood on a particular day.
+• Y ∈ R: an outcome. For example the number of arrests
+recorded in a given neighborhood on a particular day.
+• X ∈ RD
+: D-dimensional observed features. For example
+statistics about the neighborhood, which may change day-
+to-day
+We will represent sensitive attributes and treatments as binary
+throughout this paper; we recognize this is not always an optimal
+modeling choice in practice. Note that the choice of treatment will
+causally alter the outcome—an arrest cannot occur if there are no
+police in the area. Furthermore, the sensitive attribute can causally
+effect the outcome as well; research has shown that policing can
+disparately effect various races, even controlling for police presence
+[14] (the treatment in this case).
+We note that in various domains, there may be more variables
+of interest than the ones we list here, and more appropriate causal
+models than those shown in Fig. 1. However, we believe that the
+setup we describe is widely applicable and contains the minimal set
+of variables to be useful for fairness-aware causal analysis. We are
+interested in calculating causal effects between the above variables.
+In particular, we seek answers to the following three questions:
+What is the effect of the treatment on the outcome? This will help
+us to understand which T is likely to produce a favorable outcome
+for a givenX . Let us denoteyT=t (x ,a) = E[y |do(T = t),X = x ,A =
+a] as the expected conditional outcome under T = t , that is, the
+ground truth value taken by Y when the treatment T is assigned
+the value t , and conditioning on the values x ,a for the features and
+sensitive attribute respectively. Then, we can express the individual
+effect of T on Y (IET→Y ) as
+IET→Y (x ,a) = yT=1(x ,a) − yT=0(x ,a). (2)
+What is the effect of the sensitive attribute on the treatment? This
+allows us to understand how the treatment assignment was biased
+in the data. Similarly, we can define tA=a (x) = E[t |do(A = a),X =
+x], which is the expected conditional treatment in the historical
+data when the value a is assigned to the sensitive attribute. Then,
+the individual effect of A on T can be expressed as
+IEA→T (x) = tA=1(x) − tA=0(x). (3)
+What is the effect of the sensitive attribute on the outcome? This
+allows us to understand what bias is introduced into the historically
+observed outcome. We can also define yA=a (x) = E[y |do(A =
+a),X = x ,T = tA=a (x)] as the expected conditional outcome under
+A = a; the ground truth value of Y conditioned on the features
+being x if the sensitive attribute were assigned the value a, and the
+treatment T were assigned the ground truth value tA=a (x). Then,
+we can express the individual effect of A on Y as
+IEA→Y (x) = yA=1(x) − yA=0(x). (4)
+3.1 Intervening on Sensitive Attributes
+There has been some disagreement around the notion of interven-
+ing on an immutable (or effectively immutable) sensitive attribute.
+Holland [18] argue that there is “no causation without manipula-
+tion” — i.e. an attribute can never be a cause; only an experience
+undergone can be. Briefly stated, they argue that if the factual and
+counterfactual versions cannot be “defined in principle, it is impos-
+sible to define the causal effect”. In a counterargument, Marini and
+Singer [33] claim that a “synthesis of intrinsic and extrinsic deter-
+mination [provides] a more adequate picture of causal relations”
+— meaning that both externally imposed experiences (extrinsic)
+and internally defined attributes (intrinsic) are valid conceptual
+components of a theory of causation. We agree with this view —
+that the notion of a causal effect of an immutable attribute is valid,
+and believe that it is particularly useful in a fairness context.
+Specifically pertaining to race, some argue it is possible to un-
+derstand the causal effect of an immutable attribute in terms of the
+effects of more manipulable attributes (proxies). VanderWeele and
+Robinson [48] argue that, rather than interpreting a causal effect
+estimate of A as a hypothetical randomized intervention on A, one
+can interpret it as a particular type of intervention on some other
+set of manipulable variables related to A (under certain graphical
+and distributional assumptions on those variables). Sen and Wa-
+sow [43] take a constructivist approach, and consider race to be
+composed of constituent parts, some of which can be theoretically
+manipulated. They describe several experimental designs which
+could estimate the effects of immutable attributes.
+Another issue with intervening on sensitive attributes is that,
+since many are “assigned at conception”, all observed covariates
+X are post-treatment [43] (as reflected in the design of our SCM
+in Fig. 1d). In statistical analysis, a frequent approach is to ignore
+all post-treatment variables to avoid introducing collider biases
+[14, 23]. However, in our model, the purpose of the covariates is to
+deduce the true (unobserved) values of the latent Z for that indi-
+vidual. Therefore, when conditioning on the observed covariates,
+correlation of A and Z is the objective, rather than an undesired
+side effect. This is the first step (“Abduction”) of computing counter-
+factuals (according to Pearl [38]); we can think of this as adjusting
+for bias (of the sensitive attribute) in the X -generating process.
+4 PROPOSED METHOD
+In this section we first conceptualize and describe our proposed
+causal model—depicted in Fig. 1d—then discuss the parameteriza-
+tion of the corresponding SCMs and learning procedure. A common
+causal modelling approach is to define a new SCM for each prob-
+lem Pearl [38], taking advantage of domain specific knowledge for
+that particular problem. This stands in contrast to a classic ma-
+chine learning (ML) approach, which aims to process data and draw
+conclusions as generally as possible, by automatically discovering
+patterns of correlation in the data. While the causal modelling ap-
+proach is capable of detecting effects the ML approach cannot, the
+ML approach is attractive since it provides modularity, general-
+ity and a more automated data processing pipeline. In this work,
+we aim to interpolate between the two approaches by considering
+a single, general causal model for observational data. Our model
+contains what we argue are a minimal set of fairly general causal
+variables for discovering treatment effects and biases in the data-
+generation process, allowing us to interface causally with arbitrary
+data that fits the proposed structure.
+Two features of our causal model are noteworthy. First is the
+explicit consideration of the sensitive attribute—a potential source
+of dataset bias—as a confounder, which causally affects both the
+treatment T and the outcome Y . This contrasts with approaches
+from outside the fairness literature (e.g. [30], Fig. 1b), which in a
+fairness setting (Fig. 1c) would treat potential sensitive attributes as
+equivalent to other observed features. Our model accounts for the
+possibility that a sensitive attribute may have causal influence on
+the observed features, treatments and outcomes and the historical
+process which generated them. It makes the sensitive attribute
+distinct from the other attributes of X , which we understand not as
+confounders but observed proxies. We can think of this as a causal
+modeling analogue of “fairness through awareness”. By actively
+adjusting for causal confounding effects of sensitive attributes, we
+can build a model which accounts for the interplay between the
+treatment and outcome for both values of the sensitive attribute.
+The other noteworthy aspect of our model is the latent variable
+Z . Together, Z and A make up all the confounding variables. We
+note two important points about these confounders. Firstly, we
+clarify that the model class we propose (a latent Gaussian and a
+deep neural network), is not necessarily the definitive model of the
+confounders ofT andY ; however, it is a flexible one, with numerous
+applications in machine learning [39]. Secondly, we note that causal
+inference and machine learning have different conventions around
+unobserved (i.e. latent) variables — in causal inference, these vari-
+ables are generally considered to be nameable objects in the world
+(e.g. SES, historical predjudice), whereas in machine learning they
+represent some unspecified (and perhaps abstract) structure in the
+data. Our Z follows the machine learning convention.
+As in Louizos et al. [30], Z represents all the unobserved con-
+founding variables which effect the outcomes or treatments (other
+than A). The features X can be seen as proxies (noisy observations)
+for the confounders (Z ,A). Altogether, the endogenous variables in
+our model are X , A, Z , T , and Y . We also have exogenous variables
+ϵX , ϵA, ϵZ , ϵT , ϵY (not shown), each the immediate parent of (only)
+their respective endogenous variable. The structural equations are:
+Z = fZ (ϵZ ) A = fA(ϵA)
+X = fX (Z ,A, ϵX ) T = fT (Z ,A, ϵT )
+Y = fY (Z ,A,T , ϵY ) ϵV ∼ PV (ϵV ) ∀V ∈ {Z ,A,X ,T ,Y } (5)
+SinceZ does not necessarily refer to tangible objects in the world,
+it is reasonable that Z ⊥ A in our model. This does not prevent a
+characteristic such as SES (which may be correlated with A) from
+being a confounder — rather, Z could represent the component of
+SES which is not based on A. Since both confounders are inputs
+to all other variables in the SCM, the model can learn to represent
+variables which are based on A, (e.g. SES) as a joint distribution of
+Z and A.
+With this SCM in hand, we can estimate various interventional
+outcomes, if we know the values of fV ∀ V ∈ {Z ,A,X ,T ,Y }. For
+instance, we might estimate:
+E [Y |Z = z,A = a,do(T = 1)] = EϵY ∼PY (ϵY )[fY (z,a, 1, ϵY )]
+E [Y |Z = z,do(A = 1),do(T = 1)] = EϵY ∼PY (ϵY )[fY (z, 1, 1, ϵY )]
+E [Y |Z = z,do(A = 1)] =
+EϵY ∼PY (ϵY )EϵT ∼PT (ϵT )[fY (z, 1, fT (z, 1, ϵT ), ϵY )]
+(6)
+which are the expected values over outcomes of interventions on
+T , T and A, and just A, respectively.
+However, the problem with the calculations in Eq. 6 is that Z
+is unobserved, so we cannot simply condition on its value. Rather,
+we observe some proxies X . Since the structural equations go the
+other direction — X is a function of Z , not the other way around —
+inferring Z from a given X is a non-trivial matter.
+In summary, we need to learn two things: a generative model
+which can approximate the structural functions f , and an inference
+model which can approximate the distribution of Z given X . Fol-
+lowing the lead of Louizos et al. [30], we use variational inference
+parametrized by deep neural networks to learn the parameters of
+both of thesemodels jointly. In variational inference, we aim to learn
+an approximate distribution over the joint variables P(Z ,A,X ,T ,Y ),
+by maximizing a variational lower bound on the log-probability
+of the observed data. As demonstrated in Louizos et al. [30], the
+causal effects in the model become identifiable if we can learn this
+joint distribution. We extend their proof in Appendix B to show
+identifiability holds when including the sensitive attribute in the
+model (as in Fig. 1d).
+We discuss here the identifiability condition from Louizos et al.
+[30]. Given some treatment T and outcome Y , the classic “no hid-
+den confounders” assumption asserts that the set of observed vari-
+ables O blocks all backdoor paths from T to Y . Louizos et al. [30]
+weaken this: they assume that there is a set of confounding vari-
+ables Z = OZ ∪UZ such that Z blocks all backdoor paths fromT to
+Y , whereOZ are observed andUZ are unobserved. They claim that
+if we recover the full joint distribtuion of p(Z ,X ,T ,Y ), then we can
+identify the causal effect T → Y . However, this is only possible if
+we have sufficiently informative proxies X . While recovering the
+full joint distribution does not mean we have to measure every
+confounder, we do have to at least measure some proxy for each
+confounder.
+This is a weaker assumption, but not fully general. There may be
+confounding factors which cannot be inferred from the proxies X —
+in this case, our model will be unable to learn the joint distribution,
+and the causal effect will be unidentifiable. In this case, we are back
+to square one; our causal estimates may be inaccurate. Determining
+the exact fairness implications of this remains an open problem — it
+would depend on which confounders were missing, and which prox-
+ies were already collected. A complicating factor is that testing for
+unconfoundedness is difficult, and usually requires making further
+assumptions [46]. Therefore we might unintentionally make unfair
+inferences if we are unaware that we cannot infer all confounders.
+If we think this is the case, one solution is to collect more proxies.
+This provides an alternative motivation for the idea of increasing
+fairness by measuring additional variables [6].
+To learn a generative model of the data which is faithful to the
+structural model defined in Eq. 5, we define distributions p which
+will approximate various conditional probabilities in our model. We
+model the joint probability assuming the following factorization:
+P(Z ,A,X ,T ,Y ) = p(Z )p(A)p(X |Z ,A)p(T |Z ,A)p(Y |Z ,A,T ) (7)
+Each of these p corresponds to an f in Eq. 5 — formally, p(V =
+v |W = w) = PϵV [fV (W , ϵV )] for an endogenous variable V and
+subset of endogenous variablesW , where {V },W ⊂ {Z ,A,X ,T ,Y }.
+For simplicity, we choose computationally tractable probability
+distributions for each conditional probability in Eq. 7:
+p(Z ) =
+DZ∏
+j=1
+N(Z j |0, 1)
+p(A) = Bern(A|πA)
+p(X |Z ,A) =
+DX∏
+j=1
+N(X j |µX (Z ,A),σ 2
+X (Z ,A)
+p(T |Z ,A) = Bern(T |πT (Z ,A))
+(8)
+whereDZ ,DX are the dimensionalities ofZ andX respectively, and
+πA ∈ [0, 1] is the empirical marginal probability of A = 1 across
+the dataset (if this is unknown, we could use a Beta prior over
+that distribution; in this paper we assume A is observed for every
+example). For p(Y |Z ,A,T ), we use either a Bernoulli or a Gaussian
+distribution, depending on if Y is binary or continuous:
+pbinary (Y |Z ,A,T ) = Bern(Y |πY (Z ,A,T ))
+pcont (Y |Z ,A,T ) = N(Y |µY (Z ,A,T ),σ 2
+Y (Z ,A,T ))
+(9)
+To flexibly model the potentially complex and non-linear rela-
+tionships in the true generative process, we specify several of the
+distribution parameters from Eqs. 8 and 9 as the output of a func-
+tion дV , which is realized by a neural network (or TARNet [44])
+with parameters θV . We parametrize the model of X with neural
+networks д
+µ
+X ,д
+σ
+X :
+µX (Z ,A) = д
+µ
+X (Z ,A)
+σ 2
+X (Z ,A) = exp 2дσX (Z ,A)
+(10)
+We use TARNets [44] (see Sec. 2.3) to parameterize the distribu-
+tions over T and Y . In our model, A acts as the “treatment” for the
+TARNet that outputs T . Likewise A and T are joint treatments af-
+fecting Y — our Y model can be seen as a hierarchical TARNet, with
+one TARNet for each value of A, where each TARNet has an arm
+for each value ofT . In all, this yields the following parametrization:
+pT (Z ,A) = (1 −A)σ (дA=0T (Z ,A)) +Aσ (дA=1T (Z ,A));
+pY (Z ,A,T ) = (1 −T )(1 −A)σ (дT=0,A=0Y (Z ,A,T ))
++T (1 −A)σ (дT=1,A=0Y (Z ,A,T ))
++ (1 −T )Aσ (дT=0,A=1Y (Z ,A,T ))
++TAσ (дT=1,A=1Y (Z ,A,T ));
+(11)
+and the same for µY (Z ,A,T ) andσ 2
+Y (Z ,A,T ); whereσ is the sigmoid
+function σ (x) = 1
+1+exp(−x ) and д
+I=0
+R (V , I ) are defined as in Sec. 2.3.
+We further define an inference model q, to determine the values
+of the latent variables Z given observed X ,A. This takes the form:
+q(Z |X ,A) = N(µZ (X ,A),σ 2
+Z (X ,A)) (12)
+where the normal distribution is reparametrized analogously to Eq.
+10 with networks д
+µ
+Z ,д
+σ
+Z . Since A is always observed, we do not
+need to infer it, even though it is a confounder. We note that this is
+a different inference network from the one in Louizos et al. [30] —
+we do not use the given treatments and outcomes in the inference
+model. We found it to be a simpler solution (no auxiliary networks
+necessary), and did not see a large change in performance. This is
+similar to the approach taken in Parbhoo et al. [37].
+To learn the parameters of this model, we can maximize the
+expected lower bound on the log probability of the data (the ELBO),
+which takes the form below, which we note is also a valid ELBO to
+optimize for lower-bounding the conditional log-probability of the
+treatments and outcomes given the data.
+L =
+n∑
+i=1
+Eq(zi |xi ,ai )[logp(xi |zi ,ai ) + logp(ti |zi ,ai )
++ logp(yi |zi ,ai , ti ) + logp(zi ) − logq(zi |xi ,ai )]
+(13)
+5 RELATEDWORK
+Our work most closely relates to the Causal Effect Variational Au-
+toencoder [30]. Some follow-up work is done by Parbhoo et al.
+[37], who suggest a purely discriminative approach using the in-
+formation bottleneck. Our model differs from this work in that
+they did not include a sensitive attribute in their model, and their
+model does not contain a “reconstruction fidelity” term, in this case
+logp(xi |zi ,ai ). Previous papers which learn causal effects using
+deep learning (with all confounders observed) include Shalit et al.
+[44] and Johansson et al. [19], who propose TARNets as well as
+some form of balancing penalty.
+The intersection of fairness and causality has been explored
+recently. Counterfactual fairness — the idea that a fair classifier is
+one which doesn’t change its prediction under the counterfactual
+value of X when A is flipped — is a major theme [27]. Criteria for
+fairness in treatments are proposed in Nabi and Shpitser [36], and
+fair interventions are further explored in Kusner et al. [28]. Zhang
+and Bareinboim [51] present a decomposition which provides a
+different way of understanding of unfairness in a causal inference
+model. Other work focuses on the causal relationship between
+sensitive attributes and proxies in fair classification [21].
+Kallus and Zhou [20] explore the idea of learning from biased
+data, making the point that a “fair” predictor learned on biased
+data may not be fair under certain forms of distributional shift,
+while not touching on causal ideas. Some conceptually similar work
+has looked at the “selective labels” problem [9, 29], where only a
+biased selection of the data has labels available. There has also been
+related work on feedback loops in fairness, and the idea that past
+decisions can affect future ones, in the predictive policing [12, 32]
+and recommender systems [16] contexts, for example. Barabas et al.
+[3] advocate for understanding many problems of fair prediction
+as ones of intervention instead. Another variational autoencoder-
+based fairness model is proposed in Louizos et al. [31], but with the
+goal of fair representation learning, rather than causal modelling.
+Dwork et al. [10] originated the term “fairness through awareness”,
+and argued that the sensitive attribute needed to be given a place
+of privilege in modelling in order to reduce unfairness of outcomes.
+6 EXPERIMENTS
+In this section we compare various methods for causal effect esti-
+mation. The three effects we are interested in are
+• A → T , the causal effect of A on T :
+E(T = 1|do(A = 1),X ) −E(T = 1|do(A = 0),X )
+• A → Y , the causal effect of A on Y :
+E(Y = 1|do(A = 1),X ) −E(Y = 1|do(A = 0),X )
+• T → Y , the causal effect of T on Y :
+E(Y = 1|do(T = 1),X ,A) −E(Y = 1|do(T = 0),X ,A)
+Note that all three effects are individual-level; that is, they are con-
+ditioned on some observed X (and possibly A), and then averaged
+across the dataset.
+6.1 Data
+We evaluate our model using semi-synthetic data. The evaluation
+of causal models using non-synthetic data is challenging, since a
+random control trial on the intervention variable is required to
+validate correctness — this is doubly true in our case, where we are
+concerned with two different possible interventions. Additionally,
+while data from random control trials for treatment variables exists
+(albeit uncommon), conducting a random control trial for a sensitive
+attribute is usually impossible.
+We have adapted the IHDP dataset [5, 35]—a standard semi-
+synthetic causal inference benchmark—for use in the setting of
+causal effect estimation under a sensitive attribute. The IHDP dataset
+is from a randomized experiment run by the Infant Health and De-
+velopment Program (in the US), which "targeted low-birth-weight,
+premature infants, and provided the treatment group with both
+intensive high-quality child care and home visits from a trained
+provider" [17]. Pre-treatment variables were collected from both
+child (e.g. birth weight, sex) and the mother at time of birth (e.g.
+age, marital status) and behaviors engaged in during the pregnancy
+(e.g. smoked cigarettes, drank alcohol), as well as the site of the
+intervention (where the family resided). We choose our sensitive
+attribute to be mother’s race, binarized asWhite and non-White. We
+follow a similar method for generating outcomes to the Response B
+surface proposed in Hill [17]. However, our setup differs since we
+are interested in additionally modelling a sensitive attribute and
+hidden confounders, so there are three more steps which must be
+taken. First, we need to generate outcomes Y for each example for
+T ∈ {0, 1} under the counterfactual sensitive attribute A. Second,
+we need to generate a treatment assignment for each example for
+the counterfactual value of the sensitive attribute. Finally, we need
+to remove some data from the observable measurements to act as a
+hidden confounder, as in Louizos et al. [30].
+We detail our full data generation method in Appendix A. We
+denote the outcome Y under interventions do(T = t),do(A = a) as
+yT=t,A=a . The subroutines in Algorithms 2 and 3 generate all factual
+and counterfactual outcomes and treatments for each example, one
+for each possible setting of A and/orT . Values of the constants that
+we use for data generation can be found in Appendix A.
+We choose our hidden confounding feature Z to be birth weight.
+In the second (optional) step of data generation, we choose to re-
+move 0, 1, or 2 other features. Especially if we choose features
+which are highly correlated with the hidden confounder, this has
+the effect of making the estimation problem more difficult. When
+removing 0 features, we do nothing. When removing 1 feature, we
+remove the feature which is most highly correlated with Z (head
+size). When removing 2 features, we remove two features most
+highly correlated with Z (head size & weeks born preterm).
+6.2 Experimental Setup
+We run four different models for comparison, including the one we
+propose. Since we are interested in estimating three different causal
+effects simultaneously (A → T ,A → Y ,T → Y ), we cannot com-
+pare against most standard causal inference benchmark models for
+treatment effect estimation. The models we test are the following:
+• Counterfactual MLP (CFMLP): a multilayer perception
+(MLP) which takes the treatment and sensitive attribute as
+input, concatenated toX , and aims to predict outcome. Coun-
+terfactual outcomes are calculated by simply flipping the
+relevant attributes and re-inputting the modified vector to
+the MLP. A similar auxiliary network learns to predict the
+treatment from a vector of X concatenated to A.
+• Counterfactual Multiple MLP (CF4MLP): a set of four
+MLPs — one for each combination of (A,T ) ∈ {0, 1}2. Exam-
+ples are inputted into the appropriate MLP for the factual
+outcome, and simply inputted into another MLP for the ap-
+propriate counterfactual outcome. A similar pair of auxiliary
+networks predict treatment.
+• Causal Effect Variational Autoencoder with Sensitive
+Attribute (CVAE-A, Fig. 1c): a model similar to Louizos
+et al. [30], but with the simpler inference model we propose.
+We incorporate a sensitive attributeA by concatenating X to
+A as input; counterfactuals along A are taken by flipping A
+and re-inputting the modified vector. Counterfactuals along
+T are taken as in Louizos et al. [30].
+• FairCausal EffectVariationalAutoencoder (FCVAE, Fig.
+1d): our proposed fair-aware causal model, with A concate-
+nated to Z as confounders. We run two versions: one where
+A is used to help with reconstructing X and inferring Z from
+X (FCVAE-1), and one where it is not (FCVAE-2). Formally,
+the inference model and generative model of X in FCVAE-1
+Model A → T T → Y A → Y
+CFMLP 0.681 ± 0.00 4.51 ± 0.13 3.28 ± 0.07
+CF4MLP 0.667 ± 0.00 4.58 ± 0.13 3.71 ± 0.09
+CVAE-A 0.665 ± 0.00 3.80 ± 0.10 3.04 ± 0.06
+FCVAE-1 0.659 ± 0.00 3.82 ± 0.11 2.88± 0.06
+FCVAE-2 0.659 ± 0.00 3.81 ± 0.11 2.78 ± 0.06
+Table 1: PEHE for each model on IHDP data (no extra fea-
+tures removed). Mean and standard errors shown, as calcu-
+lated over 500 random seedings.
+are q(Z |X ,A) and p(X |Z ,A), and in FCVAE-2 are q(Z |X ) and
+p(X |Z ) respectively. In both versions, A is a confounder of
+both the treatment and the outcome.
+The CFMLP is purely a classification baseline. It learns a map-
+ping from input to output, estimating the conditional distribution
+P(Y |X ,A,T ). The CF4MLP shares this goal, but has a more complex
+architecture—it learns a disjoint set of parameters for each setting of
+interventions, allowing it to model completely separate generative
+processes. However, it is still ultimately concerned with supervised
+prediction. Furthermore, neither of these models is built to consider
+the impact of hidden confounders.
+The CVAE-A is a model for causal inference of outcomes from
+treatments. Therefore, we should expect it to perform well in esti-
+matingT → Y . It is also created to model these effects under hidden
+confounders. Therefore, the difference between CVAE-A and the
+MLPs will tell us the improvement which comes from appropriate
+causal modelling rather than classification.
+However, the CVAE-A does not consider the sensitive attribute
+A as a confounder; rather, it treats it simply as another covariate
+of X . So in comparing the FCVAE to the CVAE-A, we observe
+the improvement that comes from causally modelling the dataset
+unfairness stemming from a sensitive attribute. In comparing the
+FCVAE to the MLPs, we observe the full impact of the FCVAE —
+joint causal modelling of treatments, outcomes, sensitive attributes,
+and hidden confounders. See Appendix C for experimental details.
+6.3 Results
+6.3.1 Estimating Causal Effects. In this section, we evaluate how
+well the models from Sec. 6.2 can estimate the three causal effects
+A → T ,A → Y ,T → Y . To avoid confusion with the words treat-
+ment and outcome, in each of these three causal interactions, we
+will refer to to the causing variable as the intervention variable,
+and the affected variable as the result variable. To evaluate how
+well our model can estimate causal effects, we use PEHE: Precision
+in Estimation of Heterogeneous Effects [17]. This is calculated as:
+PEHE =
+√
+E[((r1 − r0) − (r̂1 − r̂0))2], where ri is the ground truth
+value of result from the intervention i , and r̂i is our model’s esti-
+mate of that quantity. PEHE measures our ability to model both the
+factual (ground truth) and the counterfactual results.
+In Tables 1-3, we show the PEHE for each of the models described
+in Sec. 6.2, for each causal effect of interest. Each table shows results
+for a version of the dataset with 0-2 of the most informative features
+removed (as measured by correlation with the hidden confounder).
+Model A → T T → Y A → Y
+CFMLP 0.675 ± 0.00 4.30 ± 0.11 3.42 ± 0.08
+CF4MLP 0.661 ± 0.00 4.37 ± 0.11 3.89 ± 0.07
+CVAE-A 0.672 ± 0.00 4.05 ± 0.10 3.53 ± 0.07
+FCVAE-1 0.663 ± 0.00 4.00 ± 0.10 3.39 ± 0.08
+FCVAE-2 0.663 ± 0.00 3.99 ± 0.10 3.25 ± 0.07
+Table 2: PEHE for each model on IHDP data (1 most infor-
+mative feature removed). Mean and standard errors shown,
+as calculated over 500 random seedings.
+Model A → T T → Y A → Y
+CFMLP 0.666 ± 0.00 6.03 ± 0.21 4.30 ± 0.12
+CF4MLP 0.659 ± 0.00 5.77 ± 0.18 4.59 ± 0.10
+CVAE-A 0.672 ± 0.00 5.46 ± 0.18 4.19 ± 0.10
+FCVAE-1 0.659 ± 0.00 5.40 ± 0.18 4.07± 0.11
+FCVAE-2 0.659 ± 0.00 5.39 ± 0.18 3.95 ± 0.10
+Table 3: PEHE for each model on IHDP data (2 most infor-
+mative features removed). Mean and standard errors shown,
+as calculated over 500 random seedings. Lower is better.
+Therefore, the easiest problem is with zero features removed, the
+hardest is with two. Note that in IHDP, Y ∈ R.
+Generally, as expected, we observe that the causal models achieve
+lower PEHE for most estimation problems. Also as expected, we ob-
+serve that that the PEHE for the more complex estimation problems
+(A → Y ,T → Y ) increases as the most useful proxies are removed
+from the data. We suspect there is less variation in the results for
+A → T since it is a simpler problem: there are no extra confounders
+(other than Z ) or mediating factors to consider.
+We find that our model (the FCVAE) compares favorably to the
+other models in this experiment. We see that in general, the fair-
+aware models (FCVAE-1 and FCVAE-2) have lower PEHE than all
+other models when estimating the causal effects relating to the
+sensitive attribute (A → Y ,A → T ). Furthermore, the FCVAE also
+performs similarly to the CVAE-A at T → Y estimation as well,
+demonstrating a slight improvement (at least in the more difficult
+1, 2 features removed cases).
+One interesting note is that FCVAE-1 (where A is used in recon-
+struction of X and in inference of Z ) and FCVAE-2 seem to perform
+similarly, with FCVAE-2 being slightly better, if anything. This may
+seem surprising at first, since one might imagine that usingAwould
+allow the model to learn better representations of X , particularly
+for the purpose of doing counterfactual inference across A.
+To explore this further, we examine in table 4 the latent represen-
+tationsZ learned by each model in terms of their encoder mutual in-
+formation betweenZ andX , which is calculated asKL(q(Z |X )| |p(Z )),
+the KL-divergence from the encoder posterior to the prior. This
+quantity is roughly the same for both versions of the FCVAE, im-
+plying that the inference network q(Z |·) does not leverage the
+additional information provided by A in its latent code Z . This is
+in fact sensible because FCVAE has access to A as an observed
+confounder in modeling the structural equations. We also noticed
+that CVAE contains about one bit of extra information in its latent
+Model KL [q(z |·)| |p(z)]
+CVAE-A 4.28 ± 0.10
+FCVAE-1 3.50 ± 0.12
+FCVAE-2 3.53 ± 0.12
+Table 4: KL divergence from the encoder posterior q(z |·) to
+prior p(z) after training on IHDP; equivalent to encoder mu-
+tual information [2]. CVAE and FCVAE-1 use (X ,A) as input
+to encoder, while FCVAE-2 uses X only. Mean and standard
+errors shown, as calculated over 500 random seedings.
+code, implying some degree of success in capturing relevant infor-
+mation about A in Z . But if CVAE models all confounders during
+inference, why does it underperform relative to FCVAE estimat-
+ing the downstream causal effects, especially A → Y? By making
+explicit the role of A as confounder, we hypothesize that FCVAE
+can learn the interventional distributions with respect to A (e.g.,
+p(Y |T ,do(A = a),Z )) rather than the conditional distributions of
+CVAE (e.g., p(Y |T ,Z (A))); we suspect that the gating mechanism
+of the TARNet implementation of the structural equations to be
+important in this regard.
+6.3.2 Learning a Treatment Policy. The next natural question is:
+how does estimating these causal effects contribute to a fair decision-
+making policy? We examine two dimensions of this. We define a
+policy π : X ,A → T as a function which maps inputs (features and
+sensitive attribute) to treatments. We suppose the goal is to assign
+treatmentsT using a policy T̂ = π (X ,A) that maximizes its expected
+valueV (π ), defined here as the expected outcomeY it achieves over
+the data, i.e. V (π ) = Ex,a [Y |do(T = π (x ,a)),A = a,X = x]. For
+example, we could imagine the treatments to be various medica-
+tions, and the outcome to be some health indicator (e.g. number of
+months survived post-treatment).
+We can derive a policy from an outcome prediction model sim-
+ply by outputting the predicted argmax value over treatments, i.e.
+π (x ,a) = argmaxt ∈T EŶ [Ŷ |do(T = t),A = a,X = x], where Ŷ is
+the model’s prediction of the true outcome Y . The optimal policy
+π⋆(x ,a) = argmaxt ∈T EY [Y |do(T = t),A = a,X = x] takes the
+argmax over ground truth outcomes every time.
+First, we look at the mean regret of the policy π , which is the
+difference between its achieved value and the the value of the
+optimal policy: R(π ) = V (π⋆) − V (π ). We note that in general, a
+policy’s regret is not easy to compute or boundwithout assumptions
+on the outcome distribution in the data. In Table 5, we display the
+expected regret values for the learned policies. We observe that the
+fair-aware model achieves lower regret than the unaware causal
+model, and much lower regret than the non-causal models, for both
+the easier and more difficult settings of the IHDP data.
+Next, we attempt to measure the policy’s fairness. Most fairness
+metrics are designed for evaluating classification, not for inter-
+vention. However, Chen et al. [6] explore an idea which is easily
+adjusted to the interventional setting: that an algorithm is unfair
+if it is much less accurate on one subgroup. Here, we adapt this
+notion to evaluate treatment policy fairness.
+For any x , let us say the policy π is accurate if it chooses the
+treatment which in fact yields the best outcome for that individual;
+Model 0 removed 1 removed 2 removed
+CFMLP 0.37 ± 0.02 0.42 ± 0.02 0.81 ± 0.04
+CF4MLP 0.31 ± 0.02 0.43 ± 0.02 0.59 ± 0.02
+CVAE-A 0.21 ± 0.01 0.38 ± 0.01 0.59 ± 0.02
+FCVAE-1 0.19 ± 0.01 0.36 ± 0.01 0.55 ± 0.02
+FCVAE-2 0.19 ± 0.01 0.35 ± 0.01 0.55 ± 0.02
+Table 5: Regret for each model’s policy on IHDP data with 0,
+1, or 2 of themost useful covariates removed.Mean and stan-
+dard errors shown, as calculated over 500 random seedings.
+Lower regret is better.
+Model 0 removed 1 removed 2 removed
+CFMLP 0.042 ± 0.002 0.033 ± 0.002 0.062 ± 0.002
+CF4MLP 0.034 ± 0.002 0.038 ± 0.002 0.054 ± 0.002
+CVAE-A 0.033 ± 0.001 0.028 ± 0.001 0.051 ± 0.002
+FCVAE-1 0.031 ± 0.001 0.028 ± 0.001 0.046 ± 0.001
+FCVAE-2 0.030 ± 0.001 0.027 ± 0.001 0.047 ± 0.001
+Table 6: Accuracy gap for each model’s policy on IHDP data
+with 0, 1, or 2 of the most useful covariates removed. Mean
+and standard errors shown, as calculated over 500 random
+seedings. Lower gap is more fair.
+i.e. if π (x ,a) = π⋆(x ,a). We can define the accuracy of the policy
+Acc(π ) = Ex,a [1(π (x ,a) = π⋆(x ,a))], where 1 is an indicator
+function. We can define the subgroup accuracy Accα as accuracy
+calculatedwhile conditioning (not intervening) on a particular value
+α of A: Accα (π ) = Ex |A=α [1(π (x ,α) = π⋆(x ,α))]. We condition
+rather than intervene onAhere sincewe are interested inmeasuring
+the impact of the policy on real, existing populations, rather than
+hypothetical ones. Finally, to evaluate the fairness of the policy, we
+can look at the accuracy gap: |Acc1(π ) −Acc0(π )|. If this is high, the
+model is more unfair, since the policy has been more successful at
+modelling one group than the other, and is much more consistently
+choosing the correct treatment for individuals in that group.
+In Table 6 we display the accuracy gaps for our models and base-
+lines on the IHDP dataset. We observe that the FCVAE achieves
+a smaller accuracy gap than those which do not consider the ef-
+fect of the sensitive attribute. This is an encouraging sign that by
+understanding the confounding influence of sensitive attributes in
+biasing historical datasets, we can learn treatment policies which
+are more accurate for all subgroups of the data.
+7 DISCUSSION
+In this paper, we proposed a causally-motivated model for learn-
+ing from potentially biased data. We emphasize the importance
+of modeling the potential confounders of historical datasets: we
+model the sensitive attribute as an observed confounder contribut-
+ing to dataset bias, and leverage deep latent variable models to
+approximately infer other hidden confounders.
+In Sec. 6.3.2, we demonstrated how to use our model to learn a
+simple treatment policy from data which assigns treatments more
+accurately and fairly than several causal and non-causal baselines.
+Looking forward, the estimation of sensitive attribute causal effects
+suggests several compelling new research directions, which we
+non-exhaustively discuss here:
+• Counterfactual Fairness: Our model learns outcomes for
+counterfactual values of both T and A. This means we could
+choose to implement a policy where we assess everyone
+under the same value a′, by assigning treatments to all indi-
+viduals, no matter their original value a of A, based on the
+inferred outcome distribution P(Y |do(A = a′),X ,T ). Such a
+policy respects the definition of counterfactual fairness pro-
+posed by Kusner et al. [27], which requires invariance to
+counterfactuals in A at the individual level.
+• Path-Specific Effects: Our model allows us to decompose
+A → Y into direct and indirect effects through mediation
+analysis of T [40]. By estimating this decomposition, we
+could learn a policy which respects path-specific fairness, as
+proposed by Nabi and Shpitser [36].
+• Analyzing Historical Bias: Estimating causal effects be-
+tweenA,T , andY permits for the analysis and comparison of
+bias in historical datasets. For instance, the effect A → T is a
+measure of bias in a historical policy, and the effectA → Y is
+a measure of bias in whatever system historically generated
+the outcome. This could serve as the basis of a bias auditing
+technique for data scientists.
+• DataAugmentation:The absence of data (especially not-at-
+random) has strong implications for downstream modeling
+in both fairness [20] and causal inference [41]. Our model
+outputs counterfactual outcomes for both A and T , which
+could be used for fair missing data imputation [45, 47]. This
+could in turn enable the application of simpler methods like
+supervised learning to interventional problems.
+• Fair Policies Under Constraints: In this paper, we con-
+sider an approach to fairness where understanding dataset
+bias is paramount, rather than the more common fairness-
+accuracy constraint-based tradeoff [15, 34]. However, in
+some domains we may be interested in policies which satisfy
+a fairness constraint (e.g., the same distribution of treatments
+are given to each group). Estimating the underlying causal
+effects would be useful for constrained policy learning.
+• Incorporating Prior Knowledge: Graphical models (both
+probabilistic and SCM) permit the specification of prior knowl-
+edge when modeling data, and provide a framework for infer-
+ence that balances these beliefs with evidence from the data.
+This is a powerful fairness idea—we may believe a priori that
+a dataset should look a certain way if not for some bias. In
+the context of a fair machine learning pipeline that considers
+many datasets, this relates to the AutoML task of learning
+distributions over datasets that share global parameters [11].
+In automated decision making, the focus on intervention over
+classification [3] suggests the more equitable deployment of ma-
+chine learning when only biased data are available, but also raises
+significant technical challenges. We believe causal modeling to be
+an invaluable tool in addressing these challenges, and hope that this
+paper contributes to the discussion around how best to understand
+and make predictions from existing datasets without replicating
+existing biases.
+REFERENCES
+[1] Alekh Agarwal, Alina Beygelzimer, Miroslav Dudik, John Langford, and Hanna
+Wallach. 2018. A Reductions Approach to Fair Classification. In Proceedings
+of the 35th International Conference on Machine Learning (Proceedings of Ma-
+chine Learning Research), Jennifer Dy and Andreas Krause (Eds.), Vol. 80. PMLR,
+StockholmsmÃďssan, Stockholm Sweden, 60–69.
+[2] Alexander Alemi, Ben Poole, Ian Fischer, Joshua Dillon, Rif A Saurous, and Kevin
+Murphy. 2018. Fixing a Broken ELBO. In International Conference on Machine
+Learning. 159–168.
+[3] Chelsea Barabas, Madars Virza, Karthik Dinakar, Joichi Ito, and Jonathan Zittrain.
+2018. Interventions over Predictions: Reframing the Ethical Debate for Actuarial
+Risk Assessment. In Proceedings of the 1st Conference on Fairness, Accountability
+and Transparency (Proceedings of Machine Learning Research), Sorelle A. Friedler
+and Christo Wilson (Eds.), Vol. 81. PMLR, New York, NY, USA, 62–76.
+[4] Yahav Bechavod and Katrina Ligett. 2017. Penalizing Unfairness in Binary Clas-
+sification. arXiv preprint arXiv:1707.00044 (2017).
+[5] J. Brooks-Gunn, F. Liaw, and P. Klebanov. 1994. Effects of Early Intervention
+on Cognitive Function of Low Birth Weight Preterm Infants,. Pediatric Physical
+Therapy 6, 1 (1994). https://doi.org/10.1097/00001577-199400610-00022
+[6] Irene Chen, Fredrik D Johansson, and David Sontag. 2018. Why Is My Classifier
+Discriminatory? In Advances in Neural Information Processing Systems 31.
+[7] Alexandra Chouldechova. 2017. Fair prediction with disparate impact: A study
+of bias in recidivism prediction instruments. Big data 5, 2 (2017), 153–163.
+[8] Djork-Arné Clevert, Thomas Unterthiner, and Sepp Hochreiter. 2015. Fast and
+accurate deep network learning by exponential linear units (elus). International
+Conference on Learning Representations (2015).
+[9] Maria De-Arteaga, Artur Dubrawski, and Alexandra Chouldechova. 2018. Learn-
+ing under selective labels in the presence of expert consistency. arXiv preprint
+arXiv:1807.00905 (2018).
+[10] Cynthia Dwork, Moritz Hardt, Toniann Pitassi, Omer Reingold, and Richard
+Zemel. 2012. Fairness through awareness. In Proceedings of the 3rd innovations in
+theoretical computer science conference. ACM, 214–226.
+[11] Harrison Edwards and Amos Storkey. 2017. Towards a neural statistician. In
+International Conference on Learning Representations.
+[12] Danielle Ensign, Sorelle A. Friedler, Scott Neville, Carlos Scheidegger, and Suresh
+Venkatasubramanian. 2018. Runaway Feedback Loops in Predictive Policing. In
+Proceedings of the 1st Conference on Fairness, Accountability and Transparency
+(Proceedings of Machine Learning Research), Sorelle A. Friedler and ChristoWilson
+(Eds.), Vol. 81. PMLR, New York, NY, USA, 160–171. http://proceedings.mlr.press/
+v81/ensign18a.html
+[13] Sorelle A Friedler, Carlos Scheidegger, and Suresh Venkatasubramanian. 2016.
+On the (im) possibility of fairness. arXiv preprint arXiv:1609.07236 (2016).
+[14] Andrew Gelman, Jeffrey Fagan, and Alex Kiss. 2007. An analysis of the New York
+City police department’s âĂĲstop-and-friskâĂİ policy in the context of claims of
+racial bias. J. Amer. Statist. Assoc. 102, 479 (2007), 813–823.
+[15] Moritz Hardt, Eric Price, Nati Srebro, et al. 2016. Equality of opportunity in
+supervised learning. In Advances in neural information processing systems. 3315–
+3323.
+[16] Tatsunori Hashimoto, Megha Srivastava, Hongseok Namkoong, and Percy Liang.
+2018. Fairness Without Demographics in Repeated Loss Minimization. In Pro-
+ceedings of the 35th International Conference on Machine Learning (Proceed-
+ings of Machine Learning Research), Jennifer Dy and Andreas Krause (Eds.),
+Vol. 80. PMLR, StockholmsmÃďssan, Stockholm Sweden, 1929–1938. http:
+//proceedings.mlr.press/v80/hashimoto18a.html
+[17] Jennifer L Hill. 2011. Bayesian nonparametric modeling for causal inference.
+Journal of Computational and Graphical Statistics 20, 1 (2011), 217–240.
+[18] Paul W Holland. 1986. Statistics and causal inference. Journal of the American
+statistical Association 81, 396 (1986), 945–960.
+[19] Fredrik Johansson, Uri Shalit, and David Sontag. 2016. Learning representations
+for counterfactual inference. In International Conference on Machine Learning.
+3020–3029.
+[20] Nathan Kallus and Angela Zhou. 2018. Residual Unfairness in Fair Machine
+Learning from Prejudiced Data. In Proceedings of the 35th International Conference
+on Machine Learning (Proceedings of Machine Learning Research), Jennifer Dy and
+Andreas Krause (Eds.), Vol. 80. PMLR, StockholmsmÃďssan, Stockholm Sweden,
+2439–2448. http://proceedings.mlr.press/v80/kallus18a.html
+[21] Niki Kilbertus, Mateo Rojas Carulla, Giambattista Parascandolo, Moritz Hardt, Do-
+minik Janzing, and Bernhard Schölkopf. 2017. Avoiding Discrimination through
+Causal Reasoning. In Advances in Neural Information Processing Systems 30,
+I. Guyon, U. V. Luxburg, S. Bengio, H. Wallach, R. Fergus, S. Vishwanathan, and
+R. Garnett (Eds.). Curran Associates, Inc., 656–666. http://papers.nips.cc/paper/
+6668-avoiding-discrimination-through-causal-reasoning.pdf
+[22] Yoon Kim, Sam Wiseman, Andrew Miller, David Sontag, and Alexander Rush.
+2018. Semi-Amortized Variational Autoencoders. In Proceedings of the 35th
+International Conference on Machine Learning.
+[23] Gary King, Robert O Keohane, and Sidney Verba. 1994. Designing social inquiry:
+Scientific inference in qualitative research. Princeton university press.
+[24] Diederik Kingma and Jimmy Ba. 2015. Adam: A method for stochastic optimiza-
+tion. In International Conference on Learning Representations.
+[25] Diederik P Kingma and Max Welling. 2014. Auto-encoding variational bayes.
+International Conference on Learning Representations (2014).
+[26] Alp Kucukelbir, Dustin Tran, Rajesh Ranganath, Andrew Gelman, and David M
+Blei. 2017. Automatic differentiation variational inference. The Journal of Machine
+Learning Research 18, 1 (2017), 430–474.
+[27] Matt J Kusner, Joshua Loftus, Chris Russell, and Ricardo Silva. 2017. Counterfac-
+tual fairness. In Advances in Neural Information Processing Systems. 4066–4076.
+[28] Matt J Kusner, Chris Russell, Joshua R Loftus, and Ricardo Silva. 2018. Causal
+Interventions for Fairness. arXiv preprint arXiv:1806.02380 (2018).
+[29] Himabindu Lakkaraju, Jon Kleinberg, Jure Leskovec, Jens Ludwig, and Mul-
+lainathanm Sendhil. 2018. The Selective Labels Problem: Evaluating Algorithmic
+Predictions in the Presence of Unobservables. In International Conference on
+Knowledge Discovery and Data Mining.
+[30] Christos Louizos, Uri Shalit, Joris M Mooij, David Sontag, Richard Zemel, and
+Max Welling. 2017. Causal effect inference with deep latent-variable models. In
+Advances in Neural Information Processing Systems. 6446–6456.
+[31] Christos Louizos, Kevin Swersky, Yujia Li, Max Welling, and Richard Zemel.
+2016. The variational fair autoencoder. International Conference on Learning
+Representations (2016).
+[32] Kristian Lum and William Isaac. 2016. To predict and serve? Significance 13, 5
+(2016), 14–19.
+[33] Margaret MooneyMarini and Burton Singer. 1988. Causality in the social sciences.
+Sociological methodology 18 (1988), 347–409.
+[34] Aditya Krishna Menon and Robert C Williamson. 2018. The cost of fairness in
+binary classification. In Proceedings of the 1st Conference on Fairness, Account-
+ability and Transparency (Proceedings of Machine Learning Research), Sorelle A.
+Friedler and Christo Wilson (Eds.), Vol. 81. PMLR, New York, NY, USA, 107–118.
+http://proceedings.mlr.press/v81/menon18a.html
+[35] A Multisite. 1990. Enhancing the Outcomes of Low-Birth-Weight, Premature
+Infants. JAMA 263 (1990), 3035–3042.
+[36] Razieh Nabi and Ilya Shpitser. 2018. Fair inference on outcomes. In Proceedings
+of the... AAAI Conference on Artificial Intelligence. AAAI Conference on Artificial
+Intelligence, Vol. 2018. NIH Public Access, 1931.
+[37] Sonali Parbhoo, Mario Wieser, and Volker Roth. 2018. Causal Deep Information
+Bottleneck. arXiv preprint arXiv:1807.02326 (2018).
+[38] Judea Pearl. 2009. Causality. Cambridge university press.
+[39] Danilo Jimenez Rezende, Shakir Mohamed, and Daan Wierstra. 2014. Stochastic
+Backpropagation and Approximate Inference in Deep Generative Models. In
+Proceedings of the 31st International Conference on International Conference on
+Machine Learning - Volume 32 (ICML’14). JMLR.org, II–1278–II–1286. http:
+//dl.acm.org/citation.cfm?id=3044805.3045035
+[40] James M Robins and Sander Greenland. 1992. Identifiability and exchangeability
+for direct and indirect effects. Epidemiology (1992), 143–155.
+[41] Donald B Rubin. 1976. Inference and missing data. Biometrika 63, 3 (1976),
+581–592.
+[42] Donald B Rubin. 2005. Causal inference using potential outcomes: Design, mod-
+eling, decisions. J. Amer. Statist. Assoc. 100, 469 (2005), 322–331.
+[43] Maya Sen andOmarWasow. 2016. Race as a bundle of sticks: Designs that estimate
+effects of seemingly immutable characteristics. Annual Review of Political Science
+19 (2016), 499–522.
+[44] Uri Shalit, Fredrik D. Johansson, and David Sontag. 2017. Estimating individual
+treatment effect: generalization bounds and algorithms. In Proceedings of the 34th
+International Conference on Machine Learning (Proceedings of Machine Learning
+Research), Doina Precup and Yee Whye Teh (Eds.), Vol. 70. PMLR, International
+Convention Centre, Sydney, Australia, 3076–3085. http://proceedings.mlr.press/
+v70/shalit17a.html
+[45] Jonathan AC Sterne, Ian R White, John B Carlin, Michael Spratt, Patrick Royston,
+Michael G Kenward, Angela M Wood, and James R Carpenter. 2009. Multiple
+imputation for missing data in epidemiological and clinical research: potential
+and pitfalls. Bmj 338 (2009), b2393.
+[46] Dustin Tran, Francisco JR Ruiz, Susan Athey, and David M Blei. 2016. Model
+criticism for bayesian causal inference. arXiv preprint arXiv:1610.09037 (2016).
+[47] Stef Van Buuren. 2018. Flexible imputation of missing data. Chapman and
+Hall/CRC.
+[48] Tyler J VanderWeele and Whitney R Robinson. 2014. On causal interpretation of
+race in regressions adjusting for confounding and mediating variables. Epidemi-
+ology (Cambridge, Mass.) 25, 4 (2014), 473.
+[49] Martin J Wainwright, Michael I Jordan, et al. 2008. Graphical models, exponential
+families, and variational inference. Foundations and Trends® in Machine Learning
+1, 1–2 (2008), 1–305.
+[50] Muhammad Bilal Zafar, Isabel Valera, Manuel Gomez Rogriguez, and Krishna P.
+Gummadi. 2017. Fairness Constraints: Mechanisms for Fair Classification. In
+Proceedings of the 20th International Conference on Artificial Intelligence and
+Statistics. 962–970.
+[51] Junzhe Zhang and Elias Bareinboim. 2018. Fairness in Decision-Making–The
+Causal Explanation Formula. In 32nd AAAI Conference on Artificial Intelligence.

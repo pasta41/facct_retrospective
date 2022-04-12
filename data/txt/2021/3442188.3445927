@@ -1,0 +1,3248 @@
+A Statistical Test for Probabilistic Fairness
+Bahar Taskesen
+Ecole Polytechnique Fédérale de Lausanne
+Switzerland
+bahar.taskesen@epfl.ch
+Jose Blanchet
+jose.blanchet@stanford.edu
+Stanford University
+USA
+Daniel Kuhn
+Ecole Polytechnique Fédérale de Lausanne
+Switzerland
+daniel.kuhn@epfl.ch
+Viet Anh Nguyen
+Stanford University
+USA
+viet-anh.nguyen@stanford.edu
+ABSTRACT
+Algorithms are now routinely used to make consequential decisions
+that affect human lives. Examples include college admissions, med-
+ical interventions or law enforcement. While algorithms empower
+us to harness all information hidden in vast amounts of data, they
+may inadvertently amplify existing biases in the available datasets.
+This concern has sparked increasing interest in fair machine learn-
+ing, which aims to quantify andmitigate algorithmic discrimination.
+Indeed, machine learning models should undergo intensive tests to
+detect algorithmic biases before being deployed at scale. In this pa-
+per, we use ideas from the theory of optimal transport to propose a
+statistical hypothesis test for detecting unfair classifiers. Leveraging
+the geometry of the feature space, the test statistic quantifies the
+distance of the empirical distribution supported on the test samples
+to the manifold of distributions that render a pre-trained classi-
+fier fair. We develop a rigorous hypothesis testing mechanism for
+assessing the probabilistic fairness of any pre-trained logistic classi-
+fier, and we show both theoretically as well as empirically that the
+proposed test is asymptotically correct. In addition, the proposed
+framework offers interpretability by identifying the most favorable
+perturbation of the data so that the given classifier becomes fair.
+CCS CONCEPTS
+• Applied computing→ IT governance; Law; • Social and pro-
+fessional topics → Race and ethnicity; Geographic charac-
+teristics; Sexual orientation; Gender; Age; • Theory of com-
+putation→Mathematical optimization.
+KEYWORDS
+fairness, algorithmic bias, equal opportunity, equalized odds,Wasser-
+stein distance
+ACM Reference Format:
+Bahar Taskesen, Jose Blanchet, Daniel Kuhn, and Viet Anh Nguyen. 2021.
+A Statistical Test for Probabilistic Fairness. In ACM Conference on Fairness,
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than the
+author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or
+republish, to post on servers or to redistribute to lists, requires prior specific permission
+and/or a fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 1–10, 2021, Virtual Event, Canada
+© 2021 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+https://doi.org/10.1145/3442188.3445927
+Accountability, and Transparency (FAccT ’21), March 1–10, 2021, Virtual
+Event, Canada. ACM, New York, NY, USA, 18 pages. https://doi.org/10.1145/
+3442188.3445927
+1 INTRODUCTION
+The past decade witnessed data and algorithms becoming an inte-
+grative part of the human society. Recent technological advances
+are now allowing us to collect and store an astronomical amount of
+unstructured data, and the unprecedented computing power is en-
+abling us to convert these data into decisional insights. Nowadays,
+machine learning algorithms can uncover complex patterns in the
+data to produce an exceptional performance that can match, or even
+surpass, that of humans. These algorithms, as a consequence, are
+proliferating in every corner of our lives, from suggesting us the
+next vacation destination to helping us create digital paintings and
+melodies. Machine learning algorithms are also gradually assisting
+humans in consequential decisions such as deciding whether a stu-
+dent is admitted to college, picking which medical treatment to be
+prescribed to a patient, and determining whether a person is con-
+victed. Arguably, these decisions impact radically many people’s
+lives, together with the future of their loved ones.
+Algorithms are conceived and function following strict rules of
+logic and algebra; it is hence natural to expect that machine learn-
+ing algorithms deliver objective predictions and recommendations.
+Unfortunately, in-depth investigations reveal the excruciating real-
+ity that state-of-the-art algorithmic assistance is far from being free
+of biases. For example, a predictive algorithm widely used in the
+United States criminal justice system is more likely to misclassify
+African-American offenders into the group of high recidivism risk
+compared to white-Americans [12, 46]. The artificial intelligence
+tool developed by Amazon also learned to penalize gender-related
+keywords such as “women’s” in the profile screening process, and
+thus may prefer to recommend hiring male candidates for soft-
+ware development and technical positions [17]. Further, Google’s
+ad-targeting algorithm displayed advertisements for higher-paying
+executive jobs more often to men than to women [18].
+There are several possible explanations for why cold, soulless
+algorithms may trigger biased recommendations. First, the data
+used to train machine learning algorithms may already encrypt hu-
+man biases manifested in the data collection process. These biases
+arise as the result of a suboptimal design of experiments, or from
+historically biased human decisions that accumulate over centuries.
+Machine-learned algorithms, which are apt to detect underlying
+patterns from data, will unintentionally learn and maintain these
+648
+FAccT ’21, March 1–10, 2021, Virtual Event, Canada Bahar Taskesen, Jose Blanchet, Daniel Kuhn, and Viet Anh Nguyen
+existing biases [9, 43]. For example, secretary or primary school
+teacher are professions which are predominantly taken by women,
+thus, natural language processing systems are inclined to associate
+female attributes to these jobs. Second, training a machine learn-
+ing algorithm typically involves minimizing the prediction error
+which privileges the majority populations over the minority groups.
+Clinical trials, for instance, typically involve very few participants
+from the minority groups such as indigenous people, and thus med-
+ical interventions recommended by the algorithms may not align
+perfectly to the characteristics and interests of patients from the
+minority groups. Finally, even when the sensitive attributes are
+not used in the training phase, strong correlations between the
+sensitive attributes and the remaining variables in the dataset may
+be exploited to generate unjust actions. For example, the sensitive
+attribute of race can be easily inferred with high accuracy based
+on common non-sensitive attributes such as the travel history of
+passengers or the grocery shopping records of customers.
+The pressing needs to redress undesirable algorithmic biases
+have propelled the rising field of fair machine learning
+1
+. A building
+pillar of this field involves the verification task: given a machine
+learning algorithm, we are interested in verifying if this algorithm
+satisfies a chosen criterion of fairness. This task is performed in
+two steps: first, we choose an appropriate notion of fairness, then
+the second step invokes a computational procedure, which may
+or may not involve data, to decide if the chosen fairness criterion
+is fulfilled. A plethora of criteria for fair machine learning were
+proposed in the literature, many of them are motivated by philo-
+sophical or sociological ideologies or legal constraints. For example,
+anti-discrimination laws may prohibit making decisions based on
+sensitive attributes such as age, gender, race or sexual orienta-
+tion. Thus, a naïve strategy, called fairness through unawareness,
+involves removing all sensitive attributes from the training data.
+However, this strategy seldom guarantees any fairness due to the
+inter-correlation issues [27, 30], and thus potentially fails to gener-
+ate inclusive outcomes [2, 6, 36, 41]. Other notions of fairness aim to
+either promote individual fairness [21], prevent disparate treatment
+[70] or avoid disparate mistreatment [23, 71] of the algorithms. To-
+wards similar goals, notions of group fairness focus on reducing the
+difference of favorable outcomes proportions among different sen-
+sitive groups. Examples of group fairness notions include disparate
+impact [70], demographic parity (statistical parity) [10, 21], equality
+of opportunity [31] and equalized odds [31]. The notion of coun-
+terfactual fairness [27] was also suggested as a measure of causal
+fairness. Despite the abundance of available notions, there is un-
+fortunately no general consensus on the most suitable measure to
+serve as the industry standard. Moreover, except in trivial cases, it
+is not possible for a machine learning algorithm to simultaneously
+satisfy multiple notions of fairness [5, 37]. Therefore, the choice of
+the fairness notion is likely to remain more an art than a science.
+This paper focuses not on the normative approach to choosing
+an ideal notion of machine learning fairness. We endeavor in this
+paper to shed more light on the computational procedure to com-
+plement the verification task. Concretely, we position ourselves in
+the classification setting, which is arguably the most popular task
+in machine learning. Moreover, we will focus on notions of group
+1
+Comprehensive surveys on fair machine learning can be found in [5, 13, 14, 44].
+fairness, and we employ the framework of statistical hypothesis
+test instead of algorithmic test.
+Contributions. Our paper makes two concrete contributions to
+the problem of fairness testing of machine learning’s classifiers.
+(1) We propose the Wasserstein projection framework to perform
+statistical hypothesis test of group fairness for classification
+algorithms. We derive in details the computation of the test
+statistic and the limiting distribution when fairness is measured
+using the probabilistic equality of opportunity and probabilistic
+equalized odds criteria.
+(2) We demonstrate that the Wasserstein projection hypothesis test-
+ing paradigm is asymptotically correct and can exploit additional
+information on the geometry of the feature space. Moreover,
+we also show that this paradigm promotes transparency and
+interpretability through the analysis of the most favorable dis-
+tributions.
+The remaining of the paper is structured as follows. In Section 2,
+we introduce the general problem of statistical hypothesis test of
+classification fairness, and depict the current landscape of fairness
+testing in the literature. Section 3 details ourWasserstein projection
+approach to this problem. Sections 4 and 5 apply the proposed
+framework to test if a pre-trained logistic classifier satisfies the
+fairness notion of probabilistic equal opportunity and probabilistic
+equalized odds, respectively. Numerical experiments are presented
+in Section 6 to empirically validate the correctness and demonstrate
+the power of our proposed paradigm. Section 7 concludes the paper
+with outlooks on the broader impact of our Wasserstein projection
+hypothesis testing approach.
+All technical proofs are relegated to the Appendix.
+2 STATISTICAL TESTING FRAMEWORK FOR
+FAIRNESS AND LITERATURE REVIEW
+We consider throughout this paper a generic binary classification
+setting. Let X = R𝑑 and Y = {0, 1} be the space of feature inputs
+and label outputs of interest. We assume that there is a single
+sensitive attribute corresponding to each data point and its space is
+denoted byA = {0, 1}. A probabilistic classifier is represented by a
+functionℎ(·) : X → [0, 1] that outputs for each given sample 𝑥 ∈ X
+the probability that 𝑥 belongs to the positive class. The deterministic
+classifier predicts class 1 if ℎ(𝑥) ≥ 𝜏 and class 0 otherwise, where
+𝜏 ∈ [0, 1] is a classification threshold. Note that the function ℎ
+depends only on the feature 𝑋 , but not on the sensitive attribute 𝐴,
+thus predicting 𝑌 using ℎ satisfies fairness through unawareness.
+The central goal of this paper is to provide a statistical test to
+detect if a classifier ℎ fails to satisfy a prescribed notion of machine
+learning fairness. A statistical hypothesis test can be cast with the
+null hypothesis being
+H0: the classifier ℎ is fair,
+against the alternative hypothesis being
+H1: the classifier ℎ is not fair.
+In this paper, we focus on statistical notions of group fairness, which
+are usually defined using conditional probabilities. A prevalent
+notion of fairness in machine learning is the criterion of equality of
+649
+A Statistical Test for Probabilistic Fairness FAccT ’21, March 1–10, 2021, Virtual Event, Canada
+opportunity
+2
+, which requires that the true positive rate are equal
+between subgroups.
+Definition 2.1 (Equal opportunity [31]). A classifier ℎ(·) : X →
+[0, 1] satisfies the equal opportunity criterion relative to Q if
+Q(ℎ(𝑋 ) ≥ 𝜏 |𝐴 = 1, 𝑌 = 1) = Q(ℎ(𝑋 ) ≥ 𝜏 |𝐴 = 0, 𝑌 = 1),
+where 𝜏 is the classification threshold.
+Another popular criterion of machine learning fairness is the
+equalized odds, which is more stringent than the equality of op-
+portunity: it requires that the positive outcome is conditionally
+independent of the sensitive attributes given the true label.
+Definition 2.2 (Equalized odds [31]). A classifierℎ(·) : X → [0, 1]
+satisfies the equalized odds criterion relative to Q if
+Q(ℎ(𝑋 ) ≥𝜏 |𝐴=1,𝑌 =𝑦)=Q(ℎ(𝑋 ) ≥𝜏 |𝐴=0,𝑌 =𝑦) ∀𝑦 ∈Y,
+where 𝜏 is the classification threshold.
+Notice that the criteria of fairness presented in Definitions 2.1
+and 2.2 are dependent on the distribution Q: a classifier ℎ can be
+fair relative to a distribution Q1, but it may become unfair with
+respect to another distribution Q2 ≠ Q1. If we denote by P the true
+population distribution that governs the random vector (𝑋,𝐴,𝑌 ),
+then it is imperative and reasonable to test for group fairness with
+respect to P. For example, to test for the equality of opportunity,
+we can reformulate a two-sample equal conditional mean test of
+the null hypothesis
+H0 : EP [1ℎ (𝑋 ) ≥𝜏 |𝐴 = 1, 𝑌 = 1] = EP [1ℎ (𝑋 ) ≥𝜏 |𝐴 = 0, 𝑌 = 1],
+and one can potentially employ a Welch’s 𝑡-test with proper adjust-
+ment for the randomness of the sample size. Unfortunately, deriving
+the test becomes complicated when the null hypothesis involves an
+equality of multi-dimensional quantities, which arises in the case
+of equalized odds, due to the complication of the covariance terms.
+Variations of the permutation tests were also proposed to detect
+discriminatory behaviour of machine learning algorithms following
+the same formulation of the one-dimensional two-sample equal-
+ity of conditional mean test [19, 66]. However, these permutation
+tests follow a black-box mechanism and are unable to be gener-
+alized to multi-dimensional tests. Tests based on group fairness
+notions can also be accomplished using an algorithmic approach
+as in [19, 29, 35, 57].
+From a broader perspective, deriving tests for fairness is an active
+area of research, and many testing procedures have been recently
+proposed to test for individual fairness [34, 68], for counterfactual
+fairness [6, 27] and diverse other criteria [3, 66, 67].
+Literature related to optimal transport. Optimal transport is
+a long-standing field that dates back to the seminal work of Gas-
+pard Monge [45]. In the past few years, it has attracted signif-
+icant attention in the machine learning and computer science
+communities thanks to the availability of fast approximation al-
+gorithms [4, 8, 16, 20, 28]. Optimal transport is particularly suc-
+cessful in various learning tasks, notably generative mixture mod-
+els [38, 49], image processing [1, 24, 39, 50, 63], computer vision
+and graphics [51, 52, 56, 61, 62], clustering [32], dimensionality
+reduction [11, 25, 55, 58, 59], domain adaptation [15, 47], signal
+2
+We use two terms “equality of opportunity” and “equal opportunity” interchangeably.
+processing [65] and data-driven distributionally robust optimiza-
+tion [7, 26, 40, 72]. Recent comprehensive survey on optimal trans-
+port and its applications can be found in [38, 53].
+In the context of fair classification, ideas from optimal transport
+have been used to construct fair logistic classifier [64], to detect
+classifiers that does not obey group fairness notions, or to ensure
+fairness by pre-processing [29], to learn a fair subspace embedding
+that promotes fair classification [69], to test individual fairness [68],
+or to construct a counterfactual test [6].
+3 WASSERSTEIN PROJECTION FRAMEWORK
+FOR STATISTICAL TEST OF FAIRNESS
+We hereby provide a fresh alternative to the testing problem of
+machine learning fairness. On that purpose, for a given classifier ℎ,
+we define abstractly the following set of distributions
+Fℎ = {Q ∈ P : the classifier ℎ is fair relative to Q} , (1)
+where P denotes the space of all distributions on X × A × Y.
+Intuitively, the set Fℎ contains all probability distributions under
+which the classifier ℎ satisfies the prescribed notion of fairness. It is
+trivial to see that ifFℎ contains the true data-generating distribution
+P, then the classifier ℎ is fair relative to P. Thus, we can reinterpret
+the hypothesis test of fairness using the hypotheses
+H0: P ∈ Fℎ , H1: P ∉ Fℎ .
+Testing the inclusion of P in Fℎ is convenient if P is endowed with
+a distance. In this paper, we equip P with the Wasserstein distance.
+Definition 3.1 (Wasserstein distance). The type-2 Wasserstein
+distance between two probability distributions Q and Q′ supported
+on Ξ is defined as
+W(Q′,Q) = min
+𝜋 ∈Π (Q′,Q)
+√
+E𝜋 [𝑐 (b ′, b)2],
+where the setΠ(Q′,Q) contains all joint distributions of the random
+vectors b ′ ∈ Ξ and b ∈ Ξ under which b ′ and b have marginal
+distributions Q′ and Q, respectively, and 𝑐 : Ξ × Ξ → [0,∞]
+constitutes a lower semi-continuous ground metric.
+The type-2 Wasserstein distance
+3
+is a special instance of the
+optimal transport. The squared Wasserstein distance between Q′
+and Q can be interpreted as the cost of moving the distribution
+Q′ to Q, where 𝑐 (b ′, b) is the cost of moving a unit mass from b ′
+to b . Being a distance on P, W is symmetric, non-negative and
+vanishes to zero if Q′ = Q. The Wasserstein distance is hence an
+attractive measure to identify if P belongs to Fℎ . Using this insight,
+the hypothesis test for fairness has the equivalent representation
+H0: infQ∈Fℎ W(P,Q) = 0, H1: infQ∈Fℎ W(P,Q) > 0.
+Even though P remains elusive to our knowledge, we are given
+access to a set of i.i.d test samples {(𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 )}𝑁𝑖=1
+generated from
+the true distribution P. Thus we can rely on the empirical value
+inf
+Q∈Fℎ
+W( ˆP𝑁 ,Q),
+which is the distance from the empirical distribution supported on
+the samples
+ˆP𝑁 =
+∑𝑁
+𝑖=1
+𝛿 (𝑥𝑖 ,𝑎𝑖 ,?̂?𝑖 ) to the set Fℎ . To perform the test,
+it is sufficient to study the limiting distribution of the test statistic
+using proper scaling under the null hypothesisH0. The outcome of
+3
+From this point, we omit the term “type-2” for brevity.
+650
+FAccT ’21, March 1–10, 2021, Virtual Event, Canada Bahar Taskesen, Jose Blanchet, Daniel Kuhn, and Viet Anh Nguyen
+the test is determined by comparing the test statistic to the quantile
+value of the limiting distribution at a chosen level of significant
+𝛼 ∈ (0, 1).
+Advantages. The Wasserstein projection framework to hypothesis
+testing that we described above offers several advantages over the
+existing methods.
+(1) Geometric flexibility: The definition of the Wasserstein distance
+implies that there exists a joint ground metric 𝑐 on the space of
+the features, the sensitive attribute and the label. If the modelers
+or the regulators possess any structural information on an ap-
+propriate metric on Ξ = X × A ×Y, then this information can
+be exploited in the testing procedure. Thus, the Wasserstein pro-
+jection framework equips the users with an additional freedom
+to inject prior geometric information into the statistical test.
+(2) Mutivariate generalizability: Certain notions of fairness, such
+as equalized odds, are prescribed using multiple equalities of
+conditional expectations. TheWasserstein projection framework
+encapsulates these equalities simultaneously in the definition of
+the set Fℎ , and provides a joint test of these equalities without
+the hassle of decoupling and testing individual equalities as
+being done in the currently literature.
+(3) Interpretability: If we denote by Q★ the projection of the empir-
+ical distribution
+ˆP𝑁 onto the set of distributions Fℎ , i.e.,
+Q★ = arg min
+Q∈Fℎ
+W( ˆP𝑁 ,Q),
+then Q★ encodes the minimal perturbation to the empirical sam-
+ples so that the classifier ℎ becomes fair. The distribution Q★ is
+thus termed the most favorable distribution, and examining Q★
+can reveal the underlying mechanism and explain the outcome
+of the hypothesis test. The accessibility to Q★ showcases the
+expressiveness of the Wasserstein projection framework.
+Whilst theoretically sound and attractive, there are three poten-
+tial difficulties with the Wasserstein projection approach to statis-
+tical test of fairness. First, to project
+ˆP𝑁 onto the set Fℎ , we need
+to solve an infinite-dimensional optimization problem, which is
+inherently difficult. Second, for many notions of machine learning
+fairness such as the equality of opportunity and the equalized odds,
+the corresponding set Fℎ in (1) is usually prescribed using nonlinear
+constraints. For example, if we consider the equal opportunity cri-
+terion in Definition 2.1, then the set Fℎ can be re-expressed using a
+fractional function of the probability measure as
+Fℎ =
+Q ∈ P such that
+Q(ℎ(𝑋 ) ≥ 𝜏,𝐴 = 1, 𝑌 = 1)
+Q(𝐴 = 1, 𝑌 = 1) =
+Q(ℎ(𝑋 ) ≥ 𝜏,𝐴 = 0, 𝑌 = 1)
+Q(𝐴 = 0, 𝑌 = 1)
+ .
+Apart from involving nonlinear constraints, it is easy to verify that
+the set Fℎ is also non-convex, which amplifies the difficulty of
+computing the projection onto Fℎ . Finally, the limiting distribution
+of the test statistic is difficult to analyze due to the discontinuity
+of the probability function at the set {𝑥 ∈ X : ℎ(𝑥) = 𝜏}. The
+asymptotic analysis with this discontinuity is of a combinatorial
+nature, and is significantly more problematic than the asymptotic
+analysis of smooth quantities.
+While these difficulties may be overcome via various ways, in
+this paper we choose the following combination of remedies. First,
+we will use a relaxed notion of fairness termed probabilistic fairness,
+which was originally introduced in [54]. Second, when computing
+the Wasserstein distances between distributions on X ×A ×Y, we
+use
+𝑐
+(
+(𝑥 ′, 𝑎′, 𝑦′), (𝑥, 𝑎,𝑦)
+)
+= ∥𝑥 − 𝑥 ′∥ + ∞|𝑎 − 𝑎′ | + ∞|𝑦 − 𝑦′ | (2)
+as the ground metric, where ∥ · ∥ is a norm on R𝑑 . This case corre-
+sponds to having an absolute trust in the label and in the sensitive
+attribute of the training samples. This absolute trust restriction is
+common in the literature of fair machine learning [64, 68].
+We now briefly discuss the advantage of using the ground met-
+ric of the form (2). Denote by 𝑝 ∈ R |A |×|Y |++ the array of the true
+marginals of (𝐴,𝑌 ), in particular, 𝑝𝑎𝑦 = P(𝐴 = 𝑎,𝑌 = 𝑦) for all
+𝑎 ∈ A and 𝑦 ∈ Y. Further, let 𝑝𝑁 ∈ R |A |×|Y |++ be the array of the
+empirical marginals of (𝐴,𝑌 ) under the empirical measure
+ˆP𝑁 , that
+is, 𝑝𝑁𝑎𝑦 = ˆP𝑁 (𝐴 = 𝑎,𝑌 = 𝑦) for all 𝑎 ∈ A and 𝑦 ∈ Y. Through-
+out this paper, we assume that the empirical marginals are proper,
+that is, 𝑝𝑁𝑎𝑦 ∈ (0, 1) for any (𝑎,𝑦) ∈ A × Y. We define temporar-
+ily the simplex set Δ B {𝑝 ∈ R |A |×|Y |++ :
+∑
+𝑎∈A,𝑦∈Y 𝑝𝑎𝑦 = 1}.
+Subsequently, for any marginals 𝑝 ∈ Δ, we define the marginally-
+constrained set of distributions
+Fℎ (𝑝) ≜
+{
+Q ∈ P :
+ℎ is fair relative to Q
+Q(𝐴 = 𝑎,𝑌 = 𝑦) = 𝑝𝑎𝑦 ∀(𝑎,𝑦) ∈ A × Y
+}
+.
+Using these notations, one can readily verify that Fℎ = ∪𝑝∈ΔFℎ (𝑝) .
+Moreover, the next result asserts that in order to compute the pro-
+jection of
+ˆP𝑁 onto Fℎ , to suffices to project onto the marginally-
+constrained set Fℎ (𝑝𝑁 ).
+Lemma 3.2 (Projection with marginal restrictions). Suppose that
+the ground metric is chosen as in (2). If a measure Q ∈ Fℎ satisfies
+W( ˆP𝑁 ,Q) < ∞, then Q ∈ Fℎ (𝑝𝑁 ).
+A useful consequence of Lemma 3.2 is that
+inf
+Q∈Fℎ
+W( ˆP𝑁 ,Q) = inf
+Q∈Fℎ (𝑝𝑁 )
+W( ˆP𝑁 ,Q), (3)
+where the feasible set of the problem on the right-hand side is the
+marginally-constrained set Fℎ (𝑝𝑁 ) using the empirical marginals
+𝑝𝑁 . For two notions of probabilistic fairness that we will explore in
+this paper, projecting
+ˆP𝑁 onto Fℎ (𝑝𝑁 ) is arguably easier than onto
+Fℎ . Thus, this choice of ground metric improves the tractability
+when computing the test statistic.
+Third, and finally, we will focus on the logistic regression setting,
+which is one of the most popular classification methods [33]. In this
+setting, the conditional probability P[𝑌 = 1|𝑋 = 𝑥] is modelled by
+the sigmoid function ℎ𝛽 (𝑥) = (1 + exp(−𝛽⊤𝑥))−1, where 𝛽 ∈ R𝑑
+is the regression parameter. Moreover, a classifier with 𝛽 = 0, is
+trivially fair. Thus, it suffices to consider 𝛽 ≠ 0.
+Notations. We use ∥ · ∥∗ to denote the dual norm of ∥ · ∥. For any
+integer 𝑁 , we define [𝑁 ] B {1, 2, . . . , 𝑁 }. Given 𝑁 test samples
+(𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 )𝑁𝑖=1
+, we use I𝑦 ≜ {𝑖 ∈ [𝑁 ] : 𝑦𝑖 = 𝑦} to denote the index
+set of observations with label 𝑦. The parameters _𝑖 are defined as
+∀𝑖 ∈ [𝑁 ] : _𝑖 =
+
+(𝑝𝑁
+11
+)−1
+if (𝑎𝑖 , 𝑦𝑖 ) = (1, 1),
+−(𝑝𝑁
+01
+)−1
+if (𝑎𝑖 , 𝑦𝑖 ) = (0, 1),
+(𝑝𝑁
+10
+)−1
+if (𝑎𝑖 , 𝑦𝑖 ) = (1, 0),
+−(𝑝𝑁
+00
+)−1
+if (𝑎𝑖 , 𝑦𝑖 ) = (0, 0) .
+(4)
+651
+A Statistical Test for Probabilistic Fairness FAccT ’21, March 1–10, 2021, Virtual Event, Canada
+4 TESTING FAIRNESS FOR PROBABILISTIC
+EQUAL OPPORTUNITY CRITERION
+In this section, we use the ingredients introduced in the previous
+section to concretely construct a statistical test for the fairness of a
+logistic classifier ℎ𝛽 . Specifically, we will employ the probabilistic
+equal opportunity criterion which was originally proposed in [54].
+Definition 4.1 (Probabilistic equal opportunity criterion [54]). A
+logistic classifier ℎ𝛽 : X → [0, 1] satisfies the probabilistic equal-
+ized opportunity criteria relative to a distribution Q if
+EQ [ℎ𝛽 (𝑋 ) |𝐴 = 1, 𝑌 = 1] = EQ [ℎ𝛽 (𝑋 ) |𝐴 = 0, 𝑌 = 1] .
+The probabilistic equal opportunity criterion, which serves as
+a surrogate for the equal opportunity criterion in Definition 2.1,
+depends on the smooth and bounded sigmoid function ℎ𝛽 but is
+independent of the classification threshold 𝜏 . Motivated by [42],
+we empirically illustrate in Figure 1 that the probabilistic surrogate
+provides a good approximation of the equal opportunity criterion.
+Figure 1a plots the absolute difference of the classification probabil-
+ities |P(ℎ(𝑋 ) ≥ 1
+2
+|𝐴 = 1, 𝑌 = 1) −P(ℎ(𝑋 ) ≥ 1
+2
+|𝐴 = 0, 𝑌 = 1) |, while
+Figure 1b plots the absolute difference of the sigmoid expectations
+|EP [ℎ(𝑋 ) |𝐴 = 1, 𝑌 = 1]−EP [ℎ(𝑋 ) |𝐴 = 0, 𝑌 = 1] |. One may observe
+that the regions of 𝛽 so that the absolute differences fall close to
+zero are similar in both plots. This implies that a logistic classifier
+ℎ𝛽 which is equal opportunity fair is also likely to be probabilistic
+equal opportunity fair, and vice versa.
+2 0 2
+2
+2
+1
+0
+1
+2
+1
+0.0
+0.2
+0.4
+(a) Equal opportunity
+2 0 2
+2
+2
+1
+0
+1
+2
+1
+0.2
+0.4
+(b) Probabilistic equal opportunity
+Figure 1: Comparison of fairness notions for 𝑑 = 2 and
+ℎ𝛽 (𝑥) = 1/(1 + exp( 1
+3
+− 𝛽1𝑥1 − 𝛽2𝑥2)).
+We use the superscript “opp” to emphasize that fairness is mea-
+sured using the probabilistic equal opportunity criterion. Conse-
+quentially, the set of distributions F opp
+ℎ𝛽
+that makes the logistic
+classifier ℎ𝛽 fair is
+F opp
+ℎ𝛽
+=
+{
+Q ∈ P such that :
+EQ [ℎ𝛽 (𝑋 ) |𝐴 = 1, 𝑌 = 1]=EQ [ℎ𝛽 (𝑋 ) |𝐴 = 0, 𝑌 = 1]
+}
+.
+The statistical hypothesis test to verify whether the classifier ℎ𝛽 is
+fair is formulated with the null and alternative hypotheses
+Hopp
+0
+: P ∈ F opp
+ℎ𝛽
+, Hopp
+1
+: P ∉ F opp
+ℎ𝛽
+.
+The remainder of this section unfolds as follows. In Section 4.1,
+we delineate the computation of the projection of
+ˆP𝑁 onto F opp
+ℎ𝛽
+.
+Section 4.2 studies the limiting distribution of the test statistic,
+while Section 4.3 examines the most favorable distribution.
+4.1 Wasserstein Projection
+Lemma 3.2 suggests that it is sufficient to consider the projection
+onto the marginally-constrained set F opp
+ℎ𝛽
+(𝑝𝑁 ), where 𝑝𝑁 is the
+empirical marginals of the empirical distribution
+ˆP𝑁 . In particular,
+F opp
+ℎ𝛽
+(𝑝𝑁 ) is
+F opp
+ℎ𝛽
+(𝑝𝑁 )
+=
+
+Q ∈ P such that :
+(𝑝𝑁
+11
+)−1EQ [ℎ𝛽 (𝑋 )1(1,1)(𝐴,𝑌 )]= (𝑝𝑁01
+)−1EQ [ℎ𝛽 (𝑋 )1(0,1)(𝐴,𝑌 )]
+Q(𝐴 = 𝑎,𝑌 = 𝑦)=𝑝𝑁𝑎𝑦 ∀(𝑎,𝑦) ∈ A × Y
+,
+where the equality follows from the law of conditional expectation.
+Notice that the set F opp
+ℎ𝛽
+(𝑝𝑁 ) is prescribed using linear constraints
+of Q, and thus it is more amenable to optimization than the set
+F opp
+ℎ𝛽
+. It is also more convenient to work with the squared distance
+function R whose input is the empirical distribution
+ˆP𝑁 and its
+corresponding vector of empirical marginals 𝑝𝑁 by
+Ropp ( ˆP𝑁 , 𝑝𝑁 ) B
+inf W(Q, ˆP𝑁 )2
+s.t. EQ [ℎ𝛽 (𝑋 ) ((𝑝𝑁11
+)−1
+1(1,1)(𝐴,𝑌 )−(𝑝𝑁01
+)−1
+1(0,1)(𝐴,𝑌 ))]=0
+EQ [1(𝑎,𝑦) (𝐴,𝑌 )] = 𝑝𝑁𝑎𝑦 ∀(𝑎,𝑦) ∈ A × Y .
+Notice that the constraints of the above infimum problem are linear
+in the measure Q, but the functions inside the expectation opera-
+tors are possibly nonlinear functions of 𝑝𝑁 . Using the equivalent
+characterization (3), the following relation holds
+inf
+Q∈Fopp
+ℎ𝛽
+W( ˆP𝑁 ,Q) = inf
+Q∈Fopp
+ℎ𝛽
+(𝑝𝑁 )
+W( ˆP𝑁 ,Q) =
+√
+Ropp ( ˆP𝑁 , 𝑝𝑁 ) .
+We now proceed to show how computing the projection can be
+reduced to solving a finite-dimensional optimization problem.
+Proposition 4.2 (Dual reformulation). The squared projection
+distance Ropp ( ˆP𝑁 , 𝑝𝑁 ) equals to the optimal value of the following
+finite-dimensional optimization problem
+sup
+𝛾 ∈R
+1
+𝑁
+∑
+𝑖∈I1
+inf
+𝑥𝑖 ∈X
+{
+∥𝑥𝑖 − 𝑥𝑖 ∥2 + 𝛾_𝑖ℎ𝛽 (𝑥𝑖 )
+}
+. (5)
+While Proposition 4.2 asserts that computing the squared pro-
+jection distance Ropp ( ˆP𝑁 , 𝑝𝑁 ) is equivalent to solving a finite-
+dimensional problem, unfortunately, this saddle point problem is
+in general difficult. Indeed, because ℎ𝛽 is non-convex, even finding
+the optimal inner solution 𝑥★
+𝑖
+for a fixed value of the outer variable
+𝛾 ∈ R is generally NP-hard [48]. The situation can be partially
+alleviated if ∥ · ∥ is an Euclidean norm on R𝑑 .
+Lemma 4.3 (Univariate reduction). Suppose that ∥ · ∥ is the Eu-
+clidean norm on R𝑑 , we have
+Ropp ( ˆP𝑁 , 𝑝𝑁 ) =
+sup
+𝛾 ∈R
+1
+𝑁
+∑
+𝑖∈I1
+min
+𝑘𝑖 ∈[0, 1
+8
+]
+𝛾2_2
+𝑖 ∥𝛽 ∥
+2
+2
+𝑘2
+𝑖 +
+𝛾_𝑖
+1 + exp(𝛾_𝑖 ∥𝛽 ∥2
+2
+𝑘𝑖 − 𝛽⊤𝑥𝑖 )
+.
+(6)
+The proof of Lemma 4.3 follows trivially from application of
+Lemma B.1 to reformulate the inner infimum problems for each
+652
+FAccT ’21, March 1–10, 2021, Virtual Event, Canada Bahar Taskesen, Jose Blanchet, Daniel Kuhn, and Viet Anh Nguyen
+𝑖 ∈ I1. Lemma 4.3 offers a significant reduction in the computa-
+tional complexity to solve the inner subproblems of (5). Instead
+of optimizing over 𝑑-dimensional vector 𝑥𝑖 , the representation in
+Lemma 4.3 suggests that it suffices to search over a 1-dimensional
+space for 𝑘𝑖 . While the objective function is still non-convex in 𝑘𝑖 ,
+we can perform a grid search over a compact interval to find the
+optimal solution for 𝑘𝑖 to high precision. The grid search operations
+can also be parallelized across the index 𝑖 thanks to the indepen-
+dent structure of the inner problems. Furthermore, the objective
+function of the supremum problem is a point-wise minimum of
+linear, thus concave, functions of 𝛾 . Hence, the outer problem is a
+concave maximization problem in 𝛾 , which can be solved using a
+golden section search algorithm.
+4.2 Limiting Distribution
+Wenow characterize the limit properties ofRopp ( ˆP𝑁 , 𝑝𝑁 ). The next
+theorem assert that the limiting distribution is of the chi-square
+type.
+Theorem 4.4 (Limiting distribution – Probabilistic equal opportu-
+nity). Suppose that (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 ) are i.i.d. samples from P. Under the
+null hypothesisHopp
+0
+, we have
+𝑁 × Ropp ( ˆP𝑁 , 𝑝𝑁 ) 𝑑.−→ \ 𝜒2
+1
+,
+where 𝜒2
+1
+is a chi-square distribution with 1 degree of freedom,
+\ =
+(
+EP
+[∇ℎ𝛽 (𝑋 ) (1(1,1) (𝐴,𝑌 )𝑝11
+−
+1(0,1) (𝐴,𝑌 )
+𝑝01
+)2
+∗
+])−1
+𝜎2
+1
+𝑝2
+01
+𝑝2
+11
+with 𝜎2
+1
+= Cov(𝑍1), and 𝑍1 is the random variable
+𝑍1 = ℎ𝛽 (𝑋 )
+(
+𝑝011(1,1) (𝐴,𝑌 ) − 𝑝111(0,1) (𝐴,𝑌 )
+)
++ 1(0,1) (𝐴,𝑌 )EP [1(1,1) (𝐴,𝑌 )ℎ𝛽 (𝑋 )]
+− 1(1,1) (𝐴,𝑌 )EP [1(0,1) (𝐴,𝑌 )ℎ𝛽 (𝑋 )] .
+Construction of the hypothesis test. Based on the result of The-
+orem 4.4, the statistical hypothesis test proceeds as follows. Let
+[
+opp
+1−𝛼 denote the (1 − 𝛼) × 100% quantile of \ 𝜒2
+1
+, where 𝛼 ∈ (0, 1) is
+the predetermined significance level. By Theorem 4.4, the statistical
+decision has the form
+RejectHopp
+0
+if 𝑠
+opp
+𝑁
+> [
+opp
+1−𝛼 ,
+with
+𝑠
+opp
+𝑁
+= 𝑁 × Ropp ( ˆP𝑁 , 𝑝𝑁 ) .
+The limiting distribution \ 𝜒2
+1
+is nonpivotal because \ depends on
+the true distribution P. Luckily, because the quantile function of
+\ 𝜒2
+1
+is continuous in \ , if ˆ\𝑁 is a consistent estimator of \ then it
+is also valid to use the quantile of
+ˆ\𝑁 𝜒2
+1
+for the purpose of testing.
+We thus proceed to discuss a consistent estimator
+ˆ\𝑁 constructed
+from the available data. First, notice that 𝑝𝑁
+01
+and 𝑝𝑁
+11
+are consistent
+estimator for 𝑝01 and 𝑝11. Similarly, the law of large numbers asserts
+that the denominator term in the definition of \ can be estimated
+by the sample average
+EP
+[∇ℎ𝛽 (𝑋 ) (1(1,1) (𝐴,𝑌 )𝑝11
+−
+1(0,1) (𝐴,𝑌 )
+𝑝01
+)2
+∗
+]
+≈ 𝑇𝑁 =
+∥𝛽 ∥2∗
+𝑁
+𝑁∑
+𝑖=1
+ℎ𝛽 (𝑥𝑖 )2(1−ℎ𝛽 (𝑥𝑖 ))2
+(
+1(1,1)(𝑎𝑖 , 𝑦𝑖 )
+(𝑝𝑁
+11
+)2
++
+1(0,1)(𝑎𝑖 , 𝑦𝑖 )
+(𝑝𝑁
+01
+)2
+)
+.
+Under the null hypothesisHopp
+0
+,𝑍1 hasmean 0. The sample average
+estimate of 𝜎2
+1
+is 𝜎2
+1
+≈ (?̂?𝑁 )2 with
+(?̂?𝑁
+1
+)2 =
+1
+𝑁
+𝑁∑
+𝑖=1
+[
+ℎ𝛽 (𝑥𝑖 )
+(
+𝑝011(1,1) (𝑎𝑖 , 𝑦𝑖 ) − 𝑝111(0,1) (𝐴,𝑌 )
+)
++ 1(0,1) (𝑎𝑖 , 𝑦𝑖 )
+( 𝑁∑
+𝑗=1
+1(1,1) (𝑎 𝑗 , 𝑦 𝑗 )ℎ𝛽 (𝑥 𝑗 )
+)
+(7)
+− 1(1,1) (𝑎𝑖 , 𝑦𝑖 )
+( 𝑁∑
+𝑗=1
+1(0,1) (𝑎 𝑗 , 𝑦 𝑗 )ℎ𝛽 (𝑥 𝑗 )
+) ]2
+.
+Using a nested arguments involving the continuous mapping theo-
+rem and Slutsky’s theorem, the estimator
+ˆ\𝑁 =
+(?̂?𝑁
+1
+)2
+𝑇𝑁 (𝑝𝑁
+01
+)2 (𝑝𝑁
+11
+)2
+is consistent for \ . Let the corresponding (1 − 𝛼) × 100% quantile
+of the random variable
+ˆ\𝑁 𝜒2
+1
+be [̂
+opp
+1−𝛼 . The statistical test decision
+using the plug-in consistent estimate becomes
+RejectHopp
+0
+if 𝑠
+opp
+𝑁
+> [̂
+opp
+1−𝛼 .
+4.3 Most Favorable Distributions
+We now discuss the construction of the most favorable distribution
+Q★, the projection of the empirical distribution
+ˆP𝑁 onto the set
+F opp
+ℎ𝛽
+. Intuitively,Q★ is the distribution closest to
+ˆP𝑁 that makesℎ𝛽
+a fair classifier under the equal opportunity criterion. If ∥ · ∥ is the
+Euclidean norm, the information about Q★ can be recovered from
+the optimal solution of problem (6) by the result of the following
+lemma.
+Lemma 4.5 (Most favorable distribution). Suppose that ∥ · ∥ is
+the Euclidean norm. Let 𝛾★ be the optimal solution of problem (6),
+and for any 𝑖 ∈ I1, let 𝑘★𝑖 be a solution of the inner minimization
+of (6) with respect to 𝛾★. Then the most favorable distribution
+Q★ = arg min
+Q∈Fopp
+ℎ𝛽
+W( ˆP𝑁 ,Q) is a discrete distribution of the form
+Q★ =
+1
+𝑁
+( ∑
+𝑖∈I0
+𝛿 (𝑥𝑖 ,𝑎𝑖 ,?̂?𝑖 ) +
+∑
+𝑖∈I1
+𝛿 (𝑥𝑖−𝑘★𝑖 𝛾★_𝑖𝛽,𝑎𝑖 ,?̂?𝑖 )
+)
+.
+By using the result of Lemma 4.3, it is easy to verify that Q★
+satisfies W(Q★, ˆP𝑁 )2 = Ropp ( ˆP𝑁 , 𝑝𝑁 ). Moreover, one can also
+show that Q★ ∈ F opp
+ℎ𝛽
+. These two observations imply that Q★ is
+the projection of
+ˆP𝑁 onto F opp
+ℎ𝛽
+. The detailed proof is omitted.
+Lemma 4.5 suggests that in order to obtain the most favorable
+distribution, it suffices to perturb only the data points with positive
+label. This is intuitively rational because the notion of probabilistic
+equality of opportunity only depends on the positive label, and thus
+the perturbation with a minimal energy requirement should only
+653
+A Statistical Test for Probabilistic Fairness FAccT ’21, March 1–10, 2021, Virtual Event, Canada
+move sample points with 𝑦𝑖 = 1. When the underlying geometry
+is the Euclidean norm, the optimal perturbation of the point 𝑥𝑖 is
+to move it along a line dictated by 𝛽 with a scaling factor 𝑘★
+𝑖
+𝛾★_𝑖 .
+Notice that _𝑖 defined in (4) are of opposite signs between samples
+of different sensitive attributes, which implies that it is optimal to
+perturb 𝑥𝑖 in opposite directions dependent on whether 𝑎𝑖 = 0 or
+𝑎𝑖 = 1. This is, again, rational because moving points in opposite
+direction brings the clusters of points closer to the others, which
+reduces the discrepancy in the expected value of ℎ𝛽 (𝑋 ) between
+subgroups.
+As a final remark, we note that Q★ is not necessarily unique.
+This is because of the non-convexity of the inner problem over 𝑘𝑖
+in (6), which leads to the non-uniqueness of the optimal solution
+𝑘★
+𝑖
+(see Appendix B and Figure 5).
+5 TESTING FAIRNESS FOR PROBABILISTIC
+EQUALIZED ODDS CRITERION
+In this section, we extend the Wasserstein projection framework to
+the statistical test of probabilistic equalized odds for a pre-trained
+logistic classifier.
+Definition 5.1 (Probabilistic equalized odds criterion [54]). A lo-
+gistic classifier ℎ𝛽 (·) : X → [0, 1] satisfies the probabilistic equal-
+ized odds criteria relative to Q if
+EQ [ℎ𝛽 (𝑋 ) |𝐴 = 1, 𝑌 = 𝑦] = EQ [ℎ𝛽 (𝑋 ) |𝐴 = 0, 𝑌 = 𝑦] ∀𝑦 ∈ Y .
+The notion of probabilistic equalized odds requires that the con-
+ditional expectation of ℎ𝛽 to be independent of 𝐴 for any label
+subgroup, thus it is more stringent than the probabilistic equal
+opportunity studied in the previous section. We use the superscript
+“odd” in this section to emphasize on this specific notion of fairness.
+The definition of the probabilistic equalized odds prescribes the
+following set of distributions
+F odd
+ℎ𝛽
+=
+
+Q ∈ P such that :
+EQ [ℎ𝛽 (𝑋 ) |𝐴 = 1, 𝑌 = 1] = EQ [ℎ𝛽 (𝑋 ) |𝐴 = 0, 𝑌 = 1]
+EQ [ℎ𝛽 (𝑋 ) |𝐴 = 1, 𝑌 = 0] = EQ [ℎ𝛽 (𝑋 ) |𝐴 = 0, 𝑌 = 0]
+.
+Correspondingly, the Wasserstein projection hypothesis test for
+probabilisitc equalized odds can be formulated as
+Hodd
+0
+: P ∈ F odd
+ℎ𝛽
+, Hodd
+1
+: P ∉ F odd
+ℎ𝛽
+.
+In the sequence, we study the projection onto the manifold F odd
+ℎ𝛽
+in Section 5.1. Section 5.2 examines the asymptotic behaviour of
+the test statistic, and we close this section by studying the most
+favorable distribution Q★ in Section 5.3.
+5.1 Wasserstein Projection
+Following a similar strategy as in Section 4, we define the set
+F odd
+ℎ𝛽
+(𝑝𝑁 )
+=
+
+Q ∈ P such that :
+(𝑝𝑁
+11
+)−1EQ [ℎ𝛽 (𝑋 )1(1,1)(𝐴,𝑌 )]= (𝑝𝑁01
+)−1EQ [ℎ𝛽 (𝑋 )1(0,1)(𝐴,𝑌 )]
+(𝑝𝑁
+10
+)−1EQ [ℎ𝛽 (𝑋 )1(1,0)(𝐴,𝑌 )]= (𝑝𝑁00
+)−1EQ [ℎ𝛽 (𝑋 )1(0,0)(𝐴,𝑌 )]
+Q(𝐴 = 𝑎,𝑌 = 𝑦)=𝑝𝑁𝑎𝑦 ∀(𝑎,𝑦) ∈ A × Y
+
+,
+and the squared distance function
+Rodd ( ˆP𝑁 , 𝑝𝑁 ) =
+inf W(Q, ˆP𝑁 )2
+s.t. EQ [ℎ𝛽 (𝑋 ) ((𝑝𝑁11
+)−1
+1(1,1)(𝐴,𝑌 )−(𝑝𝑁01
+)−1
+1(0,1)(𝐴,𝑌 ))]=0
+EQ [ℎ𝛽 (𝑋 ) ((𝑝𝑁10
+)−1
+1(1,0)(𝐴,𝑌 )−(𝑝𝑁00
+)−1
+1(0,0)(𝐴,𝑌 ))]=0
+EQ [1(𝑎,𝑦) (𝐴,𝑌 )]=𝑝𝑁𝑎𝑦 ∀(𝑎,𝑦) ∈ A × Y .
+The equivalent relation (3) suggests that the projection onto the set
+of distributions F odd
+ℎ𝛽
+satisfies
+inf
+Q∈Fodd
+ℎ𝛽
+W( ˆP𝑁 ,Q) = inf
+Q∈Fodd
+ℎ𝛽
+(𝑝𝑁 )
+W( ˆP𝑁 ,Q) =
+√
+Rodd ( ˆP𝑁 , 𝑝𝑁 ) .
+The squared distance Rodd ( ˆP𝑁 , 𝑝𝑁 ) can be computed by solving
+the saddle point problem in the following proposition.
+Proposition 5.2 (Dual reformulation). The squared projection
+distance Rodd ( ˆP𝑁 , 𝑝𝑁 ) equals to the optimal value of the following
+finite-dimensional optimization problem
+sup
+𝛾 ∈R,Z ∈R
+1
+𝑁
+𝑁∑
+𝑖=1
+inf
+𝑥𝑖 ∈X
+{
+∥𝑥𝑖−𝑥𝑖 ∥2+(𝛾_𝑖11 (𝑦𝑖 ) + Z_𝑖10 (𝑦𝑖 ))ℎ𝛽 (𝑥𝑖 )
+}
+.
+(8)
+To complete this section, we now discuss an efficient way to
+compute Rodd ( ˆP𝑁 , 𝑝𝑁 ). The next lemma reveals that computing
+Rodd ( ˆP𝑁 , 𝑝𝑁 ) can be decomposed into two subproblems of similar
+structure.
+Lemma 5.3 (Univariate reduction). We have
+Rodd ( ˆP𝑁 , 𝑝𝑁 ) = Ropp ( ˆP𝑁 , 𝑝𝑁 ) +𝑈𝑁 ,
+where𝑈𝑁 is computed as
+𝑈𝑁 = sup
+Z ∈R
+1
+𝑁
+∑
+𝑖∈I0
+inf
+𝑥𝑖 ∈X
+{
+∥𝑥𝑖 − 𝑥𝑖 ∥2 + Z_𝑖ℎ𝛽 (𝑥𝑖 )
+}
+.
+Furthermore, if ∥ · ∥ is the Euclidean norm on R𝑑 , then
+𝑈𝑁 =
+sup
+Z ∈R
+1
+𝑁
+
+∑
+𝑖∈I0
+min
+𝑘𝑖 ∈[0, 1
+8
+]
+Z 2_2
+𝑖 ∥𝛽 ∥
+2
+2
+𝑘2
+𝑖 +
+Z_𝑖
+1 + exp(Z_𝑖 ∥𝛽 ∥2
+2
+𝑘𝑖−𝛽⊤𝑥𝑖 )
+ .
+(9)
+Notice that problem (9) has a similar structure to problem (6):
+the mere difference is that the summation in the objective function
+of (9) runs over the index set I0 = {𝑖 ∈ [𝑁 ] : 𝑦𝑖 = 0} instead of
+I1 in (6). Solving for 𝑈𝑁 thus incurs the same computational com-
+plexity as, and can also be performed in parallel with, computing
+Ropp ( ˆP𝑁 , 𝑝𝑁 ).
+5.2 Limiting Distribution
+The next result asserts that the squared projection distance Rodd
+has the 𝑂 (𝑁−1) convergence rate.
+654
+FAccT ’21, March 1–10, 2021, Virtual Event, Canada Bahar Taskesen, Jose Blanchet, Daniel Kuhn, and Viet Anh Nguyen
+Theorem 5.4 (Limiting distribution – Probabilistic equalized odds).
+Suppose that (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 ) are i.i.d. samples from P. Under the null
+hypothesisHodd
+0
+, we have
+𝑁 × Rodd ( ˆP𝑁 , 𝑝𝑁 ) 𝑑.−→
+sup
+𝛾,Z
+{
+𝛾𝐻1 + Z𝐻0+
+EP
+[(𝛾Z )⊤(𝑝−1
+11
+1(1,1) (𝐴,𝑌 )−𝑝−1
+01
+1(0,1) (𝐴,𝑌 )
+𝑝−1
+10
+1(1,0) (𝐴,𝑌 )−𝑝−1
+00
+1(0,0) (𝐴,𝑌 )
+)
+∇ℎ𝛽 (𝑋 )
+2
+∗
+]}
+,
+where ∇ℎ𝛽 (𝑋 ) = ℎ𝛽 (𝑋 ) (1−ℎ𝛽 (𝑋 )𝛽 , and𝐻𝑦 = N(0, 𝜎2
+𝑦)/(𝑝1𝑦𝑝0𝑦)
+with 𝜎2
+𝑦 = Cov(𝑍𝑦), and 𝑍𝑦 are random variables
+𝑍𝑦 = ℎ𝛽 (𝑋 )
+(
+𝑝0𝑦1(1,𝑦) (𝐴,𝑌 ) − 𝑝1𝑦1(0,𝑦) (𝐴,𝑌 )
+)
++ 1(0,𝑦) (𝐴,𝑌 )EP [1(1,𝑦) (𝐴,𝑌 )ℎ𝛽 (𝑋 )]
+− 1(1,𝑦) (𝐴,𝑌 )EP [1(0,𝑦) (𝐴,𝑌 )ℎ𝛽 (𝑋 )] .
+Construction of the hypothesis test. Contrary to the explicit
+chi-square limiting distribution for the probabilistic equal oppor-
+tunity fairness in Theorem 4.4, the limiting distribution for the
+probabilistic equalized odds fairness is not available in closed form.
+Nevertheless, the limiting distribution in this case can be obtained
+by sampling 𝐻0 and 𝐻1 and solving a collection of optimization
+problems for each sample. Notice that the objective function of the
+supremum problem presented in Theorem 5.4 is continuous in 𝐻1
+and 𝐻0, one thus can define
+?̂?𝑦 = N(0, ?̂?2
+𝑦)/(𝑝𝑁1𝑦𝑝
+𝑁
+0𝑦),
+where ?̂?2
+𝑦 is the sample average estimate of 𝜎2
+𝑦 , which can be com-
+puted using an equation similar to (7). The limiting distribution
+can be computed by solving the optimization problem with plug-in
+values
+sup
+𝛾,Z
+{
+𝛾?̂?1 + Z ?̂?0+
+E
+ˆP𝑁
+[ 
+(
+𝛾
+Z
+)⊤((𝑝𝑁
+11
+)−1
+1(1,1)(𝐴,𝑌 )−(𝑝𝑁01
+)−1
+1(0,1)(𝐴,𝑌 )
+(𝑝𝑁
+10
+)−1
+1(1,0)(𝐴,𝑌 )−(𝑝𝑁00
+)−1
+1(0,0)(𝐴,𝑌 )
+)
+∇ℎ𝛽 (𝑋 )
+
+2
+∗
+]}
+.
+Notice that the expectation in taken over the empirical distribution
+ˆP𝑁 , and can be written as a finite sum. The last optimization prob-
+lem can be solved efficiently using quadratic programming for any
+realization of ?̂?1 and ?̂?0. The objective values can be collected to
+compute the (1 − 𝛼) × 100%-quantile estimate [̂odd
+1−𝛼 of the limiting
+distribution. The statistical test decision using the plug-in estimate
+becomes
+RejectHodd
+0
+if 𝑠odd
+𝑁
+> [̂odd
+1−𝛼 ,
+where 𝑠odd
+𝑁
+= 𝑁 × Rodd ( ˆP𝑁 , 𝑝𝑁 ).
+5.3 Most Favorable Distributions
+If the feature space X is endowed with an Euclidean norm, then the
+most favorable distributionQ★, defined in this section as the projec-
+tion of
+ˆP𝑁 onto F odd
+ℎ𝛽
+, can be constructed by exploiting Lemma 5.3.
+Lemma 5.5 (Most favorable distribution). Suppose that ∥ · ∥ is
+the Euclidean norm. Let 𝛾★ and Z★ be the optimal solution of
+problems (6) and (9), respectively. For any 𝑖 ∈ I1, let 𝑘★𝑖 be the
+solution of the inner minimization of (6) with respect to 𝛾★, and
+for any 𝑖 ∈ I0, let 𝑘★𝑖 be a solution of the inner minimization
+of (9) with respect to Z★. Then the most favorable distribution
+Q★ = arg min
+Q∈Fodd
+ℎ𝛽
+W( ˆP𝑁 ,Q) is a discrete distribution of the form
+Q★ =
+1
+𝑁
+( ∑
+𝑖∈I0
+𝛿 (𝑥𝑖−𝑘★𝑖 Z★_𝑖𝛽,𝑎𝑖 ,?̂?𝑖 ) +
+∑
+𝑖∈I1
+𝛿 (𝑥𝑖−𝑘★𝑖 𝛾★_𝑖𝛽,𝑎𝑖 ,?̂?𝑖 )
+)
+.
+The proof of Lemma 5.5 follows from verifying that Q★ ∈ F odd
+ℎ𝛽
+and that W(Q★, ˆP𝑁 )2 = Rodd ( ˆP𝑁 , 𝑝𝑁 ) using Lemma 5.3, the de-
+tailed proof is omitted. For probabilistic equalized odds, the most
+favorable distribution Q★ alters the locations of both 𝑖 ∈ I0 and
+𝑖 ∈ I1. The directions of perturbation are dependent on _𝑖 , which
+is determined using (4). Notice that _𝑖 carry opposite signs corre-
+sponding to whether 𝑎𝑖 = 0 or 𝑎𝑖 = 1, thus the perturbations will
+move 𝑥𝑖 in opposite directions based on the value of the sensitive
+attribute 𝑎𝑖 .
+6 NUMERICAL EXPERIMENT
+All experiments are run on an Intel Xeon based cluster composed
+of 287 compute nodes each with 2 Skylake processors running at
+2.3 GHz with 18 cores each. We only use 2 nodes of this cluster
+and all optimization problems are implemented in Python version
+3.7.3. In all experiments, we use the 2-norm to measure distances
+in the feature space. Moreover, we focus on the hypothesis test of
+probabilistic equal opportunity, and thus theWasserstein projection,
+the limiting distribution and the most favorable distribution follow
+from the results presented in Section 4.
+6.1 Validation of the Hypothesis Test
+We now demonstrate that our proposed Wasserstein projection
+framework for statistical test of fairness is a valid, or asymptotically
+correct, test. We consider a binary classification setting in which
+X is 2-dimensional feature space. The true distribution P has true
+marginal values 𝑝𝑎𝑦 being
+𝑝11 = 0.2, 𝑝01 = 0.1, 𝑝10 = 0.3, 𝑝00 = 0.4.
+Moreover, conditioning on (𝐴,𝑌 ), the feature 𝑋 follows a Gaussian
+distribution of the form
+𝑋 |𝐴 = 1, 𝑌 = 1 ∼ N([6, 0], [3.5, 0; 0, 5]),
+𝑋 |𝐴 = 0, 𝑌 = 1 ∼ N([−2, 0], [5, 0; 0, 5]),
+𝑋 |𝐴 = 1, 𝑌 = 0 ∼ N([6, 0], [3.5, 0; 0, 5]),
+𝑋 |𝐴 = 0, 𝑌 = 0 ∼ N([−4, 0], [5, 0; 0, 5]).
+The true distribution P is thus a mixture of Gaussian, and under this
+specification, a simple algebraic calculation indicates that a logistic
+classifier with 𝛽 = (0, 1)⊤ is fair with respect to the probabilistic
+equal opportunity criterion in Definition 4.1. We thus focus on
+verifying fairness for this specific classifier. In the first experiment,
+we empirically validate Theorem 4.4. To this end, we generate
+𝑁 ∈ {100, 500} i.i.d. samples from P to be used as the test data,
+and then calculate the squared projection distance Ropp ( ˆP𝑁 , 𝑝𝑁 )
+using Proposition 4.2. The process is repeated 2,000 times to obtain
+an empirical estimate of the distribution of 𝑁 × Ropp ( ˆP𝑁 , 𝑝𝑁 ).
+655
+A Statistical Test for Probabilistic Fairness FAccT ’21, March 1–10, 2021, Virtual Event, Canada
+0 10 20 30 40 50
+100 × opp( 100, p100)
+0.0
+0.2
+0.4
+0.6
+D
+en
+si
+ty
+(a) 𝑁 = 100
+0 10 20 30 40 50
+500 × opp( 500, p500)
+0.0
+0.2
+0.4
+0.6
+D
+en
+si
+ty
+(b) 𝑁 = 500
+0 10 20 30 40 50
+100 × opp( 100, p100)
+0.7
+0.8
+0.9
+1.0
+C
+um
+ul
+at
+iv
+e 
+di
+st
+ri
+bu
+tio
+n
+(c) 𝑁 = 100
+0 10 20 30 40 50
+500 × opp( 500, p500)
+0.7
+0.8
+0.9
+1.0
+C
+um
+ul
+at
+iv
+e 
+di
+st
+ri
+bu
+tio
+n
+(d) 𝑁 = 500
+Figure 2: Empirical distribution of 𝑁 ×Ropp ( ˆP𝑁 , 𝑝𝑁 ) taken over 2,000 replications (histogram) versus the limiting distribution
+\ 𝜒2
+1
+(blue curve) with different sample sizes 𝑁 . Fig. 2a-2b are density plots, Fig. 2c-2d are cumulative distribution plots.
+We also generate another set of one million i.i.d. samples from
+P to estimate the limiting distribution \ 𝜒2
+1
+. Figure 2 shows that
+the empirical distribution of 𝑁 × Ropp ( ˆP𝑁 , 𝑝𝑁 ) converges to the
+limiting distribution \ 𝜒2
+1
+as 𝑁 increases.
+The second set of experiments aims to show that our proposed
+Wasserstein projection hypothesis test is asymptotically valid. We
+generate 𝑁 ∈ {100, 500, 1000} i.i.d. samples from P and calculate the
+test statistic 𝑁 × Ropp ( ˆP𝑁 , 𝑝𝑁 ). The same data is used to estimate
+ˆ\𝑁 and compute the (1−𝛼)×100%-quantile of
+ˆ\𝑁 𝜒2
+1
+to perform the
+quantile based test as laid out in Section 4.2. We repeat this proce-
+dure for 2,000 replications to keep track of the rejection projection
+at different significant values of 𝛼 ∈ {0.5, 0.3, 0.1, 0.05, 0.01}. Table 1
+summarizes the rejection probabilities of Wasserstein projection
+tests for equal opportunity criterion under the null hypothesis
+Hopp
+0
+. We can observe that at sample size 𝑁 > 100, the rejection
+probability is close to the desired level 𝛼 , which empirically vali-
+dates our testing procedure.
+𝑁 = 100 𝑁 = 500 𝑁 = 1000 𝛼
+0.511 0.4905 0.5 0.50
+0.282 0.2895 0.299 0.30
+0.048 0.0895 0.093 0.10
+0.007 0.0425 0.0405 0.05
+0.0 0.0065 0.005 0.01
+Table 1: Comparison of the null rejection probabilities of
+probabilistic equal opportunity tests with different signifi-
+cance levels 𝛼 and test sample sizes 𝑁 .
+6.2 Most Favorable Distribution Analysis
+In this section, we visualize the most favorable distribution Q★
+from Lemma 4.5 for a vanilla logistic regression classifier with
+weight 𝛽 = (0.4, 0.12)⊤. We simply generate 28 samples with equal
+subgroup proportions to form the empirical distribution
+ˆP𝑁 . To find
+the support of Q★, we solve problem (6), whose optimizer dictates
+the transportation plan of each sample 𝑥𝑖 . Figure 3 visualizes the
+original test samples that forms
+ˆP𝑁 , along with the most favorable
+distribution Q★. Green lines in the figure represent how samples
+are perturbed. As we are testing for the probabilistic notion of
+equal opportunity, only the samples with positive label 𝑦𝑖 = 1
+Figure 3: Visualization of themost favorable distributionQ★
+for a logistic classifier with weight 𝛽 = (0.4, 0.12)⊤. The black
+arrow indicates the vector 𝛽 . Colors represent class, while
+symbolic shapes encode the sensitive values. The green lines
+show the transport plan of the empirical test samples from
+their original positions (indicated with transparent colors)
+to their ultimate destinations (with non-transparent colors).
+presented in blue are perturbed in order to obtain Q★. Furthermore,
+we observe that the positively-labeled test samples are transported
+along the axis directed by 𝛽 (black arrow). Moreover, the samples
+with different sensitive attributes, represented by different shapes,
+move in opposite direction so that they get closer to each other,
+which reduces the discrepancy in the expected value of ℎ𝛽 (𝑋 )
+between the relevant subgroups.
+6.3 The COMPAS Dataset
+COMPAS (Correctional Offender Management Profiling for Alter-
+native Sanctions)
+4
+is a commercial tool used by judges and parole
+officers for scoring criminal defendant’s likelihood of recidivism.
+The COMPAS dataset is used by the COMPAS algorithm to com-
+pute the risk score of reoffending for defendants, and also contains
+the criminal records within 2 years after the decision. The dataset
+consists of 6,172 samples with 10 attributes including gender, age
+category, race, etc. We concentrate on the subset of the data with
+violent recidivism, and we use race (African-American and Cau-
+casian) as the sensitive attribute. We split 70% of the COMPAS data
+to train a Tikhonov-regularized logistic classifier, with the tuning
+penalty parameter _ chosen in the range from 0 to 100 with 50
+4
+https://www.propublica.org/datastore/dataset/compas-recidivism-risk-score-data-
+and-analysis
+656
+FAccT ’21, March 1–10, 2021, Virtual Event, Canada Bahar Taskesen, Jose Blanchet, Daniel Kuhn, and Viet Anh Nguyen
+0 20 40 60 80 100
+0
+10
+20
+30
+40
+50
+60
+70
+St
+at
+is
+tic
+ v
+al
+ue
+0.635
+0.640
+0.645
+0.650
+0.655
+0.660
+0.665
+0.670
+Ac
+cu
+ra
+cy
+0.95 N × opp( N, pN) Test accuracy
+Figure 4: Test statistic and accuracy of Tikhonov regularized
+logistic regression on test data with rejection threshold [̂0.95.
+equi-distant points. The remaining 30% of the data is used as the
+test samples for auditing.
+Figure 4 demonstrates the relation between the accuracy and
+the degree of fairness with respect to the regularization parameter
+_. Strong regularization penalty (high values of _) results in small
+values of the test statistic, but the classifier has low test accuracy. On
+the contrary, weak penalization leads to undesirable fairness level
+but higher prediction accuracy. The pink dashed line in Figure 4
+shows the rejection threshold of the Wasserstein projection test at
+significance level 𝛼 = 0.05 for varying value of the regularization
+parameter _. We can observe that the Wasserstein projection test
+recommends a rejection of the null hypothesis Hopp
+0
+for a wide
+range of _. Only at _ sufficiently large that the test fails to reject
+the null hypothesis.
+7 CONCLUDING REMARKS AND BROADER
+IMPACT
+In this paper, we propose a statistical hypothesis test for group
+fairness of classification algorithms based on the theory of opti-
+mal transport. Our test statistic relies on computing the projection
+distance from the empirical distribution supported on the test sam-
+ples to the manifold of distributions that renders the classifier fair.
+When the notion of fairness is chosen to be either the probabilistic
+equal opportunity or the probabilistic equalized odds, we show that
+the projection can be computed efficiently. We provide the limit-
+ing distribution of the test statistic and show that our Wasserstein
+projection test is asymptotically correct. Our proposed test also
+offers the flexibility to incorporate the geometric information of
+the feature space into testing procedure. Finally, analyzing the most
+favorable distribution can help interpreting the reasons behind the
+outcome of the test.
+The Wasserstein projection hypothesis test is the culmination
+of a benevolent motivation and effort, and it aims to furnish the
+developers, the regulators and the general public a quantitative
+method to verify certain notions of fairness in the classification
+setting. At the same time, we acknowledge the risks and limitations
+of the results presented in this paper.
+First, it is essential to keep in mind that this paper focuses
+on probabilistic notions of fairness, in particular, we provide the
+Wasserstein statistical test for probabilistic equality of opportunity
+and probabilistic equalized odds. Probabilistic notions are only ap-
+proximations of the original definitions, and the employment of
+probabilistic notions are solely for the technical purposes. Due to
+the sensitivity of the test result on the choice of fairness notions, a
+test that is designed for probabilistic notions may not be applicable
+to test for original notions of fairness due to the interplay with
+the threshold 𝜏 and the radical difference of both the test statistic
+and the limiting distribution. If a logistic classifier ℎ𝛽 is rejected
+using our framework for probabilistic equal opportunity, it does
+not necessarily imply that the classifier ℎ𝛽 fails to satisfy the equal
+opportunity criterion, and vice versa. The same argument holds
+when we test for probabilistic equalized odds.
+Second, the outcome of the Wasserstein projection test is de-
+pendent on the choice of the underlying metric on the feature, the
+sensitive attribute and the label spaces. Indeed, the test outcome
+can change if we switch the metric of the feature space, for example,
+from the Euclidean norm to a 1-norm. In the scope of this paper,
+we do not study how sensitive the test outcome is with respect to
+the choice of the metric, nor can we make any recommendation
+on the optimal choice of the metric. Nevertheless, it is reasonable
+to recommend that the metric should be chosen judiciously, and
+the action of tuning the metric in order to obtain favorable test
+outcome should be prohibited.
+Third, to simplify the computation, we have assumed absolute
+trust on the sensitive attributes and the label. The users of our test
+should be mindful if there is potential corruption to these values.
+Moreover, our test is constructed under the assumption that there
+is no missing values in the test data. This assumption, unfortu-
+nately, may not hold in real-world implementations. Constructing
+statistical test which is robust to adversarial attacks and missing
+data using the Wasserstein projection framework is an interesting
+research direction.
+Fourth, the statistical test in this paper is for a simple null hy-
+pothesis. In practice, the regulators may be interested in a relaxed
+fairness test in which the difference of the conditional expectations
+is upper bounded by a fixed positive constant 𝜖 . The extension of
+the Wasserstein hypothesis testing framework for a composite null
+hypothesis is non-trivial, thus we leave this idea for future study.
+Finally, any auditing process for algorithmic fairness can become
+a dangerous tool if it falls into the hand of unqualified or vicious
+inspectors. The results in this paper are developed to broaden our
+scientific understanding, and we recommend that the test and its
+outcomes should be used as an informative reference, but not as
+an absolute certification to promote any particular classifier or as a
+justification for any particular classification decision.
+We thus sincerely recommend that the tools proposed in this
+paper be exercised with utmost consideration.
+ACKNOWLEDGMENTS
+Research supported by the Swiss National Science Foundation un-
+der NCCR Automation, grant agreement 51NF40_180545. Material
+in this paper is based upon work supported by the Air Force Of-
+fice of Scientific Research under award number FA9550-20-1-0397.
+Additional support is gratefully acknowledged from NSF grants
+1915967, 1820942, 1838676, and also from the China Merchant Bank.
+Finally, we would like to thank Nian Si andMichael Sklar for helpful
+comments and discussions.
+657
+A Statistical Test for Probabilistic Fairness FAccT ’21, March 1–10, 2021, Virtual Event, Canada
+REFERENCES
+[1] David Alvarez-Melis, Tommi S Jaakkola, and Stefanie Jegelka. 2017. Structured
+optimal transport. arXiv preprint arXiv:1712.06199 (2017).
+[2] Solon Barocas and Andrew D Selbst. 2016. Big data’s disparate impact. California
+Law Review 104 (2016), 671–732.
+[3] Rachel KE Bellamy, Kuntal Dey, Michael Hind, Samuel C Hoffman, Stephanie
+Houde, Kalapriya Kannan, Pranay Lohia, Jacquelyn Martino, Sameep Mehta,
+Aleksandra Mojsilovic, et al. 2018. AI Fairness 360: An extensible toolkit for
+detecting, understanding, and mitigating unwanted algorithmic bias. arXiv
+preprint arXiv:1810.01943 (2018).
+[4] Jean-David Benamou, Guillaume Carlier, Marco Cuturi, Luca Nenna, and Gabriel
+Peyré. 2015. Iterative Bregman projections for regularized transportation prob-
+lems. SIAM Journal on Scientific Computing 37, 2 (2015), A1111–A1138.
+[5] Richard Berk, Hoda Heidari, Shahin Jabbari, Michael Kearns, and Aaron Roth.
+2018. Fairness in criminal justice risk assessments: The state of the art. Sociological
+Methods & Research (2018), 0049124118782533.
+[6] Emily Black, Samuel Yeom, and Matt Fredrikson. 2020. FlipTest: fairness testing
+via optimal transport. In Proceedings of the 2020 Conference on Fairness, Account-
+ability, and Transparency. 111–121.
+[7] Jose Blanchet, Yang Kang, and KarthyekMurthy. 2019. RobustWasserstein profile
+inference and applications to machine learning. Journal of Applied Probability
+56, 3 (2019), 830–857.
+[8] Mathieu Blondel, Vivien Seguy, and Antoine Rolet. 2018. Smooth and sparse op-
+timal transport. In International Conference on Artificial Intelligence and Statistics.
+880–889.
+[9] Joy Buolamwini and Timnit Gebru. 2018. Gender shades: Intersectional accu-
+racy disparities in commercial gender classification. In Conference on Fairness,
+Accountability and Transparency. 77–91.
+[10] Toon Calders and Sicco Verwer. 2010. Three naive Bayes approaches for
+discrimination-free classification. Data Mining and Knowledge Discovery 21,
+2 (2010), 277–292.
+[11] Elsa Cazelles, Vivien Seguy, Jérémie Bigot, Marco Cuturi, and Nicolas Papadakis.
+2018. Geodesic PCA versus log-PCA of histograms in the Wasserstein space.
+SIAM Journal on Scientific Computing 40, 2 (2018), B429–B456.
+[12] Alexandra Chouldechova. 2017. Fair prediction with disparate impact: A study
+of bias in recidivism prediction instruments. Big Data 5, 2 (2017), 153–163.
+[13] Alexandra Chouldechova and Aaron Roth. 2020. A snapshot of the frontiers of
+fairness in machine learning. Commun. ACM 63, 5 (2020), 82–89.
+[14] Sam Corbett-Davies, Emma Pierson, Avi Feller, Sharad Goel, and Aziz Huq. 2017.
+Algorithmic decision making and the cost of fairness. In Proceedings of the 23rd
+ACM SIGKDD International Conference on Knowledge Discovery and Data Mining.
+797–806.
+[15] Nicolas Courty, Rémi Flamary, Devis Tuia, and Alain Rakotomamonjy. 2016.
+Optimal transport for domain adaptation. IEEE transactions on pattern analysis
+and machine intelligence 39, 9 (2016), 1853–1865.
+[16] Marco Cuturi. 2013. Sinkhorn Distances: Lightspeed Computation of Optimal
+Transport. In Advances in Neural Information Processing Systems. 2292–2300.
+[17] Jeffrey Dastin. 2018. Amazon scraps secret AI recruiting tool that showed bias
+against women. San Fransico, CA: Reuters. Retrieved on October 9 (2018), 2018.
+[18] Amit Datta, Michael Carl Tschantz, and Anupam Datta. 2015. Automated ex-
+periments on ad privacy settings: A tale of opacity, choice, and discrimination.
+Proceedings on Privacy Enhancing Technologies 2015, 1 (2015), 92–112.
+[19] Cyrus DiCiccio, Sriram Vasudevan, Kinjal Basu, Krishnaram Kenthapadi, and
+DeepakAgarwal. 2020. Evaluating fairness using permutation tests. In Proceedings
+of the 26th ACM SIGKDD International Conference on Knowledge Discovery & Data
+Mining. 1467–1477.
+[20] Pavel Dvurechensky, Alexander Gasnikov, and Alexey Kroshnin. 2018. Compu-
+tational optimal transport: Complexity by accelerated gradient descent is better
+than by Sinkhorn’s algorithm. arXiv preprint arXiv:1802.04367 (2018).
+[21] Cynthia Dwork, Moritz Hardt, Toniann Pitassi, Omer Reingold, and Richard
+Zemel. 2012. Fairness through awareness. In Proceedings of the 3rd innovations in
+theoretical computer science conference. 214–226.
+[22] Mahyar Fazlyab, Manfred Morari, and George J. Pappas. 2019. Safety Verification
+and Robustness Analysis of Neural Networks via Quadratic Constraints and
+Semidefinite Programming. arXiv preprint arXiv:1903.01287 (2019).
+[23] Michael Feldman, Sorelle A. Friedler, John Moeller, Carlos Scheidegger, and
+Suresh Venkatasubramanian. 2015. Certifying and Removing Disparate Impact.
+In Proceedings of the 21th ACM SIGKDD International Conference on Knowledge
+Discovery and Data Mining. 259–268.
+[24] Sira Ferradans, Nicolas Papadakis, Gabriel Peyré, and Jean-François Aujol. 2014.
+Regularized discrete optimal transport. SIAM Journal on Imaging Sciences 7, 3
+(2014), 1853–1882.
+[25] Rémi Flamary, Marco Cuturi, Nicolas Courty, and Alain Rakotomamonjy. 2018.
+Wasserstein discriminant analysis. Machine Learning 107, 12 (2018), 1923–1945.
+[26] Rui Gao, Xi Chen, and Anton J Kleywegt. 2017. Wasserstein distributional robust-
+ness and regularization in statistical learning. arXiv preprint arXiv:1712.06050
+(2017).
+[27] Sahaj Garg, Vincent Perot, Nicole Limtiaco, Ankur Taly, Ed H Chi, and Alex
+Beutel. 2019. Counterfactual fairness in text classification through robustness. In
+Proceedings of the 2019 AAAI/ACM Conference on AI, Ethics, and Society. 219–226.
+[28] Aude Genevay, Marco Cuturi, Gabriel Peyré, and Francis Bach. 2016. Stochastic
+optimization for large-scale optimal transport. In Advances in Neural Information
+Processing Systems. 3440–3448.
+[29] Paula Gordaliza, Eustasio Del Barrio, Gamboa Fabrice, and Jean-Michel Loubes.
+2019. Obtaining Fairness using Optimal Transport Theory. In Proceedings of the
+36th International Conference on Machine Learning. 2357–2365.
+[30] Nina Grgic-Hlaca, Muhammad Bilal Zafar, Krishna P Gummadi, and Adrian
+Weller. 2016. The case for process fairness in learning: Feature selection for fair
+decision making. In NIPS Symposium on Machine Learning and the Law, Vol. 1. 2.
+[31] Moritz Hardt, Eric Price, Eric Price, and Nati Srebro. 2016. Equality of Opportunity
+in Supervised Learning. In Advances in Neural Information Processing Systems 29.
+3315–3323.
+[32] Nhat Ho, Xuan Long Nguyen, Mikhail Yurochkin, Hung Hai Bui, Viet Huynh, and
+Dinh Phung. 2017. Multilevel clustering via Wasserstein means. In Proceedings
+of the 34th International Conference on Machine Learning-Volume 70. JMLR. org,
+1501–1509.
+[33] David W Hosmer Jr, Stanley Lemeshow, and Rodney X Sturdivant. 2013. Applied
+Logistic Regression. John Wiley & Sons.
+[34] Philips George John, Deepak Vijaykeerthy, and Diptikalyan Saha. 2020. Verifying
+Individual Fairness in Machine Learning Models. In Conference on Uncertainty in
+Artificial Intelligence. PMLR, 749–758.
+[35] Nathan Kallus, Xiaojie Mao, and Angela Zhou. 2019. Assessing algorithmic
+fairness with unobserved protected class using data combination. arXiv preprint
+arXiv:1906.00285 (2019).
+[36] Jon Kleinberg, Jens Ludwig, Sendhil Mullainathan, and Ashesh Rambachan. 2018.
+Algorithmic fairness. In AEA Papers and Proceedings, Vol. 108. 22–27.
+[37] Jon Kleinberg, Sendhil Mullainathan, and Manish Raghavan. 2016. Inherent
+trade-offs in the fair determination of risk scores. arXiv preprint arXiv:1609.05807
+(2016).
+[38] Soheil Kolouri, Se Rim Park, Matthew Thorpe, Dejan Slepcev, and Gustavo K
+Rohde. 2017. Optimal mass transport: Signal processing and machine-learning
+applications. IEEE signal processing magazine 34, 4 (2017), 43–59.
+[39] Soheil Kolouri and Gustavo K Rohde. 2015. Transport-based single frame super
+resolution of very low resolution face images. In Proceedings of the IEEE Conference
+on Computer Vision and Pattern Recognition. 4876–4884.
+[40] Daniel Kuhn, Peyman Mohajerin Esfahani, Viet Anh Nguyen, and Soroosh
+Shafieezadeh-Abadeh. 2019. Wasserstein distributionally robust optimization:
+Theory and applications in machine learning. In Operations Research & Manage-
+ment Science in the Age of Analytics. INFORMS, 130–166.
+[41] Zachary Lipton, Julian McAuley, and Alexandra Chouldechova. 2018. Does
+mitigating ML’s impact disparity require treatment disparity?. In Advances in
+Neural Information Processing Systems. 8125–8135.
+[42] Michael Lohaus, Michaël Perrot, and Ulrike von Luxburg. 2020. Too Relaxed to
+Be Fair. In International Conference on Machine Learning.
+[43] Arjun K Manrai, Birgit H Funke, Heidi L Rehm, Morten S Olesen, Bradley A
+Maron, Peter Szolovits, David M Margulies, Joseph Loscalzo, and Isaac S Kohane.
+2016. Genetic misdiagnoses and the potential for health disparities. New England
+Journal of Medicine 375, 7 (2016), 655–665.
+[44] Ninareh Mehrabi, Fred Morstatter, Nripsuta Saxena, Kristina Lerman, and Aram
+Galstyan. 2019. A survey on bias and fairness in machine learning. arXiv preprint
+arXiv:1908.09635 (2019).
+[45] Gaspard Monge. 1781. Mémoire sur la théorie des déblais et des remblais. Histoire
+de l’Académie Royale des Sciences de Paris (1781).
+[46] MultiMedia LLC. 2016 (accessed June 4, 2020). Machine Bias. Avail-
+able at https://www.propublica.org/article/machine-bias-risk-assessments-in-
+criminal-sentencing.
+[47] Zak Murez, Soheil Kolouri, David Kriegman, Ravi Ramamoorthi, and Kyungnam
+Kim. 2018. Image to image translation for domain adaptation. In Proceedings of
+the IEEE Conference on Computer Vision and Pattern Recognition. 4500–4509.
+[48] Katta G Murty and Santosh N Kabadi. 1985. Some NP-complete problems in
+quadratic and nonlinear programming. Technical Report.
+[49] XuanLong Nguyen. 2013. Convergence of latent mixing measures in finite and
+infinite mixture models. The Annals of Statistics 41, 1 (2013), 370–400.
+[50] Nicolas Papadakis and Julien Rabin. 2017. Convex Histogram-Based Joint Image
+Segmentation with Regularized Optimal Transport Cost. Journal of Mathematical
+Imaging and Vision 59, 2 (2017), 161–186.
+[51] Ofir Pele andMichaelWerman. 2008. A linear time histogrammetric for improved
+sift matching. In European conference on computer vision. Springer, 495–508.
+[52] O. Pele and M. Werman. 2009. Fast and robust Earth Mover’s Distances. In
+2009 IEEE 12th International Conference on Computer Vision. 460–467. https:
+//doi.org/10.1109/ICCV.2009.5459199
+[53] Gabriel Peyré and Marco Cuturi. 2019. Computational optimal transport. Foun-
+dations and Trends® in Machine Learning 11, 5-6 (2019), 355–607.
+[54] Geoff Pleiss, Manish Raghavan, FelixWu, Jon Kleinberg, and Kilian QWeinberger.
+2017. On fairness and calibration. In Advances in Neural Information Processing
+658
+FAccT ’21, March 1–10, 2021, Virtual Event, Canada Bahar Taskesen, Jose Blanchet, Daniel Kuhn, and Viet Anh Nguyen
+Systems. 5680–5689.
+[55] Antoine Rolet, Marco Cuturi, and Gabriel Peyré. 2016. Fast dictionary learning
+with a smoothedWasserstein loss. InArtificial Intelligence and Statistics. 630–638.
+[56] Yossi Rubner, Carlo Tomasi, and Leonidas J Guibas. 2000. The earth mover’s
+distance as a metric for image retrieval. International journal of computer vision
+40, 2 (2000), 99–121.
+[57] Pedro Saleiro, Benedict Kuester, Loren Hinkson, Jesse London, Abby Stevens, Ari
+Anisfeld, Kit T Rodolfa, and Rayid Ghani. 2018. Aequitas: A bias and fairness
+audit toolkit. arXiv preprint arXiv:1811.05577 (2018).
+[58] Bernhard Schmitzer. 2016. A sparse multiscale algorithm for dense optimal
+transport. Journal of Mathematical Imaging and Vision 56, 2 (2016), 238–259.
+[59] Vivien Seguy and Marco Cuturi. 2015. Principal geodesic analysis for probability
+measures under the optimal transport metric. In Advances in Neural Information
+Processing Systems. 3312–3320.
+[60] James E Smith. 1995. Generalized Chebychev inequalities: Theory and applica-
+tions in decision analysis. Operations Research 43, 5 (1995), 807–825.
+[61] Justin Solomon, Fernando De Goes, Gabriel Peyré, Marco Cuturi, Adrian Butscher,
+Andy Nguyen, Tao Du, and Leonidas Guibas. 2015. ConvolutionalWasserstein dis-
+tances: Efficient optimal transportation on geometric domains. ACM Transactions
+on Graphics (TOG) 34, 4 (2015), 66.
+[62] Justin Solomon, Raif Rustamov, Leonidas Guibas, and Adrian Butscher. 2014.
+Earth mover’s distances on discrete surfaces. ACM Transactions on Graphics
+(TOG) 33, 4 (2014), 67.
+[63] Guillaume Tartavel, Gabriel Peyré, and Yann Gousseau. 2016. Wasserstein loss
+for image synthesis and restoration. SIAM Journal on Imaging Sciences 9, 4 (2016),
+1726–1755.
+[64] Bahar Taskesen, Viet AnhNguyen, Daniel Kuhn, and Jose Blanchet. 2020. A Distri-
+butionally Robust Approach to Fair Classification. arXiv preprint arXiv:2007.09530
+(2020).
+[65] Matthew Thorpe, Serim Park, Soheil Kolouri, Gustavo K Rohde, and Dejan Slepčev.
+2017. A Transportation 𝐿𝑝 Distance for Signal Analysis. Journal of mathematical
+imaging and vision 59, 2 (2017), 187–210.
+[66] Florian Tramer, Vaggelis Atlidakis, Roxana Geambasu, Daniel Hsu, Jean-Pierre
+Hubaux, Mathias Humbert, Ari Juels, and Huang Lin. 2017. FairTest: Discovering
+unwarranted associations in data-driven applications. In 2017 IEEE European
+Symposium on Security and Privacy (EuroS&P). IEEE, 401–416.
+[67] JamesWexler, Mahima Pushkarna, Tolga Bolukbasi, MartinWattenberg, Fernanda
+Viégas, and Jimbo Wilson. 2019. The what-if tool: Interactive probing of machine
+learning models. IEEE transactions on visualization and computer graphics 26, 1
+(2019), 56–65.
+[68] Songkai Xue, Mikhail Yurochkin, and Yuekai Sun. 2020. Auditing ML Models for
+Individual Bias and Unfairness. arXiv preprint arXiv:2003.05048 (2020).
+[69] Mikhail Yurochkin, Amanda Bower, and Yuekai Sun. 2020. Training individually
+fair ML models with sensitive subspace robustness. In International Conference
+on Learning Representations.
+[70] Muhammad Bilal Zafar, Isabel Valera, Manuel Gomez Rodriguez, and Krishna P
+Gummadi. 2017. Fairness beyond disparate treatment & disparate impact: Learn-
+ing classification without disparate mistreatment. In Proceedings of the 26th
+International Conference on World Wide Web. 1171–1180.
+[71] Muhammad Bilal Zafar, Isabel Valera, Manuel Gomez Rodriguez, and Krishna P
+Gummadi. 2017. Fairness constraints: Mechanisms for fair classification. AISTATS
+(2017).
+[72] C. Zhao and Y. Guan. 2018. Data-driven risk-averse stochastic optimization with
+Wasserstein metric. Operations Research Letters 46, 2 (2018), 262 – 267.
+A APPENDIX - PROOFS
+A.1 Proofs of Section 2
+Proof of Lemma 3.2. Because the fairness constraints are sim-
+ilar in both sets Fℎ and Fℎ (𝑝𝑁 ), it thus suffice to verify that Q
+satisfies the marginal conditions Q(𝐴 = 𝑎,𝑌 = 𝑦) = 𝑝𝑁𝑎𝑦 for all
+(𝑎,𝑦) ∈ A × Y. By the definition of the Wasserstein distance and
+the ground metric 𝑐 , there exists a coupling 𝜋 such that
+W( ˆP𝑁 ,Q)2 = E𝜋 [(∥𝑋 ′ − 𝑋 ∥ + ∞|𝐴′ −𝐴| + ∞|𝑌 ′ − 𝑌 |)2]
+and themarginal distribution of 𝜋 are
+ˆP𝑁 andQ, respectively. By the
+law of total probability and because
+ˆP𝑁 is an empirical distribution,
+we can write 𝜋 = 𝑁−1
+∑𝑁
+𝑖=1
+𝛿 (𝑥𝑖 ,𝑎𝑖 ,?̂?𝑖 ) ⊗ Q𝑖 , where Q𝑖 denotes the
+conditional distributions of (𝑋,𝐴,𝑌 ) given (𝑋 ′, 𝐴′, 𝑌 ′) = (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 )
+for all 𝑖 ∈ [𝑁 ].
+Suppose without any loss of generality that there exists a tuple
+(𝑎,𝑦) ∈ A × Y such that Q(𝐴 = 𝑎,𝑌 = 𝑦) > 𝑝𝑁𝑎𝑦 . This means
+Q(𝐴 = 𝑎,𝑌 = 𝑦) = 1
+𝑁
+𝑁∑
+𝑖=1
+Q𝑖 (𝐴 = 𝑎,𝑌 = 𝑦)
+>
+1
+𝑁
+𝑁∑
+𝑖=1
+1(𝑎,𝑦) (𝑎𝑖 , 𝑦𝑖 ).
+This implies that theremust exist an index 𝑖★ ∈ [𝑁 ] with (𝑎𝑖★, 𝑦𝑖★) ≠
+(𝑎,𝑦), and that
+Q𝑖★ (𝐴 = 𝑎,𝑌 = 𝑦) > 0.
+However, this further implies that
+W( ˆP𝑁 ,Q)2 =
+1
+𝑁
+𝑁∑
+𝑖=1
+EQ𝑖 [(∥𝑥𝑖 − 𝑋 ∥ + ∞|𝑎𝑖 −𝐴| + ∞|𝑦𝑖 − 𝑌 |)
+2]
+≥ 1
+𝑁
+EQ𝑖★ [(∥𝑥𝑖★ − 𝑋 ∥ + ∞|𝑎𝑖★ −𝐴| + ∞|𝑦𝑖★ − 𝑌 |)
+2]
+≥ 1
+𝑁
+Q𝑖★ (𝐴 = 𝑎,𝑌 = 𝑦) (∞(𝑎𝑖★ − 𝑎) + ∞(𝑦𝑖★ − 𝑦))2
+= ∞,
+where the equality follows from the decomposition of 𝜋 using the
+law of total probability and the first inequality follows because the
+transportation cost is nonnegative. This contradicts the fact that
+W( ˆP𝑁 ,Q) < ∞. □
+A.2 Proofs of Section 4
+Before proving Proposition 4.2, we first prove a preparatory lemma
+that verifies the Slater condition of the conic optimization problem.
+To shorten the notation, we write b = (𝑋,𝐴,𝑌 ) and denote Ξ =
+X × A × Y, Ξ̂𝑁 = {(𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 )}𝑁𝑖=1
+. We assume that 𝑁 ≥ 2 and
+ˆb𝑖 = (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 ) are distinct. We useM+ (Ξ × Ξ̂𝑁 ) to denote the set
+of all nonnegative measures on Ξ × Ξ̂𝑁 .
+Lemma A.1 (Slater condition - Probabilistic equal opportunity).
+Suppose that 𝛽 ≠ 0, 𝑝𝑁
+11
+∈ (0, 1) and 𝑝𝑁
+01
+∈ (0, 1). Define the function
+𝑓𝛽 (𝑋,𝐴,𝑌 ) ≜
+1
+𝑝𝑁
+11
+ℎ𝛽 (𝑋 )1(1,1) (𝐴,𝑌 ) −
+1
+𝑝𝑁
+01
+ℎ𝛽 (𝑋 )1(0,1) (𝐴,𝑌 ),
+and let 𝑓 be a vector-valued function 𝑓 : Ξ × Ξ̂𝑁 → R𝑁+1
+𝑓 (b, b ′) =
+©­­­­­«
+1
+ˆb𝑖
+(b ′)
+.
+.
+.
+1
+ˆb𝑁
+(b ′)
+𝑓𝛽 (b)
+ª®®®®®¬
+.
+Then we have
+©­­­­«
+1/𝑁
+.
+.
+.
+1/𝑁
+0
+ª®®®®¬
+∈ int
+{
+E𝜋 [𝑓 (b, b ′)] : 𝜋 ∈ M+ (Ξ × Ξ̂𝑁 )
+}
+.
+Proof of Lemma A.1. It suffices to show that for any
+𝑞 ∈
+(
+1
+2𝑁
+,
+3
+2𝑁
+)𝑁
+×
+(
+−1
+4
+,
+1
+4
+)
+,
+659
+A Statistical Test for Probabilistic Fairness FAccT ’21, March 1–10, 2021, Virtual Event, Canada
+there exists a nonnegative measure 𝜋 ∈ M+ (Ξ× Ξ̂𝑁 ) such that 𝑞 =
+E𝜋 [𝑓 (b, b ′)]. We will verify this claim by constructing 𝜋 explicitly.
+To this end, define the following locations
+𝑥𝑎𝑦 ∈ X ∀(𝑎,𝑦) ∈ A × Y,
+and set 𝜋 ∈ M+ (Ξ × Ξ̂𝑁 ) explicitly as
+𝜋 (b = (𝑥𝑎𝑖 ?̂?𝑖 , 𝑎𝑖 , 𝑦𝑖 ), b
+′ = (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 )) = 𝑞𝑖 ,
+and 𝜋 is 0 everywhere else. By construction, one can verify that
+E𝜋 [1 ˆb𝑖
+(b ′)] = 𝑞𝑖 for all 𝑖 ∈ [𝑁 ]. If we define the following index
+sets I𝑎𝑦 = {𝑖 ∈ [𝑁 ] : 𝑎𝑖 = 𝑎,𝑦𝑖 = 𝑦}, then
+E𝜋 [𝑓𝛽 (b)] = (𝑝𝑁11
+)−1ℎ𝛽 (𝑥11)
+∑
+𝑖∈I11
+𝑞𝑖 − (𝑝𝑁01
+)−1ℎ𝛽 (𝑥01)
+∑
+𝑖∈I01
+𝑞𝑖 .
+It now remains to find the locations of 𝑥11 and 𝑥01 to balance the
+above equation. We have the following two cases.
+(1) Suppose that 𝑞𝑁+1 ≥ 0. In this case, choose 𝑥01 ∈ X such that
+ℎ𝛽 (𝑥01) = 1
+6
+. The condition E𝜋 [𝑓𝛽 (b)] = 𝑞𝑁+1 requires that
+ℎ𝛽 (𝑥11) =
+𝑞𝑁+1 + 1
+6
+(𝑝𝑁
+01
+)−1
+∑
+𝑖∈I01
+𝑞𝑖
+(𝑝𝑁
+11
+)−1
+∑
+𝑖∈I11
+𝑞𝑖
+.
+Because 𝑞𝑁+1 ≥ 0 and 𝑞𝑖 are strictly positive, the term on the
+right hand side is strictly positive. Moreover, we have
+(𝑝𝑁
+01
+)−1
+∑
+𝑖∈I01
+𝑞𝑖 <
+3
+2
+and (𝑝𝑁
+11
+)−1
+∑
+𝑖∈I11
+𝑞𝑖 >
+1
+2
+for any feasible value of 𝑞𝑖 , which implies that
+0 <
+𝑞𝑁+1 + 1
+6
+(𝑝𝑁
+01
+)−1
+∑
+𝑖∈I01
+𝑞𝑖
+(𝑝𝑁
+11
+)−1
+∑
+𝑖∈I11
+𝑞𝑖
+<
+1
+4
++ 1
+4
+1
+2
+= 1.
+This implies the existence of 𝑥11 ∈ X so that E𝜋 [𝑓𝛽 (b)] = 𝑞𝑁+1.
+(2) Suppose that𝑞𝑁+1 < 0. In this case, we can choose𝑥11 ∈ X such
+that ℎ𝛽 (𝑥11) = 1
+6
+. A similar argument as in the previous case
+implies the existence of 𝑥01 ∈ X such that E𝜋 [𝑓𝛽 (b)] = 𝑞𝑁+1.
+Combining the two cases leads to the postulated results. □
+We are now ready to prove Proposition 4.2.
+Proof of Proposition 4.2. For the purpose of this proof, we
+define the function _ : A ×Y → R as
+_(𝑎,𝑦) =
+1(1,1) (𝑎,𝑦)
+𝑝𝑁
+11
+−
+1(0,1) (𝑎,𝑦)
+𝑝𝑁
+01
+. (10)
+By definition of the squared distance function Ropp
+, we have
+Ropp ( ˆP𝑁 , 𝑝𝑁 )
+=
+
+inf
+Q∈P
+W( ˆP𝑁 ,Q)2
+s.t. (𝑝𝑁
+11
+)−1EQ [ℎ𝛽 (𝑋 )1(1,1) (𝐴,𝑌 )]
+= (𝑝𝑁
+01
+)−1EQ [ℎ𝛽 (𝑋 )1(0,1) (𝐴,𝑌 )]
+Q(𝐴 = 𝑎,𝑌 = 𝑦) = 𝑝𝑁𝑎𝑦 ∀𝑎 ∈ A, 𝑦 ∈ Y
+=
+
+inf
+𝜋
+E𝜋 [𝑐
+(
+(𝑋 ′, 𝐴′, 𝑌 ′), (𝑋,𝐴,𝑌 )
+)
+2]
+s.t. 𝜋 ∈ P((X × A × Y) × (X × A ×Y))
+E𝜋 [𝑓𝛽 (𝑋,𝐴,𝑌 )] = 0
+𝜋 (𝐴 = 𝑎,𝑌 = 𝑦) = 𝑝𝑁𝑎𝑦 ∀𝑎 ∈ A, 𝑦 ∈ Y
+E𝜋 [1(𝑥𝑖 ,𝑎𝑖 ,?̂?𝑖 ) (𝑋 ′, 𝐴′, 𝑌 ′)] = 1/𝑁 ∀𝑖 ∈ [𝑁 ],
+where the function 𝑓𝛽 is defined as
+𝑓𝛽 (𝑥, 𝑎,𝑦) ≜ (𝑝𝑁11
+)−1ℎ𝛽 (𝑥)1(1,1) (𝑎,𝑦) − (𝑝𝑁01
+)−1ℎ𝛽 (𝑥)1(0,1) (𝑎,𝑦)
+= ℎ𝛽 (𝑥)_(𝑎,𝑦), (11)
+andP(S) denotes the set of all joint probabilitymeasures supported
+on S. Because of the infinity individual cost on A and Y by the
+definition of cost in (2), any joint measure 𝜋 with finite objective
+value should satisfies 𝜋 (𝐴 = 𝑎,𝑌 = 𝑦) = ˆP𝑁 (𝐴′ = 𝑎,𝑌 ′ = 𝑦) = 𝑝𝑁𝑎𝑦
+for any 𝑎 ∈ A and 𝑦 ∈ Y. Thus, the set of constraints 𝜋 (𝐴 = 𝑎,𝑌 =
+𝑦) = 𝑝𝑁𝑎𝑦 can be eliminated without alternating the optimization
+problem. We thus have
+Ropp ( ˆP𝑁 , 𝑝𝑁 )
+=
+
+inf
+𝜋
+E𝜋 [𝑐
+(
+(𝑋 ′, 𝐴′, 𝑌 ′), (𝑋,𝐴,𝑌 )
+)
+2]
+s.t. 𝜋 ∈ P((X × A × Y) × (X × A ×Y))
+E𝜋 [𝑓𝛽 (𝑋,𝐴,𝑌 )] = 0
+E𝜋 [1(𝑥𝑖 ,𝑎𝑖 ,?̂?𝑖 ) (𝑋 ′, 𝐴′, 𝑌 ′)]=1/𝑁 ∀𝑖 ∈ [𝑁 ] .
+To shorten the notations, we use Ξ = X × A × Y and Ξ̂𝑁 =
+{(𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 )}. Moreover, define the vector 𝑞 and the vector-valued
+Borel measurable function on Ξ × Ξ̂𝑁 as
+𝑞 =
+©­­­­«
+0
+1/𝑁
+.
+.
+.
+1/𝑁
+ª®®®®¬
+𝑓 (b, b ′) =
+©­­­­­«
+𝑓𝛽 (b)
+1
+ˆb𝑖
+(b ′)
+.
+.
+.
+1
+ˆb𝑁
+(b ′)
+ª®®®®®¬
+.
+By using the introduced notation, we can reformulate the above
+optimization problem as
+inf
+{
+E𝜋 [𝑐 (b, b ′)2] : 𝜋 ∈ M+ (Ξ × Ξ̂𝑁 ),E𝜋 [𝑓 (b, b ′)] = 𝑞
+}
+which is a problem of moments. By Lemma A.1, the above optimiza-
+tion problem satisfies the Slater condition, thus the strong duality
+result [60, Section 2.2] implies that
+Ropp ( ˆP𝑁 , 𝑝𝑁 )
+=
+
+sup
+1
+𝑁
+𝑁∑
+𝑖=1
+𝑏𝑖
+s.t. 𝑏 ∈ R𝑁 , 𝛾 ∈ R
+𝑁∑
+𝑖=1
+𝑏𝑖1(𝑥𝑖 ,𝑎𝑖 ,?̂?𝑖 ) (𝑥
+′, 𝑎′, 𝑦′) − 𝛾 𝑓𝛽 (𝑥, 𝑎,𝑦)
+≤ 𝑐
+(
+(𝑥 ′, 𝑎′, 𝑦′), (𝑥, 𝑎,𝑦)
+)
+2
+∀(𝑥, 𝑎,𝑦), (𝑥 ′, 𝑎′, 𝑦′) ∈ X × A ×Y .
+(12)
+Note that the problem in (12) can be equivalently represented as
+sup
+1
+𝑁
+𝑁∑
+𝑖=1
+𝑏𝑖
+s.t. 𝑏 ∈ R𝑁 , 𝛾 ∈ R
+𝑏𝑖 − 𝛾 𝑓𝛽 (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 ) ≤ 𝑐
+(
+(𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 ), (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 )
+)
+2
+∀(𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 ) ∈ X × A ×Y,∀𝑖 ∈ [𝑁 ]
+= sup
+𝛾 ∈R
+1
+𝑁
+𝑁∑
+𝑖=1
+inf
+𝑥𝑖 ∈X
+{
+∥𝑥𝑖 − 𝑥𝑖 ∥2 + 𝛾 𝑓𝛽 (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 )
+}
+. (13)
+660
+FAccT ’21, March 1–10, 2021, Virtual Event, Canada Bahar Taskesen, Jose Blanchet, Daniel Kuhn, and Viet Anh Nguyen
+Because 𝑓𝛽 has the form (11), we have the equivalent problem
+sup
+𝛾 ∈R
+1
+𝑁
+𝑁∑
+𝑖=1
+inf
+𝑥𝑖 ∈X
+{
+∥𝑥𝑖 − 𝑥𝑖 ∥2 + 𝛾_(𝑎𝑖 , 𝑦𝑖 )ℎ𝛽 (𝑥𝑖 )
+}
+.
+For any 𝑖 ∈ I0, _(𝑎𝑖 , 𝑦𝑖 ) = 0, and in this case we have the optimal
+solution of 𝑥𝑖 satisfies 𝑥
+★
+𝑖
+= 𝑥𝑖 . As a consequence, the summation
+collapses to a partial sum over I1. This observation completes the
+proof. □
+Proof of Theorem 4.4. Leveraging equation (13), we can ex-
+press
+Ropp ( ˆP𝑁 , 𝑝𝑁 ) =
+sup
+𝛾
+E
+ˆP𝑁
+[
+inf
+Δ
+𝛾ℎ𝛽 (𝑋 + Δ)
+(
+1(1,1) (𝐴,𝑌 )
+𝑝𝑁
+11
+−
+1(0,1) (𝐴,𝑌 )
+𝑝𝑁
+01
+)
++ ∥Δ∥2
+]
+.
+We define
+𝐻𝑁 ≜
+1
+√
+𝑁
+𝑁∑
+𝑖=1
+ℎ𝛽 (𝑥𝑖 )
+(
+1(1,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝𝑁
+11
+−
+1(0,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝𝑁
+01
+)
+,
+and using this expression we can reformulate Ropp ( ˆP𝑁 , 𝑝𝑁 ) as
+sup
+𝛾
+{
+1
+√
+𝑁
+𝛾𝐻𝑁 + E
+ˆP𝑁
+[
+inf
+Δ
+𝛾 [ℎ𝛽 (𝑋 + Δ) − ℎ𝛽 (𝑋 )]×(
+1(1,1) (𝐴,𝑌 )
+𝑝𝑁
+11
+−
+1(0,1) (𝐴,𝑌 )
+𝑝𝑁
+01
+)
++ ∥Δ∥2
+]}
+.
+Because ℎ𝛽 is a sigmoid function, it is differentiable, and by the
+fundamental theorem of calculus, we have for any 𝑥 ∈ X,
+ℎ𝛽 (𝑥 + Δ) − ℎ𝛽 (𝑥) =
+∫
+1
+0
+∇ℎ𝛽 (𝑥 + 𝑡Δ) · Δd𝑡,
+where · represents the inner product on R𝑑 . By applying variable
+transformations 𝛾 ← 𝛾
+√
+𝑁 and Δ← Δ
+√
+𝑁 , we have
+𝑁 × Ropp ( ˆP𝑁 , 𝑝𝑁 )
+= sup
+𝛾
+{
+𝛾𝐻𝑁 + E
+ˆP𝑁
+[
+inf
+Δ
+𝛾
+∫
+1
+0
+∇ℎ𝛽
+(
+𝑋 + 𝑡 Δ
+√
+𝑁
+)
+· Δd𝑡(
+1(1,1) (𝐴,𝑌 )
+𝑝𝑁
+11
+−
+1(0,1) (𝐴,𝑌 )
+𝑝𝑁
+01
+)
++ ∥Δ∥2
+]}
+= sup
+𝛾
+{
+𝛾𝐻𝑁 + 1
+𝑁
+𝑁∑
+𝑖=1
+inf
+Δ𝑖
+𝛾
+∫
+1
+0
+∇ℎ𝛽
+(
+𝑥𝑖 + 𝑡
+Δ𝑖√
+𝑁
+)
+· Δ𝑖d𝑡 ×(
+1(1,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝𝑁
+11
+−
+1(0,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝𝑁
+01
+)
++ ∥Δ𝑖 ∥2
+}
+,
+where the second equality follows by the definition of the empirical
+distribution
+ˆP𝑁 . For any values of 𝑝𝑁
+01
+> 0 and 𝑝𝑁
+11
+> 0, we have
+for any 𝛾 ≠ 0,
+P
+(𝛾∇ℎ𝛽 (𝑋 )
+(
+1(1,1) (𝐴,𝑌 )
+𝑝𝑁
+11
+−
+1(0,1) (𝐴,𝑌 )
+𝑝𝑁
+01
+)
+∗
+= 0
+)
+= P
+(
+(𝑝𝑁
+11
+)−1
+1(1,1) (𝐴,𝑌 ) = (𝑝𝑁01
+)−1
+1(0,1) (𝐴,𝑌 )
+)
+= P(𝑌 = 0) < 1,
+which implies that
+P
+(𝛾∇ℎ𝛽 (𝑋 )
+(
+1(1,1) (𝐴,𝑌 )
+𝑝𝑁
+11
+−
+1(0,1) (𝐴,𝑌 )
+𝑝𝑁
+01
+)
+∗
+> 0
+)
+> 0.
+This coincides with Assumption A4 in [7]. Using the same argument
+as in the proof of [7, Theorem 3], we can show that the optimal
+solution for 𝛾 and Δ𝑖 belong to a compact set with high probability.
+Moreover, we have
+1(1,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝𝑁
+11
+−
+1(0,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝𝑁
+01
+=
+1(1,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝11
+(1 − 𝑜P (1)) −
+1(0,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝01
+(1 − 𝑜P (1)) ,
+and thus
+𝑁 × Ropp ( ˆP𝑁 , 𝑝𝑁 )
+= sup
+𝛾
+{
+𝛾𝐻𝑁 + 1
+𝑁
+𝑁∑
+𝑖=1
+inf
+Δ𝑖
+𝛾
+∫
+1
+0
+∇ℎ𝛽
+(
+𝑥𝑖 + 𝑡
+Δ𝑖√
+𝑁
+)
+· Δ𝑖d𝑡 ×(
+1(1,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝11
+−
+1(0,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝01
+)
++ ∥Δ𝑖 ∥2 + 𝑜P (1)
+}
+.
+In the next step, fix any tuple (𝑎,𝑦) ∈ A × Y, and denote the
+following constant
+𝑀1 = |𝑝−1
+11
+1(1,1) (𝑎,𝑦) − 𝑝−1
+01
+1(0,1) (𝑎,𝑦) |.
+We find
+∥ [∇ℎ𝛽 (𝑥 + Δ) − ∇ℎ𝛽 (𝑥)] (𝑝−1
+11
+1(1,1) (𝑎,𝑦) − 𝑝−1
+01
+1(0,1) (𝑎,𝑦))∥∗
+=|ℎ𝛽 (𝑥 + Δ) − ℎ𝛽 (𝑥) − ℎ𝛽 (𝑥 + Δ)2 + ℎ𝛽 (𝑥)2 |∥𝛽 ∥∗𝑀1
+≤(|ℎ𝛽 (𝑥 + Δ) − ℎ𝛽 (𝑥) | + |ℎ𝛽 (𝑥 + Δ)2 − ℎ𝛽 (𝑥)2 |) ∥𝛽 ∥∗𝑀1 .
+Because the sigmoid function is slope-restricted in the interval
+[0, 1] [22, Proposition 2], we have
+0 ≤
+ℎ𝛽 (𝑥 + Δ) − ℎ𝛽 (𝑥)
+𝛽⊤Δ
+≤ 1,
+which implies that
+|ℎ𝛽 (𝑥 + Δ) − ℎ𝛽 (𝑥) | ≤ |𝛽⊤Δ| ≤ ∥𝛽 ∥∗∥Δ∥,
+where the second inequality follows from Hölder inequality. Using
+a similar argument, we have
+|ℎ𝛽 (𝑥 + Δ)2 − ℎ𝛽 (𝑥)2 | = ≤ (ℎ𝛽 (𝑥 + Δ) + ℎ𝛽 (𝑥)) |ℎ𝛽 (𝑥 + Δ) − ℎ𝛽 (𝑥) |
+≤ 2∥𝛽 ∥∗∥Δ∥.
+Combining these inequalities, we conclude that
+∥ [∇ℎ𝛽 (𝑥 + Δ) − ∇ℎ𝛽 (𝑥)] (𝑝−1
+11
+1(1,1) (𝑎,𝑦) − 𝑝−1
+01
+1(0,1) (𝑎,𝑦))∥2
+≤ 3∥𝛽 ∥2∗𝑀1∥Δ∥,
+661
+A Statistical Test for Probabilistic Fairness FAccT ’21, March 1–10, 2021, Virtual Event, Canada
+and thus Assumption 6’ in [7] is satisfied. If 𝐻𝑁 𝑑.−→ 𝑍 for some
+random variable 𝑍 , then [7, Lemma 4] asserts that
+𝑁 × Ropp ( ˆP𝑁 , 𝑝𝑁 )
+𝑑.−→ sup
+𝛾 ∈R
+{
+𝛾𝑍 − 𝛾2
+4
+EP
+[∇ℎ𝛽 (𝑋 ) (1(1,1) (𝐴,𝑌 )𝑝11
+−
+1(0,1) (𝐴,𝑌 )
+𝑝01
+)2
+∗
+]}
+=
+(
+EP
+[∇ℎ𝛽 (𝑋 ) (1(1,1) (𝐴,𝑌 )𝑝11
+−
+1(0,1) (𝐴,𝑌 )
+𝑝01
+)2
+∗
+])−1
+𝑍 2,
+where the equality sign follows from the fact that for any realization
+of 𝑍 , the optimal solution of 𝛾 is
+𝛾★(𝑍 )= 2𝑍
+EP
+[∇ℎ𝛽 (𝑋 ) (1(1,1) (𝐴,𝑌 )𝑝11
+− 1(0,1) (𝐴,𝑌 )
+𝑝01
+)2
+∗
+] .
+We now study the limit distribution 𝑍 . In the next step, we study
+the limit of 𝐻𝑁
+.
+𝐻𝑁
+=
+1
+√
+𝑁
+𝑁∑
+𝑖=1
+ℎ𝛽 (𝑥𝑖 )
+(
+1(1,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝𝑁
+11
+−
+1(0,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝𝑁
+01
+)
+=
+1
+𝑝𝑁
+11
+𝑝𝑁
+01
+× 1
+√
+𝑁
+𝑁∑
+𝑖=1
+ℎ𝛽 (𝑥𝑖 )
+(
+𝑝𝑁
+01
+1(1,1) (𝑎𝑖 , 𝑦𝑖 ) − 𝑝𝑁11
+1(0,1) (𝑎𝑖 , 𝑦𝑖 )
+)
+=
+1
+𝑝𝑁
+11
+𝑝𝑁
+01
+×
+(
+1
+√
+𝑁
+𝑁∑
+𝑖=1
+ℎ𝛽 (𝑥𝑖 )
+(
+𝑝011(1,1) (𝑎𝑖 , 𝑦𝑖 ) − 𝑝111(0,1) (𝑎𝑖 , 𝑦𝑖 )
+)
++
+√
+𝑁 (𝑝𝑁
+01
+− 𝑝01)
+1
+𝑁
+𝑁∑
+𝑖=1
+1(1,1) (𝑎𝑖 , 𝑦𝑖 )ℎ𝛽 (𝑥𝑖 )
+−
+√
+𝑁 (𝑝𝑁
+11
+− 𝑝11)
+1
+𝑁
+𝑁∑
+𝑖=1
+1(0,1) (𝑎𝑖 , 𝑦𝑖 )ℎ𝛽 (𝑥𝑖 )
+)
+By Slutsky’s theorem, we have
+√
+𝑁 (𝑝𝑁
+01
+− 𝑝01)×
+1
+𝑁
+𝑁∑
+𝑖=1
+(
+1(1,1) (𝑎𝑖 , 𝑦𝑖 ) ℎ𝛽 (𝑥𝑖 ) − EP [1(1,1) (𝐴,𝑌 )ℎ𝛽 (𝑋 )]
+)
+= 𝑜P (1),
+√
+𝑁 (𝑝𝑁
+11
+− 𝑝11)×
+1
+𝑁
+𝑁∑
+𝑖=1
+(
+1(0,1) (𝑎𝑖 , 𝑦𝑖 )ℎ𝛽 (𝑥𝑖 ) − EP [1(0,1) (𝐴,𝑌 ) ℎ𝛽 (𝑋 )]
+)
+= 𝑜P (1).
+Under the null hypothesisHopp
+0
+, we have
+𝐻𝑁
+=
+1
+𝑝𝑁
+11
+𝑝𝑁
+01
+×
+[
+1
+√
+𝑁
+𝑁∑
+𝑖=1
+ℎ𝛽 (𝑥𝑖 )
+(
+𝑝011(1,1) (𝑎𝑖 , 𝑦𝑖 ) − 𝑝111(0,1) (𝑎𝑖 , 𝑦𝑖 )
+)
++
+√
+𝑁
+(
+1
+𝑁
+𝑁∑
+𝑖=1
+1(0,1) (𝑎𝑖 , 𝑦𝑖 ) − 𝑝01
+)
+EP [1(1,1) (𝐴,𝑌 )ℎ𝛽 (𝑋 )]
+−
+√
+𝑁
+(
+1
+𝑁
+𝑁∑
+𝑖=1
+1(1,1) (𝑎𝑖 , 𝑦𝑖 ) − 𝑝11
+)
+EP [1(0,1) (𝐴,𝑌 )ℎ𝛽 (𝑋 )]
+]
++ 𝑜P (1)
+=
+1
+𝑝𝑁
+11
+𝑝𝑁
+01
+×
+[
+1
+√
+𝑁
+𝑁∑
+𝑖=1
+ℎ𝛽 (𝑥𝑖 )
+(
+𝑝011(1,1) (𝑎𝑖 , 𝑦𝑖 ) − 𝑝111(0,1) (𝑎𝑖 , 𝑦𝑖 )
+)
++ 1
+√
+𝑁
+𝑁∑
+𝑖=1
+(
+1(0,1) (𝑎𝑖 , 𝑦𝑖 ) − 𝑝01
+)
+EP [1(1,1) (𝐴,𝑌 )ℎ𝛽 (𝑋 )]
+− 1
+√
+𝑁
+𝑁∑
+𝑖=1
+(
+1(1,1) (𝑎𝑖 , 𝑦𝑖 ) − 𝑝11
+)
+EP [1(0,1) (𝐴,𝑌 )ℎ𝛽 (𝑋 )]
+]
++ 𝑜P (1)
+𝑑.−→ 𝑍,
+where 𝑍 ∼ 1
+𝑝11𝑝01
+N(0, 𝜎2), 𝜎2 = Cov(𝑍 ), where 𝑍 is defined as in
+the theorem statement. Defining \ completes the proof. □
+A.3 Proofs of Section 5
+The proof of Proposition 5.2 necessitates the following preparatory
+lemma. We use the same notations with Lemma A.1.
+Lemma A.2 (Slater condition - Probabilistic equalized odds). Sup-
+pose that 𝛽 ≠ 0 and 𝑝𝑁𝑎𝑦 ∈ (0, 1) for all (𝑎,𝑦) ∈ A × Y. Define the
+functions
+𝑓𝛽 (𝑋,𝐴,𝑌 ) ≜
+1
+𝑝𝑁
+11
+ℎ𝛽 (𝑋 )1(1,1) (𝐴,𝑌 ) −
+1
+𝑝𝑁
+01
+ℎ𝛽 (𝑋 )1(0,1) (𝐴,𝑌 ),
+𝑔𝛽 (𝑋,𝐴,𝑌 ) ≜
+1
+𝑝𝑁
+10
+ℎ𝛽 (𝑋 )1(1,0) (𝐴,𝑌 ) −
+1
+𝑝𝑁
+00
+ℎ𝛽 (𝑋 )1(0,0) (𝐴,𝑌 ),
+and let 𝑓 be a vector-valued function 𝑓 : Ξ × Ξ̂𝑁 → R𝑁+2
+𝑓 (b, b ′) =
+©­­­­­­­«
+1
+ˆb𝑖
+(b ′)
+.
+.
+.
+1
+ˆb𝑁
+(b ′)
+𝑓𝛽 (b)
+𝑔𝛽 (b)
+ª®®®®®®®¬
+Then we have
+©­­­­­­«
+1/𝑁
+.
+.
+.
+1/𝑁
+0
+0
+ª®®®®®®¬
+∈ int
+{
+E𝜋 [𝑓 (b, b ′)] : 𝜋 ∈ M+ (Ξ × Ξ̂𝑁 )
+}
+.
+Proof of Lemma A.2. It suffices to show that for any
+𝑞 ∈
+(
+1
+2𝑁
+,
+3
+2𝑁
+)𝑁
+×
+(
+−1
+4
+,
+1
+4
+)
+2
+,
+662
+FAccT ’21, March 1–10, 2021, Virtual Event, Canada Bahar Taskesen, Jose Blanchet, Daniel Kuhn, and Viet Anh Nguyen
+there exists a nonnegative measure 𝜋 ∈ M+ (Ξ × Ξ̂𝑁 ) such that
+𝑞 = E𝜋 [𝑓 (b, b ′)]. The proof follows a similar argument as that of
+Lemma A.1 by noticing that
+E𝜋 [𝑔𝛽 (b)] = (𝑝𝑁10
+)−1ℎ𝛽 (𝑥10)
+∑
+𝑖∈I10
+𝑞𝑖 − (𝑝𝑁00
+)−1ℎ𝛽 (𝑥00)
+∑
+𝑖∈I00
+𝑞𝑖 ,
+and the specification of 𝑥10 and 𝑥00 can be achieved using similar
+steps. □
+Proof of Proposition 5.2. To ease the exposition, we let the
+function Λ : A ×Y → R2
+be defined as
+Λ(𝑎,𝑦) =
+(
+(𝑝𝑁
+11
+)−1
+1(1,1) (𝑎,𝑦) − (𝑝𝑁01
+)−1
+1(0,1) (𝑎,𝑦)
+(𝑝𝑁
+10
+)−1
+1(1,0) (𝑎,𝑦) − (𝑝𝑁00
+)−1
+1(0,0) (𝑎,𝑦)
+)
+.
+Moreover, we define 𝑓𝛽 as in (11), and additionally define 𝑔𝛽 as
+𝑔𝛽 (𝑥, 𝑎,𝑦) = (𝑝𝑁10
+)−1ℎ𝛽 (𝑥)1(1,0) (𝑎,𝑦) − (𝑝𝑁00
+)−1ℎ𝛽 (𝑥)1(0,0) (𝑎,𝑦) .
+From the definition of Rodd ( ˆP𝑁 , 𝑝𝑁 ), we have
+Rodd ( ˆP𝑁 , 𝑝𝑁 )
+=
+
+inf
+Q∈P
+W( ˆP𝑁 ,Q)2
+s.t. (𝑝𝑁
+11
+)−1EQ [ℎ𝛽 (𝑋 )1(1,1) (𝐴,𝑌 )]
+= (𝑝𝑁
+01
+)−1EQ [ℎ𝛽 (𝑋 )1(0,1) (𝐴,𝑌 )]
+(𝑝𝑁
+10
+)−1EQ [ℎ𝛽 (𝑋 )1(1,0) (𝐴,𝑌 )]
+= (𝑝𝑁
+00
+)−1EQ [ℎ𝛽 (𝑋 )1(0,0) (𝐴,𝑌 )]
+Q(𝐴 = 𝑎,𝑌 = 𝑦) = 𝑝𝑁𝑎𝑦 ∀𝑎 ∈ A, 𝑦 ∈ Y
+=
+
+inf
+𝜋
+E𝜋 [𝑐
+(
+(𝑋 ′, 𝐴′, 𝑌 ′), (𝑋,𝐴,𝑌 )
+)
+2]
+s.t. 𝜋 ∈ P((X × A × Y) × (X × A ×Y))
+E𝜋 [𝑓𝛽 (𝑋,𝐴,𝑌 )] = 0
+E𝜋 [𝑔𝛽 (𝑋,𝐴,𝑌 )] = 0
+𝜋 (𝐴 = 𝑎,𝑌 = 𝑦) = 𝑝𝑁𝑎𝑦 ∀𝑎 ∈ A, 𝑦 ∈ Y
+E𝜋 [1(𝑥𝑖 ,𝑎𝑖 ,?̂?𝑖 ) (𝑋 ′, 𝐴′, 𝑌 ′)] = 1/𝑁 ∀𝑖 ∈ [𝑁 ] .
+To shorten the notations, we use Ξ = X × A × Y and Ξ̂𝑁 =
+{(𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 )}. Moreover, define the vector 𝑞 and the vector-valued
+Borel measurable function on Ξ × Ξ̂𝑁 as
+𝑞 =
+©­­­­­­«
+0
+0
+1/𝑁
+.
+.
+.
+1/𝑁
+ª®®®®®®¬
+𝑓 (b, b ′) =
+©­­­­­­­«
+𝑓𝛽 (b)
+𝑔𝛽 (b)
+1
+ˆb𝑖
+(b ′)
+.
+.
+.
+1
+ˆb𝑁
+(b ′)
+ª®®®®®®®¬
+.
+By using the introduced notation, we can reformulate the above
+optimization problem as
+inf
+{
+E𝜋 [𝑐 (b, b ′)2] : 𝜋 ∈ M+ (Ξ × Ξ̂𝑁 ),E𝜋 [𝑓 (b, b ′)] = 𝑞
+}
+which is a problem of moments. By Lemma A.2, the above optimiza-
+tion problem satisfies the Slater condition, thus the strong duality
+result [60, Section 2.2] implies that
+Rodd ( ˆP𝑁 , 𝑝𝑁 )
+=
+
+sup
+1
+𝑁
+𝑁∑
+𝑖=1
+𝑏𝑖
+s.t. 𝑏 ∈ R𝑁 , 𝛾 ∈ R, Z ∈ R
+𝑁∑
+𝑖=1
+𝑏𝑖1(𝑥𝑖 ,𝑎𝑖 ,?̂?𝑖 ) (𝑥
+′, 𝑎′, 𝑦′) − 𝛾 𝑓𝛽 (𝑥, 𝑎,𝑦) − Z𝑔𝛽 (𝑥, 𝑎,𝑦)
+≤ 𝑐
+(
+(𝑥 ′, 𝑎′, 𝑦′), (𝑥, 𝑎,𝑦)
+)
+2
+∀(𝑥, 𝑎,𝑦), (𝑥 ′, 𝑎′, 𝑦′) ∈ X × A ×Y
+=
+
+sup
+1
+𝑁
+𝑁∑
+𝑖=1
+𝑏𝑖
+s.t. 𝑏 ∈ R𝑁 , 𝛾 ∈ R, Z ∈ R
+𝑏𝑖 − 𝛾 𝑓𝛽 (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 ) − Z𝑔𝛽 (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 )
+≤ 𝑐
+(
+(𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 ), (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 )
+)
+2
+∀(𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 ) ∈ X × A ×Y,∀𝑖 ∈ [𝑁 ]
+= sup
+𝛾,Z
+1
+𝑁
+𝑁∑
+𝑖=1
+inf
+𝑥𝑖 ∈X
+{
+∥𝑥𝑖 − 𝑥𝑖 ∥2 + 𝛾 𝑓𝛽 (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 ) + Z𝑔𝛽 (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 )
+}
+,
+By definition of 𝑓𝛽 , 𝑔𝛽 and the parameters _𝑖 , we have
+𝛾 𝑓𝛽 (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 ) + Z𝑔𝛽 (𝑥𝑖 , 𝑎𝑖 , 𝑦𝑖 ) = (𝛾_𝑖11 (𝑦𝑖 ) + Z_𝑖10 (𝑦𝑖 ))ℎ𝛽 (𝑥𝑖 ) .
+The proof is complete. □
+Proof of Lemma 5.3. Because [𝑁 ] = I0 ∪ I1, we can write
+Rodd ( ˆP𝑁 , 𝑝𝑁 )
+= sup
+𝛾 ∈R
+1
+𝑁
+∑
+𝑖∈I1
+inf
+𝑥𝑖 ∈X
+{
+∥𝑥𝑖 − 𝑥𝑖 ∥2 + 𝛾_𝑖ℎ𝛽 (𝑥𝑖 )
+}
++ sup
+Z ∈R
+1
+𝑁
+∑
+𝑖∈I0
+inf
+𝑥𝑖 ∈X
+{
+∥𝑥𝑖 − 𝑥𝑖 ∥2 + Z_𝑖ℎ𝛽 (𝑥𝑖 )
+}
+.
+Note that the first supremum coincides with Ropp ( ˆP𝑁 , 𝑝𝑁 ), and the
+second supremum is 𝑈𝑁 . Under the Euclidean norm assumption,
+we can use Lemma B.1 to reformulate the inner infimum problems
+for𝑈𝑁 , which leads to (9). □
+Proof of Theorem 5.4. By applying a similar duality argument
+as in the proof of Theorem 4.4, we can reformulate Rodd ( ˆP𝑁 , 𝑝𝑁 )
+as
+Rodd ( ˆP𝑁 , 𝑝𝑁 )
+=sup
+𝛾,Z
+E
+ˆP𝑁
+inf
+Δ
+
+𝛾ℎ𝛽 (𝑋 + Δ)
+(1(1,1) (𝐴,𝑌 )
+𝑝𝑁
+11
+− 1(0,1) (𝐴,𝑌 )
+𝑝𝑁
+01
+)
++Zℎ𝛽 (𝑋 + Δ)
+(1(1,0) (𝐴,𝑌 )
+𝑝𝑁
+10
+− 1(0,0) (𝐴,𝑌 )
+𝑝𝑁
+00
+)
++ ∥Δ∥2
+
+
+= sup
+𝛾,Z
+{
+1
+√
+𝑁
+(Z𝐻𝑁
+0
++ 𝛾𝐻𝑁
+1
+)+
+E
+ˆP𝑁
+inf
+Δ
+©­­­«
+𝛾 [ℎ𝛽 (𝑋 + Δ) − ℎ𝛽 (𝑋 )]
+(1(1,1) (𝐴,𝑌 )
+𝑝𝑁
+11
+− 1(0,1) (𝐴,𝑌 )
+𝑝𝑁
+01
+)
++Z [ℎ𝛽 (𝑋 + Δ) − ℎ𝛽 (𝑋 )]
+(1(1,0) (𝐴,𝑌 )
+𝑝𝑁
+10
+− 1(0,0) (𝐴,𝑌 )
+𝑝𝑁
+00
+)
++∥Δ∥2
+ª®®®¬
+
+
+663
+A Statistical Test for Probabilistic Fairness FAccT ’21, March 1–10, 2021, Virtual Event, Canada
+with the random variables 𝐻𝑁
+0
+and 𝐻𝑁
+1
+being defined as
+𝐻𝑁
+0
+≜
+1
+√
+𝑁
+𝑁∑
+𝑖=1
+ℎ𝛽 (𝑥𝑖 )
+(1(1,0) (𝑎𝑖 , 𝑦𝑖 )
+𝑝𝑁
+10
+−
+1(0,0) (𝑎𝑖 , 𝑦𝑖 )
+𝑝𝑁
+00
+)
+,
+𝐻𝑁
+1
+≜
+1
+√
+𝑁
+𝑁∑
+𝑖=1
+ℎ𝛽 (𝑥𝑖 )
+(1(1,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝𝑁
+11
+−
+1(0,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝𝑁
+01
+)
+.
+Notice that the condition
+P
+( (
+𝛾1
+𝛾0
+)⊤
+Λ(𝐴,𝑌 )∇ℎ𝛽 (𝑋 )
+
+∗
+> 0
+)
+> 0
+is satisfied for any (𝛾0, 𝛾1) ≠ 0. Using the same argument as in the
+proof of [7, Theorem 3], we can show that the optimal solution
+for 𝛾 , Z and Δ𝑖 belong to a compact set with high probability. As
+𝑝𝑎𝑦 − 𝑝𝑎𝑦 = 𝑜P (1) for any (𝑎,𝑦) ∈ A × Y, we have
+𝑁 × Rodd ( ˆP𝑁 , 𝑝𝑁 )
+= sup
+𝛾,Z
+{
+𝛾𝐻𝑁
+1
++ Z𝐻𝑁
+0
++ 1
+𝑁
+𝑁∑
+𝑖=1
+inf
+Δ𝑖
+𝛾
+∫
+1
+0
+∇ℎ𝛽
+(
+𝑥𝑖 + 𝑡
+Δ𝑖√
+𝑁
+)
+· Δ𝑖d𝑡 ×(
+𝛾
+Z
+)⊤ (
+𝑝−1
+11
+1(1,1) (𝑎𝑖 , 𝑦𝑖 ) − 𝑝−1
+01
+1(0,1) (𝑎𝑖 , 𝑦𝑖 )
+𝑝−1
+10
+1(1,0) (𝑎𝑖 , 𝑦𝑖 ) − 𝑝−1
+00
+1(0,0) (𝑎𝑖 , 𝑦𝑖 )
+)
++ ∥Δ𝑖 ∥2 + 𝑜P (1)
+}
+.
+Using a similar argument, we can bound
+∥ [∇ℎ𝛽 (𝑥 + Δ) − ∇ℎ𝛽 (𝑥)] (𝑝−1
+10
+1(1,0) (𝑎,𝑦) − 𝑝−1
+00
+1(0,0) (𝑎,𝑦))∥2
+≤ 3∥𝛽 ∥2∗𝑀0∥Δ∥
+for some constant𝑀0, and thus Assumption 6’ in [7] is satisfied. If
+𝐻𝑁
+0
+𝑑.−→ 𝐻0 and 𝐻𝑁
+1
+𝑑.−→ 𝐻1 for some random variables 𝐻0 and 𝐻1,
+then [7, Lemma 4] asserts that
+𝑁 × Rodd ( ˆP𝑁 , 𝑝𝑁 ) 𝑑.−→
+sup
+𝛾,Z
+{𝛾𝐻1 + Z𝐻0+
+EP
+[(𝛾
+Z
+)⊤(
+𝑝−1
+11
+1(1,1) (𝐴,𝑌 )−𝑝−1
+01
+1(0,1) (𝐴,𝑌 )
+𝑝−1
+10
+1(1,0) (𝐴,𝑌 )−𝑝−1
+00
+1(0,0) (𝐴,𝑌 )
+)
+∇ℎ𝛽 (𝑋 )
+2
+∗
+]}
+.
+Using the same limiting argument as in the proof of Theorem 4.4,
+we have the characterization of 𝐻1 and 𝐻0 as in the statement of
+the theorem. □
+B APPENDIX - AUXILIARY RESULT
+The following lemma is used repeatedly to prove Lemmas 4.3
+and 5.3.
+Lemma B.1. For any 𝜔 ∈ R, 𝑥 ∈ R𝑝 and 𝛽 ∈ R𝑝 , we have
+inf
+𝑥 ∈R𝑝
+∥𝑥 − 𝑥 ∥2
+2
++ 𝜔
+1 + exp(−𝛽⊤𝑥)
+= min
+𝑘∈[0, 1
+8
+]
+𝜔2∥𝛽 ∥2
+2
+𝑘2 + 𝜔
+1 + exp(−𝛽⊤𝑥 + 𝑘𝜔 ∥𝛽 ∥2
+2
+)
+. (14)
+Proof of Lemma B.1. Any 𝑥 ∈ R𝑝 can be written using the
+orthogonal decomposition as 𝑥 = 𝑥 − 𝑘𝜔𝛽 − 𝑘 ′𝛽⊥ for some 𝑘 ∈ R,
+𝑘 ′ ∈ R and 𝛽⊥ perpendicular to 𝛽 , that is, 𝛽⊤ (𝛽⊥) = 0. Optimizing
+over 𝑥 is equivalent to jointly optimizing over 𝑘 , 𝑘 ′ and 𝛽⊥ as
+inf ∥𝑘𝜔𝛽 + 𝑘 ′𝛽⊥∥2
+2
++ 𝜔
+1 + exp(−𝛽⊤𝑥 + 𝑘𝜔 ∥𝛽 ∥2
+2
+)
+s.t. 𝑘 ∈ R, 𝑘 ′ ∈ R, 𝛽⊥ ∈ R𝑝 , 𝛽⊤ (𝛽⊥) = 0.
+After extending the norm, and by noticing that the optimal solution
+in 𝑘 ′ and 𝛽⊥ should satisfy 𝑘 ′𝛽⊥ = 0, the above optimization
+problem is equivalent to
+inf 𝑘2𝜔2∥𝛽 ∥2
+2
++ 𝜔
+1 + exp(−𝛽⊤𝑥 + 𝑘𝜔 ∥𝛽 ∥2
+2
+)
+s.t. 𝑘 ∈ R.
+Let 𝐿(𝑘) be the objective function of the above optimization prob-
+lem, we have
+∇𝑘𝐿(𝑘) = 2𝜔2∥𝛽 ∥2
+2
+𝑘 −
+𝜔2∥𝛽 ∥2
+2
+exp(−𝛽⊤𝑥 + 𝑘𝜔 ∥𝛽 ∥2
+2
+)
+(1 + exp(−𝛽⊤𝑥 + 𝑘𝜔 ∥𝛽 ∥2
+2
+))2
+= 𝜔2∥𝛽 ∥2
+2
+(2𝑘 − 𝜎 (𝑘) (1 − 𝜎 (𝑘))) ,
+where for the purpose of this proof, we define 𝜎 (𝑘) as
+𝜎 (𝑘) ≜ 1
+1 + exp(−𝛽⊤𝑥 + 𝑘𝜔 ∥𝛽 ∥2
+2
+)
+∈ (0, 1).
+Notice that 𝜎 (𝑘) (1−𝜎 (𝑘)) ∈ (0, 1
+4
+) for any value of 𝑘 ∈ R. Because
+∇𝑘𝐿(𝑘) is continuous in𝑘 ,∇𝑘𝐿(𝑘) ≤ 0 for any𝑘 ≤ 0, and∇𝑘𝐿(𝑘) ≥
+0 for any 𝑘 ≥ 1
+8
+, one can conclude that there exists an optimal
+solution 𝑘★ that lies in the compact range [0, 1
+8
+]. This completes
+the proof. □
+Let 𝐿(𝑘) be the objective function of the optimization prob-
+lem (14). Figure 5 visualizes several instances of 𝐿(𝑘) for differ-
+ent values of inputs 𝛽, 𝑥 and 𝜔 . Note that 𝐿(𝑘) is non-convex in 𝑘 ,
+and the optimizer of 𝐿(𝑘) is not necessarily unique as indicated in
+Figure 5d.
+C APPENDIX - NUMERICAL RESULTS
+We use the synthetic experiment from [71] to generate unfairness
+landscapes provided in Figure 1. We set the true distributions of
+the class labels P(𝑌 = 0) = P(𝑌 = 1) = 1/2, and conditioning on 𝑌 ,
+the feature 𝑋 has
+𝑋 |𝑌 = 1 ∼ N([2; 2], [5, 1; 1, 5]),
+𝑋 |𝑌 = 0 ∼ N([−2;−2], [10, 1; 1, 3]).
+Then, we draw sensitive attribute of each sample 𝑥 from a Bernoulli
+distribution, that is
+P(𝐴=1|𝑋 =𝑥 ′)=𝑝𝑑 𝑓 (𝑥 ′ |𝑌 =1)/(𝑝𝑑 𝑓 (𝑥 ′ |𝑌 =1) + 𝑝𝑑 𝑓 (𝑥 ′ |𝑌 =0)),
+where 𝑥 ′ = [cos(𝜋/4), sin(𝜋/4); sin(𝜋/4), cos(𝜋/4)]𝑥 is a rotated
+version of the feature vector 𝑥 and 𝑝𝑑 𝑓 (·|𝑌 = 𝑦) is the Gaussian
+probability density function of 𝑋 given 𝑌 = 𝑦.
+664
+FAccT ’21, March 1–10, 2021, Virtual Event, Canada Bahar Taskesen, Jose Blanchet, Daniel Kuhn, and Viet Anh Nguyen
+0.00 0.02 0.04 0.06 0.08 0.10 0.12
+k
+18
+19
+20
+21
+22
+L(
+k)
+(a) 𝛽 = (0, 1)⊤, 𝑥 = (−2, 10)⊤, 𝜔 =17.6
+0.00 0.02 0.04 0.06 0.08 0.10 0.12
+k
+4
+6
+8
+10
+12
+L(
+k)
+(b) 𝛽 = (−5, 5)⊤, 𝑥 = (3, 5)⊤, 𝜔 =4
+0.00 0.02 0.04 0.06 0.08 0.10 0.12
+k
+2
+4
+6
+8
+10
+12
+14
+L(
+k)
+(c) 𝛽 = (−6, 5)⊤, 𝑥 = (3, 5)⊤, 𝜔 =4
+0.00 0.02 0.04 0.06 0.08 0.10 0.12
+k
+4
+5
+6
+7
+8
+9
+10
+11
+12
+L(
+k)
+(d) 𝛽 = (−4.7, 5)⊤, 𝑥 = (3, 5)⊤, 𝜔 =4
+Figure 5: Plots of 𝐿(𝑘) with respect to 𝑘 for different values of 𝛽, 𝑥 and 𝜔 .
+665

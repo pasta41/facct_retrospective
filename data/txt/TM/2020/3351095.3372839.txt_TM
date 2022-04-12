@@ -1,0 +1,178 @@
+
+Motivated by concerns surrounding the fairness effects of shar-
+ing and transferring fair machine learning tools, we propose two
+algorithms: Fairness Warnings and Fair-MAML. The first is a model-
+agnostic algorithm that provides interpretable boundary conditions
+for when a fairly trained model may not behave fairly on similar
+but slightly different tasks within a given domain. The second is
+a fair meta-learning approach to train models that can be quickly
+fine-tuned to specific tasks from only a few number of sample in-
+stances while balancing fairness and accuracy. We demonstrate
+experimentally the individual utility of each model using relevant
+baselines and provide the first experiment to our knowledge of
+K-shot fairness, i.e. training a fair model on a new task with only K
+data points. Then, we illustrate the usefulness of both algorithms as
+a combined method for training models from a few data points on
+new tasks while using Fairness Warnings as interpretable boundary
+conditions under which the newly trained model may not be fair.
+CCS CONCEPTS
+• Computing methodologies → Machine learning.
+KEYWORDS
+machine learning, fairness, meta-learning, covariate shift
+ACM Reference Format:
+Dylan Slack, Sorelle A. Friedler, and Emile Givental. 2020. Fairness Warn-
+ings and Fair-MAML: Learning Fairly with Minimal Data. In Conference on
+Fairness, Accountability, and Transparency (FAT* ’20), January 27–30, 2020,
+Barcelona, Spain. ACM, New York, NY, USA, 10 pages. https://doi.org/10.
+1145/3351095.3372839
+1 INTRODUCTION
+As machine learning tools become more responsible for decision
+making in sensitive domains such as credit, employment, and crim-
+inal justice, developing methods that are both fair and accurate
+become critical to the success of such tools.
+∗Partially supported by the NSF under grant IIS-1633387. Code can be found
+at: https://github.com/dylan-slack/fairness-warnings-fair-maml. Thanks
+to Deirdre Mulligan, Charles Marx, and the other participants of the 2019 Summer
+Cluster on Fairness at the Simons Institute for the Theory of Computing for interesting
+conversations that helped to shape this work.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than the
+author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or
+republish, to post on servers or to redistribute to lists, requires prior specific permission
+and/or a fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 978-1-4503-6936-7/20/02. . . $15.00
+https://doi.org/10.1145/3351095.3372839
+Correspondingly, there has been an increasing amount of aca-
+demic interest in the field of fair machine learning (for surveys, see
+[4, 10, 28, 39]). Research on fairness is often concerned with identi-
+fying a notion of fairness, developing an approach that mitigates
+the notion of fairness, and applying the approach to a variety of
+data sets in a supervised learning setting (see, e.g., [16, 19, 37, 38]).
+However, we ask where this leaves fairness-concerned practi-
+tioners who are interested in using fair tools for their particular
+applications but have access to minimal or no training data. In
+particular, we introduce the following questions:
+• When can a practitioner rule out the use of a fair tool trained
+in a similar but slightly different context?
+• How can a practitioner who has access to only a few labeled
+training points successfully train a fair machine learning
+model?
+We suggest the relevance of these questions through the mo-
+tivating scenario of recidivism prediction. There have been calls
+for and extensive action towards the proliferation of criminal risk
+assessment tools in the United States [31]. However, there is often
+a disconnect between the intended use of these tools and how they
+are used in practice, which can lead to undesirable or ineffective
+results [11, 31]. The LJAF, a foundation that focuses on addressing
+societal issues through data driven approaches, argues for a risk
+assessment tool that “[can] be adopted by judges and jurisdictions
+anywhere in America” and has released such a tool that has been
+widely used [2, 31]. We observe that minor demographic differences
+in the distribution of data can lead to broad effects on statistical
+notions of group fairness on fairly trained machine learning models.
+These results could impact the ways in which fair risk prediction
+tools are used because such results suggest the proliferation and
+transfer of such methods between precincts can lead to their unre-
+liability.
+The most related work to the proposed questions is fairness ap-
+plied to transfer learning and the covariate shift problem inmachine
+learning. Covariate shift deals with situations where the distribu-
+tion of data in application differs from the distribution of data in
+training. Covariate shift is a well studied field, and there are numer-
+ous methods that attempt to train supervised learning classifiers
+that are robust to test distribution shifts with respect to accuracy
+[7, 25, 32]. Related methods have been developed to address fairness
+in the covariate shift setting. Kallus et. al. address the problem of
+systematic bias in data collection and use covariate shift methods
+to better compute fairness metrics under such conditions [21]. Cos-
+ton et. al. consider the situation where there are sensitive labels
+available in only the source or target domain and propose covariate
+shift methods to solve such problems [12].
+Additional work focuses on transferring fair machine learning
+models across domains. Madras et. al. propose a solution called
+LAFTR that uses an adversarial approach to create an encoder that
+can be used to generate fair representations of data sets and demon-
+strate the utility of the encoder for fair transfer learning [26]. Simi-
+larly, Schumman et. al. provide theoretical guarantees surrounding
+transfer fairness related to equalized odds and opportunity and
+suggest another adversarial approach aimed at transferring into
+new domains with different sensitive attributes [29]. Lan and Huan
+observe that the predictive accuracy of transfer learning across
+domains can be improved at the cost of fairness [23]. Related to fair
+transfer learning, Dwork et. al. use a decoupled classifier technique
+to train a selection of classifiers fairly for each sensitive group in a
+data set [14].
+We argue that our proposed questions are different than the
+existing work in the following ways. While methods exist that
+address fairness and covariate shift, such methods do not address
+the problem of communicating to practitioners and policy makers
+what domain specific factors might cause a fairly trained model to
+fail to be fair in practice.
+Additionally, the problem of training fair machine learning mod-
+els with very little task specific training data is relatively unstudied.
+Practitioners might have access to minimal training data in one
+task and sufficient data from other related tasks. This data might be
+minimal or skewed in terms of which sensitive attribute or label the
+data belongs to because of data collection issues associated with
+sensitive data sets like those discussed in Kallus et. al [21]. Though
+LAFTR offers a way to transfer machine learning models between
+tasks, we observe it is unsuccessful in very data light situations.
+In this paper, we propose two different methods to address the
+proposed problems. First, we discuss the situation where a practi-
+tioner has no training data and must decide whether to use a fair
+machine learning tool trained in another similar but slightly differ-
+ent context. We introduce Fairness Warnings — a model agnostic
+approach that provides interpretable boundary conditions on fairness
+for when not to apply a fair model in a different but related context
+because the model may behave unfairly. Fairness Warnings pro-
+vide an interpretable model that indicates what distribution shifts
+to a data set’s features may cause a fairly trained classifier to act
+unfairly in terms of a user specified notion of group fairness. While
+the covariate shift problem setting allows for arbitrary changes to
+the testing distribution, we only consider mean shifts in this paper.
+We discuss the limitations imposed by this problem restriction in
+section 3.1.2.
+To provide intuition, if Fairness Warnings were trained on a
+recidivism classifier with respect to the 80% rule of demographic
+parity [5, 16], the model would provide conditions such as what
+mean shifts to the features age and priors count would cause the
+model to score demographic parity lower than 80%. Because law en-
+forcement agencies report general covariate crime information [1],
+it is likely the case that precinct specific practitioners have access
+to these high level details and can effectively use fairness warnings
+to assess whether unfairly trained machine learning model may
+behave fairly in their application.
+Second, we consider a better route to transfer a fair machine
+learningmodel throughmeta-learning.We introduce ameta-learning
+approach, Fair-MAML, to quickly train models that are both accu-
+rate and fair with respect to different notions of fairness with very
+minimal task specific data. Fair-MAML is based on a meta-learning
+algorithm called Model Agnostic Meta Learning or MAML [17] that
+has shown success in reinforcement learning and image recognition.
+Fair-MAML encourages the learning of more general notions of
+fairness and accuracy that allow it to achieve strong results on new
+tasks with only minimal data available. In this way, Fair-MAML
+can escape the negative inter-distributional effects of sharing a fair
+machine learning model by providing a model that can be quickly
+fine-tuned a specific task. We connect Fairness-Warnings and Fair-
+MAML by applying Fairness Warnings as boundary conditions on
+the fine-tuned fair meta-model.
+Besides offering better ways for practitioners to implement fair
+machine learning models, these methods also provide ways for
+involved parties to question and assess the results of fair machine
+learning models. Considering recidivism prediction, the absence of
+success surrounding the adoption of recidivism tools in the United
+States has been explained in part by judges’ lack of trust in algo-
+rithm recidivism tools [11, 31]. Indeed, such scores are sometimes
+given to judges without any context [31]. By including Fairness
+Warnings in assessments, users may be able to better understand un-
+der what conditions the algorithmwill fail to be fair. This could help
+increase judge understanding of such tools, as well as defense at-
+torneys’ ability to challenge its results. Additionally, by fine-tuning
+recidivism prediction to specific precincts using Fair-MAML, users
+may more readily trust that such algorithms are delivering relevant
+predictions than if they were only trained on disparate localities.

@@ -1,0 +1,134 @@
+
+How do we learn from biased data? Historical datasets often reflect
+historical prejudices; sensitive or protected attributes may affect
+the observed treatments and outcomes. Classification algorithms
+tasked with predicting outcomes accurately from these datasets
+tend to replicate these biases. We advocate a causal modeling ap-
+proach to learning from biased data, exploring the relationship
+between fair classification and intervention. We propose a causal
+model in which the sensitive attribute confounds both the treat-
+ment and the outcome. Building on prior work in deep learning
+and generative modeling, we describe how to learn the parameters
+of this causal model from observational data alone, even in the
+presence of unobserved confounders. We show experimentally that
+fairness-aware causal modeling provides better estimates of the
+causal effects between the sensitive attribute, the treatment, and
+the outcome. We further present evidence that estimating these
+causal effects can help learn policies that are both more accurate
+and fair, when presented with a historically biased dataset.
+CCS CONCEPTS
+•Mathematics of computing→ Causal networks; • Comput-
+ingmethodologies→Latent variablemodels; Neural networks;
+KEYWORDS
+causal inference, variational inference, fairness in machine learning
+ACM Reference Format:
+David Madras, Elliot Creager, Toniann Pitassi, Richard Zemel. 2019. Fairness
+through Causal Awareness: Learning Causal Latent-Variable Models for
+Biased Data. In FAT* ’19: Conference on Fairness, Accountability, and Trans-
+parency, January 29–31, 2019, Atlanta, GA, USA. ACM, New York, NY, USA,
+Article 4, 12 pages. https://doi.org/10.1145/3287560.3287564
+1 INTRODUCTION
+In this work, we consider the problem of fair decision-making from
+biased datasets. Much work has been done recently on the problem
+of fair classification [1, 4, 15, 50], yielding an abundant supply of
+definitions, models, and algorithms for the purposes of learning
+classifiers whose outputs satisfy distributional constraints. Some
+of the canonical problems for which these algorithms have been
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+https://doi.org/10.1145/3287560.3287564
+proposed are loan assignment [15], criminal risk assessment [7], and
+school admissions [13]. However, none of these problems are fully
+specified by the classification paradigm. Rather, they are decision-
+making problems: each problem requires an action (or “treatment”)
+to be taken in the world, which in turn yields an outcome. In other
+words, the central question is how to intervene in an ongoing and
+evolving process, rather than predict outcomes alone [3].
+Decision-making, i.e. learning to intervene, requires a funda-
+mentally different approach from learning to classify: historical
+training data are the product of past interventions and thus provide
+an incomplete view of all possible outcomes. Only actions which
+were previously chosen yield observable outcomes in the training
+data, while the implicit counterfactual outcomes (the outcome that
+would have occurred had another action been taken) are never
+observed. The incompleteness of this data can have great impact
+on learning and inference [41].
+It has been widely argued that biased data yields unfair machine
+learning systems [12, 16, 20]. In this work we examine dataset bias
+through the lens of causal inference. To understand how past deci-
+sions may bias a dataset, we first must understand how sensitive
+attributes may have affected the generative process which created
+the dataset, including the (historical) decisionmakers’ actions (treat-
+ments) and results (outcomes). Causal inference is well suited to
+this task: since we are interested in decision-making rather than
+classification, we should be interested in the causal effects of actions
+rather than correlations. Causal inference has the added benefit of
+answering counterfactual queries: What would this outcome have
+been under another treatment? How would the outcome change if
+the sensitive attribute were changed, all else being equal? These
+questions are core to the mission of learning fair systems which
+aim to inform decision-making [27].
+While there is much that causal inference can offer to the field
+of fair machine learning, it also poses several significant challenges.
+For example, the presence of hidden confounders—unobserved fac-
+tors that effect both the historical choice of treatment and the
+outcome—often prohibits the exact inference of causal effects. Ad-
+ditionally, understanding effects at the individual level can be espe-
+cially complex, particularly if the outcome is non-linear in the data
+and treatments. These technical difficulties are often amplified by
+the problem scope of modern machine learning, where large and
+high-dimensional datasets are commonplace.
+To address these challenges, we propose a model for fairly es-
+timating individual-level causal effects from biased data, which
+combines causal modeling [38] with approximate inference in deep
+latent variable models [26, 30]. Our focus on individual-level causal
+effects and counterfactuals provides a natural fit for application
+areas requiring fair policies and treatments for individuals, such as
+X Y
+T
+(a) Pearl [38] no hidden con-
+founders
+X
+Z
+Y
+T
+(b) Louizos et al. [30] Causal
+Effect VAE (CVAE)
+XA
+Z
+Y
+T
+(c) CVAE with sensitive at-
+tribute
+X
+ZA
+Y
+T
+(d) Proposed model: Fair
+Causal VAE (FCVAE)
+Figure 1: Various approaches causally modeling data features X , treatment T , and outcome Y . 1a assumes no hidden con-
+founders; 1b models hidden confounders via a latent variable Z to be inferred by an inference neural network (not pictured);
+1c naively extends 1b to include a sensitive attribute A as an additional observation, not as a confounder. 1d, the Fair Causal
+VAE (ours), explicitly models the sensitive attribute as confounding the treatment T and the label Y in historical data.
+finance, medicine, and law. Specifically, we incorporate the sensi-
+tive attribute into our model as a confounding factor, which can
+possibly influence both the treatment and the outcome. This is a
+first step towards achieving “fairness through awareness” [10] in
+the interventional setting.
+Our model also leverages recent advances in deep latent-variable
+modeling to model potential hidden confounders as well as complex,
+non-linear functions between variables, which greatly increases the
+class of relationships which it can represent. Through experimental
+analysis, we show that our model can outperform non-causal mod-
+els, as well as causal models which do not consider the sensitive
+attribute as a confounder. We further explore the performance of
+this model, showing that fair-aware causal modeling can lead to
+more accurate, fairer policies in decision-making systems.

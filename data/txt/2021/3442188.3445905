@@ -1,0 +1,1467 @@
+Designing Accountable Systems
+Severin Kacianka
+severin.kacianka@tum.de
+Technical University of Munich
+Garching, Germany
+Alexander Pretschner
+alexander.pretschner@tum.de
+Technical University of Munich
+Garching, Germany
+ABSTRACT
+Accountability is an often called for property of technical systems.
+It is a requirement for algorithmic decision systems, autonomous
+cyber-physical systems, and for software systems in general. As a
+concept, accountability goes back to the early history of Liberalism
+and is suggested as a tool to limit the use of power. This long
+history has also given us many, often slightly differing, definitions
+of accountability. The problem that software developers now face
+is to understand what accountability means for their systems and
+how to reflect it in a system’s design. To enable the rigorous study
+of accountability in a system, we need models that are suitable for
+capturing such a varied concept. In this paper, we present a method
+to express and compare different definitions of accountability using
+Structural Causal Models. We show how these models can be used
+to evaluate a system’s design and present a small use case based on
+an autonomous car.
+CCS CONCEPTS
+• Software and its engineering→Designing software; •Com-
+puter systems organization→ Architectures.
+KEYWORDS
+Accountability, Structural Causal Models, Socio-Technical Systems
+ACM Reference Format:
+Severin Kacianka and Alexander Pretschner. 2021. Designing Accountable
+Systems. In Conference on Fairness, Accountability, and Transparency (FAccT
+’21), March 3–10, 2021, Virtual Event, Canada. ACM, New York, NY, USA,
+14 pages. https://doi.org/10.1145/3442188.3445905
+1 INTRODUCTION
+Accountability differs from many other system properties because
+it is notoriously hard to define and its benefits are elusive to name.
+A property like performance can often be measured with hard num-
+bers and has the very clear benefit that more performance means
+more or faster operations. Security and privacy are hard to mea-
+sure, but have the well understood meaning of keeping the bad guys
+out and keep data from unauthorized eyes. In a recent systematic
+literature review, Wieringa has written that many organizations
+are “advocating for more algorithmic accountability, yet a thorough
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than the
+author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or
+republish, to post on servers or to redistribute to lists, requires prior specific permission
+and/or a fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+© 2021 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+https://doi.org/10.1145/3442188.3445905
+and systematic definition of the term lacks, and it has not been
+systematically embedded within the existing body of work on ac-
+countability” [55][p. 2]. This finding now begs the question of what
+exactly these organizations are advocating if there is not even a def-
+inition of the concept. This feeling of ambiguity is reinforced when
+looking at the concrete examples given in the appendix of [55]. The
+first is an automatic system that checks if people repay their debt,
+the second one is a system that automatically anonymizes permits,
+the third and fourth systems check for fraudulent social benefit
+claims. All examples do something that some people cannot know
+or understand and might find objectionable. Accountability is now
+supposed to fix this. Similarly, [27] surveyed implementations of ac-
+countability in computer science and found that systems will often
+implement something and then just call it accountability, without
+trying to ground that in any definition or understanding of the term.
+In complex systems, accountability is often deflected and hard to
+pinpoint, which leads to blame being assigned to humans [12]. As
+an example, a “pilot error” often is not just an error of the pilots,
+but a complex interplay of the humans and the technical systems.
+Currently, the literature does not offer any method to model the
+accountability of a system, especially across system boundaries.
+It offers no way to quantify or qualify the accountability of a sys-
+tem, nor even a precise language to reason about it or compare
+implementations. The current state of the art does not go beyond
+giving differing definitions of what accountability might mean and
+proposing implementations of accountability in specific contexts.
+In this paper, we show how to leverage one commonality among
+all definitions of accountability, namely causality, to express ac-
+countability definitions and identify them in the causal model of a
+system. This allows us to describe patterns in the design of a sys-
+tem that are necessary to fulfill a specific notion of accountability.
+Moreover, this knowledge helps us to reason about what data needs
+to be logged and, conversely, what data can be omitted, without
+compromising the system’s adherence to the chosen definition of
+accountability. We propose to use Structural Causal Models (SCMs)
+as the mathematical foundation. They are flexible enough to model
+even the most complex systems and offer a toolbox of mathematical
+methods to analyze them.
+2 BACKGROUND
+Accountability is a concept rooted in Liberalism and was first intro-
+duced by political philosophers like John Locke and Adam Smith,
+who used it in the 17th and 18th century to describe the fact that
+official representatives will have to justify their action to someone,
+ultimately their sovereign.1 This core idea was then picked up and
+refined by other political and, later, social scientists. In a survey,
+Lindberg gives the central idea as “when decision-making power is
+1See [11], [6], or [33] for a more detailed history.
+424
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Severin Kacianka and Alexander Pretschner
+transferred from a principal (e.g. the citizens) to an agent (e.g. gov-
+ernment), there must be a mechanism in place for holding the agent
+accountable for their decisions and tools for sanction” [33, p. 203].
+Bovens writes that “[t]he most concise description of accountability
+would be: ‘the obligation to explain and justify conduct’, ” while also
+warning that “[a]s a concept, however, ‘accountability’ is rather elu-
+sive. It has become a hurrah-word, like ‘learning’, ‘responsibility’,
+or ‘solidarity’, to which no one can object” [6, p. 7].
+This core idea is, with some variations, deeply embedded into
+the fabric of liberal democracies. From the idea that voters will hold
+politicians accountable for their performance, to companies that
+are accountable to their shareholders, to the legal system, where
+wrongdoing is discouraged by the possibility of being held account-
+able for one’s actions. As such, accountability rose to prominence
+in computer science together with the tight integration of comput-
+ers into our societies and their increasing effect on daily life, for
+example by managing medical records or controlling vehicles.
+This long history of the term has led to many different definitions
+and meanings of accountability. Lindberg, for example identified
+twelve different subtypes of accountability and has also cautioned
+us that “[i]t cannot be assumed that findings in the area of one
+subtype of accountability are relevant for another” [33, p. 204].
+For example, if we find an implementation of accountability that
+works well in a societal setting, it is not a given that it will also
+work in a legal setting. [27] have found a tendency in computer
+science to not worry much about the underlying definitions of
+accountability. Even recent works, for example [55], usually pick
+some definitions and declare it as typical. This is, in our opinion,
+wrong. Computer science should not try to pick winners, and push
+one theory over another. When talking about accountability, it is
+important to be precise about the exact meaning. As Lindberg puts
+it, “everything is not accountability: it is but one of many possible
+ways to constrain the (mis-)use of power” [33, p. 202]. Other means
+of limiting power are the “devolution of power, violence, economic
+pressure, public shaming, and anarchy” [33, p. 205]. However, since
+accountability is a very old concept, it has multiple meanings that
+often have subtle differences. This is why, when talking about
+accountability or making systems accountable, we should always
+first try to define what we actually mean. For example, in some
+definitions sanctioning an actor for their action is considered part
+of accountability, while in others a principal can only sanction an
+agent if they do not provide an account. Such differences have
+a huge impact on the underlying system design and should thus
+be made explicit, and not left ambiguous by just using the term
+accountability. In our view, all definitions of accountability have
+some merit in a specific context, and computer science should strive
+to offer ways to implement any definition. It is the purview of fields
+like sociology or the political sciences to debate the intricacies of
+the definitions themselves.2 They have accumulated experience in
+debating these finer points and computer science should rely on
+their insights and offer ways to realize the theories developed there.
+Here we will now present some approaches to accountability as
+an example of their wide variety and show how to formalize them
+later in Section 4.
+2Causes and accountability are also an important topic in law. Since causality has
+only been formalized very recently, relevant literature can be found under the term
+statistics, e.g., [9].
+2.1 Lindberg
+Staffen Lindberg [33] surveyed the literature in the social sciences
+and distilled the following definition of accountability:
+(1) An agent or institution who is to give an account (A for agent);
+(2) An area, responsibilities, or domain subject to accountability
+(D for domain);
+(3) An agent or institution to whom A is to give account (P for
+principal);
+(4) The right of P to require A to inform and explain/justify deci-
+sions with regard to D; and
+(5) The right of P to sanction A if A fails to inform and/or ex-
+plain/justify decisions with regard to D [33, p. 209].
+The first two points mean that there is an agent that has some
+power in a certain domain and knows that they need to give an
+account for their actions. The third and the fourth condition imply
+that there is a third party that has the right to require A to explain
+and justify their decisions. The last condition requires that P can
+sanction A. Lindberg adds an important restriction, often lost in
+other definitions: he distinguishes between the right of P to sanction
+A for not providing the information and the right to sanction A for
+the content of effect of an action. Another important implication is
+that there needs to be “standard or measurable expectations” [33,
+p. 211] to have accountability. Without a clear idea of what is
+acceptable and unacceptable behavior, it cannot be evaluated and
+sanctioned. As such, we always need some form of evidence.
+2.2 Bovens
+Mark Boven’s definition [6] became popular recently in computer
+science because it was used as the definition in the systematic liter-
+ature review conducted by [55]. Bovens finds that accountability is
+hardly defined and he tries to counteract this vagueness and make
+it “more amendable to empirical analysis” [6, p. 7] He focuses on
+public accountability and gives a short definition, “the obligation
+to explain and justify conduct” [6, p. 9], before giving the more
+detailed one, as follows:
+(1) There is a relationship between an actor and a forum
+(2) in which the actor is obliged
+(3) to explain and justify
+(4) his conduct,
+(5) the forum can pose questions,
+(6) pass judgement,
+(7) and the actor may face consequences [6, p. 12].
+Following his definition, actors can be individuals or organiza-
+tions, and a forum can also be a specific person, an organization, or
+even the general public. The relationship between actor and forum
+will often, but not always, be a principal-agent relation in which the
+forum delegates power to the agent, who is then held to account.
+The obligation of the actor might be formal or informal. The act of
+giving an account consists of three stages. First, “the actor is obliged
+to inform the forum about his conduct, by providing various sorts
+of data about the performance of tasks, about outcomes, or about
+procedures” [6, p. 10]. Second, “ there needs to be a possibility for
+the forum to interrogate the actor and to question the adequacy of
+the information or the legitimacy of the conduct” [6, p. 10]. Finally,
+“the forum may pass judgement on the conduct of the actor” [6,
+425
+Designing Accountable Systems FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+p. 10]. Additionally, he also requires the possibility of consequences
+for the actor if they do not comply with the requests of the forum.
+One fundamental difference between the definitions of Lindberg
+and Bovens is that Bovens requires the actor to regularly update
+the forum, whereas Lindberg suggest that the principal can demand
+an account from the agent at any time.
+2.3 Hall
+Hall et al. [18] look at accountability from the perspective of psy-
+chology. As such they focus on what it means for an individual to
+feel accountable. Their exact field of study is felt accountability. In
+their overview, they find that at the core of accountability is the
+expectation that one’s actions will be evaluated. They emphasize
+that it is not necessary that this evaluation does occur, but that the
+possibility that an evaluation occurs must be present. Furthermore,
+the actor needs to believe that an account-giving (i.e., an expla-
+nation) might be required. This account is then given to a salient
+audience that might reward or sanction the agent’s behavior.
+In their review of models of accountability, they find that ac-
+counts are often used by agents to protect their self-image and
+develop their social identity. This underscores the important role
+accountability has in a society and supports the assumption that
+complex societies and social order necessarily need accountability
+to augment the reduced level of personal trust between individuals.
+In their survey, they describe four essential features of account-
+ability. First, the accountability source describes to whom one feels
+accountable. Second, the accountability focus captures how things
+get done and how they relate to the results. Third, accountability
+salience expresses how important the task is for which an agent
+might be held accountable; the idea is that agents will be more
+careful if their action is more significant. Fourth, and finally, ac-
+countability intensity captures for how many things an agent is
+accountable; here it is thought that being responsible for multiple
+things increases stress.
+2.4 RACI
+The organizational sciences have developed several practical frame-
+works to understand accountability in an organization. Here, we
+present the Responsible-Accountable-Consult-Inform (RACI) frame-
+work [46, 49]. Such frameworks, sometimes called tools, are used in
+practical settings to explicate accountability relationships in teams
+and organizations. While these tools do not build on a sophisti-
+cated body of scientific literature, they are nonetheless important
+in practical settings because they allow people to express their
+understanding and perception of accountability in a given setting.
+We assume that such practical approaches will often be the basis
+for accountability expectations of systems, and thus need to be
+considered in any attempt to formalize accountability for them.
+RACI, specifically, tries to explicate the roles of people in an
+organization and helps to reconcile the conception of a role, i.e.,
+what a person thinks they are doing, with the expectation of a role,
+i.e., what others think the person is doing, and with the behavior of
+a role, i.e., what the person actually does. Following [49], having a
+RACI matrix helps to align these three aspects. However, they also
+point out that this is an ongoing process that needs to constantly re-
+align those three aspects, whenever they drift apart. They list a few
+typical signs, such as “Questions over who does what” or “Concern
+over who makes decisions” [49, p. 4], that arise regularly during
+the design of systems. Among other things, one major difference
+of this definition from the others is the aspect of consultation, once
+again underlining our finding in the introduction that definitions
+are manifold and different. [49] define the following four aspects
+in the RACI framework:
+• Responsible: The individual who completes a task. Responsi-
+bility can be shared.
+• Accountable: The person who answers for an action or decision.
+There can be only one such person.
+• Consult: Persons who are consulted prior to a decision. Com-
+munication must be bidirectional.
+• Inform: Persons who are informed after a decision or action is
+taken. This is unidirectional communication.
+2.5 Computer Science
+A landmark publication on accountability in computer science was
+published by Weitzner et al. [54].3 They provided a definition for
+Information Accountability, as an improvement on classic preven-
+tive data control measures. Classically, systems ensure a user’s
+privacy by ensuring that data cannot be accessed by unauthorized
+personnel and thus prevent data leaks. Weitzner et al. changed this
+premise and, drawing parallels to law enforcement, suggested to
+build systems in such a way that it is easy to trace data leaks and
+then leverage the existing legal system to punish misbehavior. This
+idea was later refined and formalized by Feigenbaum et al. [13, 14],
+albeit with a focus on security and not privacy. Coinciding with
+the discussion on e-voting systems, Küsters et al. [31] formalized
+accountability in relation to verifiability. Here, the main question
+is how to design an e-voting system such that the results can be
+trusted and any attempts to falsify the vote count or the votes will be
+detected and the perpetrator held to account. The A4cloud project
+[15], coinciding with the spread of cloud services into society and
+questions about data protection, has done extensive work on ac-
+countability in cloud environments, with a focus on data protection
+and privacy. They offer a reference architecture, tools to complete
+certifications, and risk assessment. Looking at their website,4 they
+defer the exact definition of accountability to contracts or service
+level agreements.
+Furthermore, Kacianka et al. [27] conducted a systematic map-
+ping study to understand how accountability is understood and
+implemented in research tools. In this study, they identified a steady
+rise in publications on the subject and found that most research
+was either a solution proposal or an evaluation of an approach. An-
+alyzing the prominent application domains, they found that cloud
+computing was clearly dominant, followed by distributed data shar-
+ing and web applications. The most prominent use cases were
+privacy focused, in line with [54], and the most popular techniques
+were cryptographic and network protocols, with some dedicated
+accountability protocols as well. Obviously, the focus on informa-
+tion accountability makes related definitions different from those
+discussed before.
+3The core problem, however, was discussed much earlier. Notable contributions tech-
+nical solutions are Lamport’s logical time stamps in 1978 [32] while Nissenbaum’s
+discussed the “eroding accountability in computerized societies” in 1996 [38, p. 25].
+4http://a4cloud.eu/Accountability.html
+426
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Severin Kacianka and Alexander Pretschner
+2.6 Algorithmic Accountability
+The term algorithmic accountability first gained prominence with
+the paper by Nicholas Diakopoulos [10] where he discussed how
+journalists might investigate algorithms that started to make more
+decisions that affected human lives. In this vein, the literature on the
+subject usually focused on the understanding of machine learning
+algorithms. Examples include algorithms used in court decisions [3],
+policing [30], and similar settings where human lives are directly af-
+fected by opaque computer systems. Most of the literature is highly
+critical of these systems, using terms likeWeapons of Math Destruc-
+tion [41] or Algorithms of Oppression [39]. The general approach to
+counter the power of algorithms is to make the decisions of algo-
+rithms transparent and explainable. Recently, Maranke Wieringa
+surveyed the literature on algorithmic accountability and found
+that “[w]hat is denoted with algorithmic accountability is this kind
+of accountability relationship where the topic of explanation and/or
+justification is an algorithmic system” [55, p. 2]. Her survey also
+finds that typically algorithmic accountability follows the definition
+of Mark Bovens [6] given above.
+In earlier works, transparency was often seen as a solution, but
+Ananny and Crawford [1] have shown that transparency alone is
+not sufficient for accountability. Amongst other reasons, a main
+point is that we also need someone to understand the output of
+such a transparency mechanism. To alleviate this problem, Wachter
+et al. [53], and later Tim Miller [35] as well as Mittelstadt et al. [36],
+have proposed using contrastive explanations to make decisions
+understandable for humans. Miller gives the example of a machine
+learning classifier that categorized an insect as a spider or a beetle.
+An explanation it would give is that a result is categorizes as a
+spider because it has eight legs instead of six. In contrast to the
+weights in a neural net or the layout of a decision tree, such an
+explanation would be useful and understandable for a human.
+3 CAUSALITY
+The study of causality5 is of a specific interest to the study of
+accountability, our main subject matter, because causality is a pre-
+requisite for accountability. In understanding how causal effects
+work, we can improve the design of our systems to make sure that
+effects of causes are clearly understood and then in turn ensure
+that the causes of effects are easy to identify. The first notion is
+prospective and the second one retrospective.6 Both are deeply
+intertwined, but often only studied separately. In this paper, we
+combine the study of both and build on the assumption that a good
+prospective causal model is also a good retrospective causal model.
+For prospective models, we can find structures and patterns that
+allow us to show that some variables are not relevant to certain
+outcomes and once a specific outcome comes to pass, we can use
+retrospective reasoning to identify the concrete cause, relative to
+the given context.
+5We closely follow the definition of SCMs as introduced and refined over the years
+by Judea Pearl: [42–45] and Joseph Halpern [20]. Other definitions of causality exist
+and might sometimes even be more suitable, but Pearl’s SCM approach is the most
+widely adopted notion. Even more, [20] discusses several incompatible notions of
+actual accountability and there are arguments that a single definition is not useful
+[16].
+6See also the notes in the first chapter of [20].
+Texting Accident
+(a) A correlation between texting and accidents.
+Texting Accident
+(b) Our model assumes that texting is the cause.
+Texting Distraction Accident
+(c) We discover the mechanism by which texting causes accidents.
+Figure 1: From correlations to causal models.
+Historically, causality and causal relationships are tightly con-
+nected to statistics. However, as laid out by [42], whereas statistical
+relations are epistemic and describe what we know or believe about
+the world, causal relationships are ontological, meaning that they
+describe objective constraints on the world. This means that causal
+relationships are much more stable and should not change if the
+environment changes. Still, causality is tightly linked to statistics
+as many “causal statements are uncertain” [44] and are thus often
+only true with some probability.7 As such, many prospective causal
+models will answer questions with a certain probability. For ac-
+countability, we often need exact and retrospective answers. The
+question Did Alice cause the crash? should have a clear retrospective
+answer. For this we use Actual Causality [20]. It allows us to use a
+(prospective) causal model and reason about it in a specific context.
+For example, we might have a prospective model that shows that
+texting while driving causes accidents (with a certain probability).
+Then we might have the specific context of an accident in which
+we know that Alice was distracted because she was texting. We
+can then set the context for this accident and use actual causality
+reasoning to find the cause of the accident; in this case Alice caused
+the accident by being distracted. In the literature, [8] as well [7]
+already suggested using actual causality as a building block for
+accountability, and [29] show how causality can be useful to model
+accountability.
+3.1 Type Causality
+Investigations of causality usually start with the identification of a
+correlation between two variables. In Figure 1a, for example, we
+notice a correlation between texting while driving and the number
+of accidents. A correlation has no direction, and many correlations
+will turn out to be spurious, so caused by some unknown third vari-
+able, often called a confounder. The goal of scientific investigations
+is now to find which correlations are the result of genuine causal
+mechanisms in the real world. In the end, such an investigation
+will yield a causal model. In our example, Figure 1b expresses the
+understanding that texting while driving causes accidents. Maybe
+just with a certain probability and under certain assumptions, but
+we clearly state that one is the cause of the other. This is the mod-
+eler’s understanding of a mechanism in the world. The advantage
+of stating it as a causal model is that all assumptions must be made
+7For example, “smoking causes cancer” is true, but a single cigarette is very unlikely
+to cause cancer.
+427
+Designing Accountable Systems FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+explicit and that it can be tested against actual data. It might also be
+refined over time; Figure 1c shows a causal model that assumes that
+texting does not directly cause accidents, but that it does so via a
+mediator, namely distraction. Such details are often very important,
+as they improve our understanding of the problem and allow us
+to develop ways to affect, and often prevent, specific outcomes by
+targeting the mediators directly.
+Such causal relations can be formalized in so-called Structural
+Causal Models (SCMs)8 [44]. They are are derived from structural
+equation models (SEMs) (e.g., [34]), but their relations have a direc-
+tion. Following Pearl [44], an SCM consists of two sets of variables,
+U andV and a set of functions, F , that assigns each variable in
+V a value based on the value of the other variables in the model.
+Formally,
+Definition 3.1 (Structural CausalModel). A structural causalmodel
+M is a tupleM = (U,V,F ), where
+• U is a set of exogenous variables,
+• V is a set of endogenous variables,
+• F associates with each variableX ∈ V a function that deter-
+mines the value of X given the values of all other variables.
+Every SCM is associated with a graphical causal model called
+the graphical model or the graph. Nodes are the variables; edges
+represent a causal relationship between them. While the graph
+does not include the details of F , its structure alone is enough
+to identify patterns and causes. In an SCM, exogenous variables,
+denoted byU, are external to the model, meaning that we chose
+not to explain how they are caused. They are the root nodes of
+the causal graph and are not a descendant of any other variable.
+Endogenous variables, denoted byV , are descendants of at least
+one exogenous variable and model components of our system and
+the world for which we want to explain causes. F describes the
+relationships between all those variables. If we knew the value of
+every exogenous variable, we could use F to determine the value
+of every endogenous variable. In a graphical model every node
+represents an endogenous variable and arrows represent functions
+from F between those variables.
+3.2 Actual Causality
+Type causal models make predictions on how events will unfold.
+This is useful because we want to build systems in a way that they
+will probably be accountable. To achieve this, we try to make sure
+that the causal effects within a system are clearly understood and
+that the structure ensures that as many components as possible
+are causally independent. However, what if an unwanted event has
+already happened? In this casewe do not care about the probabilities
+of events; we know they happened, but we want to find out why
+exactly they did happen. For this we need the concept of actual
+causality [20]. It is backward-looking and stands in contrast to type
+causality which is forward-looking.9
+To illustrate actual causality, Figure 2 depicts an accident be-
+tween two cars.10 Imagine two drivers, Alice and Bob, breaking the
+8Causal models are also often specified over probability distributions. For simplicity,
+we stick to the discrete definition in the paper and the examples.
+9Note that actual causality can also deal with probabilities for retrospective events;
+see [20, Ch. 2.5].
+10This is based on the classic Suzy-Billy rock throwing example [20, Example 2.3.3].
+law at an intersection. Alice is texting and thus distracted while Bob
+accidentally runs over a red light. This example is designed to show
+that the simple but-for test11 is not adequate to attribute causality.
+Here, intuitively both Alice and Bob are necessary for the accident
+to happen. However, had Alice not been texting, Bob would still
+have run the red light and caused the accident. So the accident
+would have happened, no matter what Alice did, suggesting her
+behavior is not a cause, which goes against our understanding of
+causality. The goal of the Halpern-Pearl definition (see Appendix A
+for its formalization) of causality is to find a precise mathematical
+definition to enable algorithmic reasoning over such examples so
+that the result conforms with our human understanding of causality.
+Alice texting Bob runs red light
+Accident
+Figure 2: Two cars causing an accident.
+3.3 Causality and Accountability
+It is now important to note that SCMs can describe purely technical
+systems. They do not require a principal or any human at all. For a
+system to be accountable, however, we require a natural or legal
+person that is not just a cause for an effect, but is accountable for
+that effect. In other words, causality is necessary for accountability,
+but by itself it is not sufficient for accountability. The additional
+requirements are given by accountability definitions such as the
+ones introduced in Section 2. In our work with SCMs, we found the
+following differentiation of terms useful:
+A cause is the actual cause in an SCM as determined by the
+Halpern-Pearl definition of actual causality. Similarly, to cause
+means that an endogenous variable in an SCM is the actual cause of
+another endogenous variable. Causes are purely technical, without
+any notion of intent or other social attributions.12
+Responsibility is the commitment of an entity to act a certain
+way and the ability to affect or change an outcome.13 This entity
+is responsible for a certain outcome. As such we have explicit
+notions of normality that are used to determine responsibility. This
+entity is then responsible for an outcome when, had it acted nor-
+mally, the outcome would not have happened.
+Blame is a social process in which an agent has a specific notion
+of normality and will find fault with some entity for the fact that
+this normality is violated. This agent blames that entity for some
+outcome, even if that entity is not aware of this notion of normality
+and thus might not be responsible for the outcome.
+11The but-for test is a simple understanding of causality that reads “A is a cause of B
+if, but for A, B would not have happened” [20]. It is often used in the legal context,
+called by its Latin name sine qua non test. In this domain, several improvements were
+developed such as the INUS (an Insufficient but Necessary element of an Unnecessary
+but Sufficient set) or the NESS (Necessary Element of a Sufficient Set) test. For a detailed
+overview, see [37].
+12However, it is important to note that causes are always relative to a causal model.
+The causal model might be biased and thus social attributions can leak into the model.
+13When this commitment is derived from moral reasons, the term duty will often be
+used.
+428
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Severin Kacianka and Alexander Pretschner
+A transparent systemwill have an SCMavailable and log enough
+data to set the context of the causal model after some event. Trans-
+parency indicates that an SCM is available, although it makes no
+statement about the quality of the SCM.
+Accountability, finally, means that we have a natural or legal
+person, called an agent, that is responsible for some outcome. This
+responsibility is made transparent with an SCM, and thus allows a
+dedicated principal to ask this agent for his, her, or their account and
+blame this agent for an unwanted outcome. So we can actively ques-
+tion the agent and understand him, her, or them. This means that
+our attribution of blame is no longer purely subjective, but derived
+from objective facts. An accountable system is a socio-technical
+system in which the responsibility for every outcome is linked to
+an agent, so a natural or legal person. It has an accountability
+mechanism which is an extension of the system that helps the
+principal to keep the agent accountable. Lastly, an accountability
+definition describes the necessary structures in the SCM.
+We do not claim that our definitions fit all situations and it is
+not our intention to obfuscate the long history of these terms. Yet,
+we believe that it is helpful to clearly state our understanding so
+that it can be compared, discussed, and contrasted to others.
+4 ACCOUNTABILITY STRUCTURES IN
+CAUSAL MODELS
+With SCMs as the means to formalize causal models, we can now
+revisit the accountability definitions given in Section 2 and look at
+them through a causal lens. Unfortunately there is no automatic,
+deterministic way of translating them into SCMs. Causal models
+express the modeler’s understanding of the subject matter and their
+advantage is that they are unambiguous. Here, we do not argue
+that our translations to SCMs are perfect. Our point is that they
+are easy to understand, precise in their meaning, and thus enable a
+discussion and review of a given definition of accountability.
+SCMs are useful because they may exhibit patterns, such as
+chains (see Appendix B.1), and specific structures, such as the Front-
+and Backdoor Criterion (see Appendix B.2) that allow us to show
+that some nodes will have no causal influence on a specific event.
+To leverage this, first, the models need to contain actions taken by
+humans, and as our purpose is the design of accountable systems,
+also actions taken by machines. This requires us to express the
+accountability relation as a set of variables that causally influence
+each other. On the level of accountability definitions, we do not
+care about the exact nature of this influence, so we do not need to
+specify F . The reason for this is that if there is a causal influence,
+accountability might be necessary and our system should provide
+data to ensure it. It is only after something unwanted has happened
+that we need F to understand the cause and answer questions of
+accountability. Conversely, if we can show that a specific variable,
+representing the actions of an agent, cannot contribute to a specific
+outcome, this agent cannot be accountable for that outcome.
+4.1 Lindberg, Bovens, and Hall
+Lindberg’s definition of accountability requires an agent, A, that
+should give an account for some effect, E, caused by A. Translated
+to an SCM, this means we need to have at least the relation A→ E
+in the model. A is a representation of the action taken by the agent
+Agent Action Mediator Effect
+Principal
+Figure 3: The causal model for Lindberg’s definition.
+and the result of that action, E, will depend on some value A takes.
+To allow for the fact that effects are often not caused directly, but
+indirectly via a mediator (M), we would make the possible use
+of a mediator explicit by adding the relation A → M → E. An
+example for a mediator is a power steering wheel that amplifies
+and translates the movements of the driver (A) into the actual angle
+of the wheels (E). Next, Lindberg requires a domain that is subject
+to accountability. This, conveniently, is captured very precisely by
+the model itself. It reflects the context in which A is embedded, as
+well as the effect Amight cause. Finally, the definition contains a
+principal, P , that transferred power to A and thus has the right to
+demand information from A and, should A not comply, sanction A.
+Figure 3 now depicts the structure of the Lindberg pattern. P will
+be causally affected by A and also might be affected by M and E.
+In Lindberg’s view, the principal is not directly involved in the
+course of events. Moreover, typical actions by a principal, such as
+helping in the design of the system or investigating an accident, are
+beyond the scope of the technical system and part of the society
+the system is embedded in. To reflect this, the models shows no
+arrows originating from P . Any action taken by P goes beyond the
+limits of the technical system. In other words, it is necessary for a
+system to exhibit the pattern in Figure 3, but it requires additional
+facilities in the social world around the system to be accountable.
+One interesting property of this pattern is that it seems to be at
+the core of several other definitions. Despite the differences in the
+details such as the timing, Bovens (see Section 2.2) shares the same
+causal model. Where Lindberg calls for an agent giving an account
+to a principal, Bovens considers an actor that explains his conduct to
+a forum. Both the principal and the forum might sanction or judge
+the agent or actor. This similarity of definitions suggests to us that
+the causal models should also be similar. One pronounced difference
+is that Bovens requires the actor to regularly inform the principal
+about changes, whereas Lindberg sees the principal as asking for
+information. In contrast to both, at the core of Hall’s definition
+(see Section 2.3) is an agent’s expectation that their action will
+potentially be evaluated by a third party. As such it also suggests
+the A→ P relation, but with the added twist that A only needs to
+believe this relation to exist. It does not matter if it exists in reality.
+Here, the technical system does not have to provide any logging or
+data, so long as A does not know this. Examples are systems that
+promise to randomly audit certain transactions, such as tax agencies
+or anti-cheat tools in online games. While in a concrete instance
+there might be no technical means to evaluate A, the system will
+deter A from misbehaving by introducing the fear of an evaluation.
+4.2 RACI
+RACI (see Section 2.4) in contrast does not so much look at the
+individual, but at an organization as a whole. Similar to Lindberg
+429
+Designing Accountable Systems FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Responsible Agent(s) Mediator Effect
+Accountable Agent
+Discussions
+Consulted Agent(s)
+Informed Agent
+Figure 4: The RACI accountability pattern.
+(a) A possible model of an accountability definition.
+(b) A system model with the equivalent pattern high-
+lighted in green.
+Figure 5: The first goal is to identify a specific accountability
+pattern in a given system model.
+above, it features agents that cause some effect, and thus also ex-
+hibits the familiar causal chain A→ M → E. It specifically extends
+the pattern with an accountable agent, AA, that instructs A to do
+a specific task. To reflect that in the model, we need to extend it
+with an edge AA→ A. Furthermore, RACI requires any consulted
+agents, C , to be reflected in the model. We would model this by
+adding a dedicated node, D, to the SCM to capture the outcomes of
+these discussions. Lastly, RACI considers dedicated agents, I , that
+are informed of the effects. In contrast to the others, RACI requires
+no dedicated principal. Figure 4 shows the complete model.
+4.3 Designing an Accountable System
+The question now is, how canwe use these accountability structures
+in the development of a system? Here, we assume that we have
+an accurate SCM of the socio-technical system available. We will
+call thisM connoting that it is a model of the system.14M can be
+used to answer questions of causality of the system. This, however,
+is not the same as answering questions of accountability. For a
+system to be accountable, it needs to conform to a given definition
+of accountability, which we call D, connoting that it is a definition.
+For example, if our notion of accountability is the driver is always
+accountable for what the car does, a causal model that does not
+contain that the driver violates this notion of accountability.
+Figure 5a shows the causal model for a fictitious definition of
+accountability (D) and Figure 5b shows a fictitious system model
+(M). The question now is if this given model fulfills the given defi-
+nition of accountability. Unfortunately, we cannot simply compare
+the graphs. Causal structures are more complex, and, as in this
+14Getting the SCM is not easy; however, parts of it can be automated by using models
+of a system such as fault and attack trees [22] or models of human behavior [28].
+(a) The causal model for this definition of accountability
+requires a mediator.
+(b) Adding the required node to the system model.
+Figure 6: Here, the problem is to change a system model to
+comply with a given definition of accountability.
+example, additional intermediate nodes do not necessarily affect
+the equivalence of models (see Appendix B.4 for details).
+Figure 6 depicts another problem: How do we need to alter a
+given system to comply with a given model of accountability?
+Here, the fictitious accountability definition in Figure 6a requires
+a mediator between the cause and an effect; a real-world example
+would be a person confirming an order. Figure 6b shows the model
+with such a node added.
+Looking at this another way, if we can show that the socio-
+technical systemM contains a causal structure D, we can use the
+accountability definition connected to D to makeM accountable
+according to this definition. Conversely, ifM does not contain D,
+it cannot be accountable according to this specific definition.15 In
+our experience, the following steps make for a useful guideline to
+map accountability definitions onto causal models of systems:16
+(1) Identify the event for which accountability is desired.
+(2) Identify valid agents.
+(3) Choose the desired definition of accountability.
+(4) For the given definition of accountability, check if the pattern
+is fulfilled for the desired agents.
+(a) If the pattern is fulfilled, stop here.
+(b) If not, change the model to fulfill the desired pattern.
+5 EXAMPLE
+We now use the 2018 deadly crash of an Uber car as an example
+for the design decision in a system [12, 40]. Here, we will look at
+three different design choices for the control of the system and
+reason about their accountability implications. In this accident, an
+autonomous vehicle developed by Uber crashed into a pedestrian,
+Elaine Herzberg, crossing a road and is regarded as the first acci-
+dent in which a pedestrian was killed by an autonomous vehicle.
+Ms. Herzberg was pushing a bicycle while crossing a dimly lit road
+and the software of the car repeatedly misclassified her, ultimately
+hitting and killing her. The safety driver on board the vehicle was
+distracted and did not brake in time.
+In the aftermath of the crash the accountability of the parties was
+hotly contested. At first the police claimed it was the pedestrian’s
+fault because at the site of the accident, crossing the road was illegal.
+15But it might be accountable according to another definition.
+16However, we have not proven these steps to be the best approach. They are merely
+distilled from our experience; other, possibly better approaches probably exist.
+430
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Severin Kacianka and Alexander Pretschner
+Next, the car’s safety driver was blamed because she did not pay
+attention to the road. The manufacturer of the car’s chassis, Volvo,
+was quick to distance itself from any blame, arguing that its chassis
+had a collision avoidance system which would have prevented the
+crash, but it was turned off by Uber to test their own software.
+Velodyne, the manufacturer of the car’s LiDAR, also pointed out
+that their system was capable of detecting a pedestrian, but that
+their system does not take the decision to brake. The search for
+reasons went as far as criticizing Uber’s development process, the
+testing process of having only one driver in the car and even the
+car-friendly (and pedestrian-hostile) layout of the road in Arizona
+or the point of autonomous cars in general. At the time of writing,
+the safety driver is being indited with negligent homicide [50]. All
+these claims have in common that they ask counterfactual questions
+of a causal model. Our goal is now to structure the causal model in
+such a way that accountability can clearly be attributed. We focus
+on a simplified model that consists of three agents, namely Uber,
+who built the car, Volvo, who contributed the chassis, and the safety
+driver, who was supervising the car. We show how different SCMs
+give us different possible agents and how certain structures of an
+SCM allow us to show that certain agents cannot be accountable
+for a given outcome.
+5.1 Models of the System
+Once we have the SCMM of the socio-technical system, we can
+then use it to evaluate it for its accountability. To illustrate this,
+we look at ways to design an autonomous car (see Figure 7). This
+example illustrates three ways that the control of such a system
+can be structured. In Figure 7a, the human can take over at any
+point in time, Figure 7b depicts a scenario where any input by the
+human can be overridden by the machine, and Figure 7c shows a
+setup where the human cannot influence the car at all. In causal
+models, the lack of arrows between two variables expresses the
+strong assumption that there is no causal connection between these
+two variables. In these Figures we used rounded boxes for possible
+agents (i.e., natural and legal persons) and rectangular boxes for
+technical components. Here, we do not model any preemption. Tem-
+poral ordering and the fact that one event might preempt another
+has a huge influence on the model [21].
+For simplicity, we assume this causal model to be binary.17 The
+meaning of the variables is as follows:
+(1) collide w/ Pedestrian, P , is true if a collision with a pedestrian
+occurs and false otherwise.
+(2) Trajectory set, T , is true if an evasive maneuver is conducted
+and false otherwise.
+(3) Safety Driver, D, is true if the driver tries to change T and
+otherwise false.
+(4) Uber Software, S , is true if the car’s software tries to change
+T and otherwise false.
+(5) Emergency Brake, E, is true if the chassis tries to change T
+and otherwise false.
+(6) Volvo, V , is true if E is enabled and otherwise false.
+(7) Uber,U , is true if Uber influences S or E.
+17This example, is of course, highly simplified. In the real world, most causal models
+will not be binary.
+Uber Software collide w/ PedestrianTrajectory set
+Emergency Brake
+Safety Driver
+Uber Volvo
+(a) The human can take over.
+Uber Software collide w/ PedestrianTrajectory set
+Emergency Brake
+Safety Driver
+Uber Volvo
+(b) Human influence is moderated by the machine.
+Uber Software collide w/ PedestrianTrajectory set
+Emergency Brake
+Safety Driver
+Uber Volvo
+(c) No human influence is possible.
+Figure 7: Three possible designs for a (semi-)autonomous car.
+While the SCMs show social entities, the system is not ac-
+countable as-is.
+Here it is important to note that we have a very lax approach to
+levels of abstraction. Uber and Volvo are companies with unfath-
+omable complexities, the safety driver is a single individual, the
+software and the emergency brake are complex technical systems,
+and the trajectory the outcome of multiple decisions. However,
+SCMs can be abstracted quite well [4] and so this mixing of layers
+is easy to do formally. Still, it is important to bear in mind that these
+variables will in reality be complex SCMs in their own right.
+Formally, our modelM = ((U,V,R),F ) looks like this:
+U = {UU ,UV ,UD } are the three exogenous variables.
+V = {P ,T ,D, S,E,V ,U } are the seven endogenous variables.
+∀v ∈ U ∪V : R(v) → {true, f alse}; since we assume a binary
+model, the range is {true, f alse} for all variables.
+Now we need to define FX , so the structural equations for every
+endogenous variable:
+U = UU , V = UV , D = UD , meaning that U , V , and D are set
+by some exogenous variables.18
+18This might seem redundant, but the point is that only endogenous variables can be
+identified as causes in a causal model. In real models, an endogenous variable will
+likely be influenced by several exogenous variables. For example, the safety driver
+might be influenced by blood alcohol level; other influences are the weather or the
+road conditions.
+431
+Designing Accountable Systems FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+E =
+{
+¬U U = true
+V U = f alse
+, so long as Uber is not disabling E, it is
+the value of V .
+S = U for Figure 7a and Figure 7c, says that the software will
+follow whatever Uber had in mind. It is trickier for Figure 7b.
+Here we need to decide ifU or D can override the other and in
+what way. The simplest model would be a model in which the
+car will break if either Uber or the safety driver wants to break.
+In this case S = U ∨ D would be the correct equation. If one
+could preempt the other, we would need to change the model to
+contain such a preemption relation.
+For Figure 7a T = S ∨ E ∨ D and for the others T = S ∨ E, if
+neither S , nor E, nor, as in Figure 7a, D influence T , the car will
+hit the pedestrian.
+P = ¬T , if the car is on a collision course with the pedestrian it
+will always hit her if the trajectory is not changed.
+5.2 Checking for Accountability
+We now have three distinct versions ofM. These models describe
+the causal relations, but this alone is not sufficient for accountability.
+Our goal now is to give a justification of why these options are
+accountable and decide between the three. First, we need to decide
+which event(s) we are concerned about. In this example, we only
+care about potential collisions with pedestrians. This means that
+we only care about causes that affect P . Next, we need to identify
+valid agents. Since accountability only has a meaning for natural
+or legal persons, we can exclude any technical components inM,
+leaving us with three potential agents: Uber (U ), Volvo (V ), and the
+safety driver (D).
+As the third step, we need to decide on a notion of accountabil-
+ity (D). Here we have two possibilities: Either D is prescribed by
+some law or standard or we want to find a D that is suitable for
+our socio-technical system. If we look at the pattern given by the
+RACI definition, it is easy to see thatM cannot be accountable
+in that sense. It is enough to look at the structure to see thatM
+simply does not have the necessary endogenous variables to fulfill
+the RACI requirements. This is not surprising, as RACI is aimed
+at organizations and a discussion is not something that translates
+well to real-time systems like cars. If we were under obligation to
+make that system RACI-accountable, we can so show that this is
+impossible, given the currentM. We would need to look for ways
+to extendM with the required nodes.
+Making this system accountable according to Hall’s definition
+would requires us to convince the three agents that their behav-
+ior will potentially be evaluated and that any misbehavior will be
+punished. In extremis, this would mean that if we are convincing
+enough, we do not need to add any technical means of account-
+ability to our system. In practice, we would need to find a trade-off
+between the cost of supervision and the compliance of the agents.
+For example, it might make sense to collect all vehicle data to create
+a plausible scenario of evaluation. To give an example, most people
+respect speed limits, despite the fact that speed traps are quite rare.
+In many technical systems, the notions of Lindberg and Bovens
+will appeal to the developers. In contrast to RACI, they do not re-
+quire many additional nodes, and in contrast to Hall, they both
+define a clear relationship between an agent (or actor) and a princi-
+pal (or forum). To apply their notion, we first need to identify the
+basic structure they prescribe: Aдent → Mediator → Effect.
+In Figure 7a, we can find the following causal chains leading to
+the crash:U → S → T → P ,U → E → T → P , V → E → T → P ,
+and D → T → P . Here, the structure of the chain including the
+safety driver is an exact match with this structure. For Uber and
+Volvo we have two steps in the mediator and would need to show
+that they can be treated as a single node. For Figure 7a and Figure 7c
+the argument is straightforward because S = U , so these two nodes
+could be joined into one. In Figure 7b, we need to clarify if U or
+D has the final say over the matter. As the model is given here, it
+would not be Lindberg accountable because bothU and D would
+be accountable for T . Similarly, Volvo only has an influence on
+the trajectory if Uber is allowing them to do so. So they fulfill this
+pattern ifU = f alse .19
+If we now take another look at T , we can see that its equation
+is as follows: T = S ∨ E ∨ D. Again, we have the problem that we
+cannot disentangle the effects from U , E, and D. However, given
+thatU will always disableV (because E = ¬U , ifU = true), we can
+at least rule outV as an eligible agent. In Figure 7a and Figure 7b, it
+is unclear if the safety driver or Uber are accountable, because both
+have a causal effect onT . This agrees with the investigations in the
+aftermath of the accident as there it was also unclear at first who
+was to be held accountable for the deadly crash. Figure 7c causality
+is much clearer because D has no causal influence on T at all.
+Lastly, we will notice that none of the models has a principal. So
+we need to determine whoA is accountable to. In the real world this
+role will be filled with the authorities, so we would need to make
+sure that they have all the evidence they need to understand the
+actions ofA. So far, just judging from the SCMs, we could either pick
+Lindberg’s or Boven’s definition. Here, we would pick Lindberg’s
+because is has the notion that P might inspect the behavior of A on
+demand. Boven’s suggests regular reports, which seem unnecessary
+for a car because accidents are rare. Boven’s would be more suitable
+if we were, for example, checking for violations of the speed limit.
+Given the three possible designs for the system, which would be
+the easiest to make Lindberg accountable? Figure 7c, where D has
+no causal influence and V is inhibited by U , is attractive because
+onlyU is left as an agent. There would be no confusion about ac-
+countability. However, Figure 7a or Figure 7b might be attractive
+in practice because keeping the human-in-the-loop allows the tech-
+nical system to make wrong decisions without clear accountability
+of the manufacturer.
+5.3 Leveraging the Structure ofM
+Specific structures in causal models allow us to prove that one
+variable cannot affect another in a specific way, even if there is a
+path between those two variables. Two such structures are the Front
+and the Back-Door Criterion (see Appendix B.2). Knowing that a
+specific variable has no causal influence on another is invaluable
+for the design of a system, because this means that we do not
+need to measure (or “log”) it. This is helpful from an engineering
+perspective, because it allows us to not store specific data and thus
+19Note that in general showing that two causal models are equivalent is not trivial
+and cannot be treated as a graph problem; see Appendix B.4.
+432
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Severin Kacianka and Alexander Pretschner
+save the cost for storage and the development of the data logging
+functionality. It is also often desirable from a privacy perspective,
+because it allows to justify not storing specific sensitive data. So if
+we can, for example, show that skin color or religion have no causal
+influence, we can justify not logging them, without compromising
+a system’s accountability. To return to our example in Figure 7c, we
+might just be interested in the effect of S onT . The question now is,
+what other values do we need to control for to calculate the effect
+of S on T ?20 Employing the Back-Door Criterion, we can see that
+we do have an open backdoor path, namely S ← U → E → T , that
+will confound our estimate of the effect of S on T . To deconfound
+this reading, we could either control forU , E, or both of them. This
+now allows us to justify not logging one of these variables, provided
+we are only interested in the effect of S on T .
+5.4 Actual Causality
+So far we used our models in a type causal manner, that is we
+looked at the future, ensuring that the accountability for a specific
+event was clear and easy to attribute. How would we now use this
+model after an accident has actually happened? For this we can
+employ actual causality reasoning (see Section 3.2).21 First, we need
+to ensure that we can set the context correctly. So in our real-world
+system, we need sensors and logs that can tell us what has actually
+happened. Here we can leverage the fact that a causal model is
+determined by its exogenous variables.22 Looking at Figure 7, we
+have three exogenous variables:UU for Uber,UV for Volvo, and
+UD for the safety driver. All can be either true or f alse .
+If we measure UU = f alse,UV = f alse,UD = f alse and
+assume the model in Figure 7a, will a crash occur?
+E = f alse
+S = U = f alse
+T = S ∨ E ∨ D = f alse ∨ f alse ∨ f alse = f alse
+P = ¬T = true
+Here we can read this as Neither Uber nor the driver, nor Volvo tried
+to change the trajectory, therefore the car crashed into the pedestrian.
+However, this sentence already includes the counterfactual assump-
+tion Had either Uber, the driver, or Volvo done something else, the
+crash would not have happened. We can now formally check if this is
+correct. Since we assumed the model to be binary, there is only one
+other thing the agents could have done, namely whatever makes
+their “measurement” true .23 So, we can change the value ofU 24 in
+the model and see if the result changes.
+E = f alse
+S = U = true
+T = S ∨ E ∨ D = true ∨ f alse ∨ true = true
+P = ¬T = f alse
+20Here binary models are not the best examples. It is easier to think of S and E
+contributing different amounts to a real valued function.
+21For ways to automatically check these models, see [23–25].
+22In this example we ignore any uncertainty. The reasoning works similarly, but the
+results would be probability distributions.
+23This simplicity makes binary models so popular for textbook examples. However, it
+is obvious that in the real world defining “something else” will be tricky.
+24Note that we just change the endogenous variable, not the exogenous variable UU .
+This setting can be read as Uber changed the trajectory and therefore
+the car did not crash into the pedestrian. So we can say that because
+there is a counterfactual world in which U could have prevented
+the crash,U is a cause for the crash to happen. If we now look at
+the causal model for Figure 7c, we see that T = ¬S ∨ ¬E, so D has
+no influence onT (or any other variable in the model). If D = f alse ,
+we would get the same result as above. However, if in the SCM
+above, we were to set D = true , T would be true and the crash
+would be prevented. What would now happen in Figure 7c?
+E = f alse
+S = U = f alse
+T = S ∨ E = f alse ∨ f alse = f alse
+P = ¬T = true
+Despite the fact that we set D = true , so the driver tried to prevent
+the accident in the counterfactual world, the accident still happens.
+This means that D is not a possible cause for the accident and, since
+causality is a requirement for accountability, can also not be held
+accountable for the crash.
+6 CONCLUSION
+Accountability is embedded deep into the fabric of society. Algo-
+rithmic systems need to be designed in a way that conforms with
+these societal expectations. This means that such important design
+decisions cannot be hidden deep within the system. They need to
+be made explicit, communicated, and discussed. SCMs are uniquely
+suitable for that because they allow us to formalize causality, the
+necessary core of all definitions of accountability. In the current
+literature, SCMs are mainly used in scientific studies. The models
+there are small and communicate assumptions about mechanisms
+in a study. Developing SCMs for socio-technical systems is, despite
+some early work, still a hard problem. Similarly, no clear-cut ways
+of identifying principals or express definitions of accountability as
+SCMs exists.
+Despite these open problems, we are convinced that SCMs of-
+fer the clarity that is a requirement to make meaningful design
+decisions. While SCMs are not sufficient to ensure accountability,
+a correct understanding of the underlying causal mechanisms is
+necessary for any notion of accountability. Expressing this as an
+SCM allows us to realize that we need certain structures in sys-
+tems to enable accountability. Without these structures, a system
+cannot be accountable. Once we have identified a specific struc-
+ture, we can utilize existing definitions of accountability and reuse
+the knowledge that comes with them; we do not need to invent
+our own notions of accountability. SCMs are a powerful tool to
+analyze systems and, if they are not accountable, provide a well-
+reasoned argument why this is the case, and how the system should
+be improved.
+ACKNOWLEDGMENTS
+This work was supported by the Deutsche Forschungsgemeinschaft
+(DFG) under grant no. PR1266/3-1, Design Paradigms for Societal-
+Scale Cyber-Physical Systems and the Bavarian Research Institute
+for Digital Transformation (bidt).
+433
+Designing Accountable Systems FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+REFERENCES
+[1] Mike Ananny and Kate Crawford. 2018. Seeing without knowing: Limitations
+of the transparency ideal and its application to algorithmic accountability. New
+Media & Society 20, 3 (2018), 973–989.
+[2] Steen A Andersson, David Madigan, Michael D Perlman, and others. 1997. A
+characterization of Markov equivalence classes for acyclic digraphs. The Annals
+of Statistics 25, 2 (1997), 505–541.
+[3] Julia Angwin, Jeff Larson, Surya Mattu, and Lauren Kirchner. 2016. Machine
+Bias: There’s software used across the country to predict future criminals. And
+it’s biased against blacks. ProPublica 2016. (2016).
+[4] Sander Beckers and Joseph Y Halpern. 2019. Abstracting causal models. In
+Proceedings of the AAAI Conference on Artificial Intelligence, Vol. 33. 2678–2685.
+[5] Marc F Bellemare and Jeffrey R Bloem. 2019. The Paper of How: Estimating
+Treatment Effects Using the Front-Door Criterion. Technical Report.
+[6] Mark Bovens. 2007. Analysing and assessing accountability: A conceptual frame-
+work 1. European law journal 13, 4 (2007), 447–468.
+[7] Hana Chockler and Joseph Y Halpern. 2004. Responsibility and blame: A
+structural-model approach. Journal of Artificial Intelligence Research 22 (2004),
+93–115.
+[8] Anupam Datta, Deepak Garg, Dilsun Kaynar, Divya Sharma, and Arunesh Sinha.
+2015. Program actions as actual causes: A building block for accountability. In
+2015 IEEE 28th Computer Security Foundations Symposium. IEEE, 261–275.
+[9] Morris H DeGroot, Stephen E Fienberg, and Joseph B Kadane. 1986. Statistics
+and the Law. Wiley New York.
+[10] Nicholas Diakopoulos. 2015. Algorithmic accountability: Journalistic investiga-
+tion of computational power structures. Digital journalism 3, 3 (2015), 398–415.
+[11] Melvin Dubnick. 2010. ’A Moral Being is an Accountable Being’: Adam Smith
+and the Ethical Foundations of Accountable Governance. In 68th Annual Meeting
+of the Midwest Political Science Association, March. 22–25.
+[12] Madeleine Clare Elish. 2019. Moral crumple zones: Cautionary tales in human-
+robot interaction. Engaging Science, Technology, and Society 5 (2019), 40–60.
+[13] Joan Feigenbaum, Aaron D Jaggard, and Rebecca N Wright. 2011. Towards
+a formal model of accountability. In Proceedings of the 2011 workshop on New
+security paradigms. ACM, 45–56.
+[14] Joan Feigenbaum, Aaron D Jaggard, Rebecca N Wright, and Hongda Xiao. 2012.
+Systematizing “Accountability” in Computer Science (Version of Feb. 17, 2012).
+Technical Report. YALEU/DCS/TR-1452, Yale University, New Haven, CT.
+[15] M Felici and S Pearson. 2014. D: C-2.1 Report detailing conceptual framework.
+Deliverable D32 1 (2014), A4CLOUD. http://cloudaccountability.eu/sites/default/
+files/D32.1%20Conceptual%20Framework.pdf
+[16] Clark Glymour, David Danks, Bruce Glymour, Frederick Eberhardt, Joseph Ram-
+sey, Richard Scheines, Peter Spirtes, Choh Man Teng, and Jiji Zhang. 2010. Actual
+causation: a stone soup essay. Synthese 175, 2 (2010), 169–192.
+[17] Sander Greenland, Judea Pearl, and James M Robins. 1999. Causal diagrams for
+epidemiologic research. Epidemiology (1999), 37–48.
+[18] Angela T. Hall, Dwight D. Frink, and M. Ronald Buckley. 2017. An accountability
+account: A review and synthesis of the theoretical and empirical research on felt
+accountability. Journal of Organizational Behavior 38, 2 (2017), 204–224. DOI:
+http://dx.doi.org/10.1002/job.2052 JOB-13-0646.R4.
+[19] Joseph Y Halpern. 2015. A Modification of the Halpern-Pearl Definition of
+Causality. In International Joint Conference on Artificial Intelligence. 3022–3033.
+https://www.aaai.org/ocs/index.php/IJCAI/IJCAI15/paper/view/11058/11085
+[20] Joseph Y Halpern. 2016. Actual causality. MIT Press.
+[21] Christopher Hitchcock. 2007. Prevention, preemption, and the principle of
+sufficient reason. The Philosophical Review 116, 4 (2007), 495–532.
+[22] Amjad Ibrahim, Severin Kacianka, Alexander Pretschner, Charles Hartsell, and
+Gabor Karsai. 2019. Practical Causal Models for Cyber-Physical Systems. In
+NASA Formal Methods Symposium. Springer, 211–227.
+[23] Amjad Ibrahim, Tobias Klesel, Ehsan Zibaei, Severin Kacianka, and Alexander
+Pretschner. 2020. Actual Causality Canvas: AGeneral Framework for Explanation-
+based Socio-Technical Constructs. In ECAI 2020, the 24th European Conference
+on Artificial Intelligence (Frontiers in Artificial Intelligence and Applications). IOS
+Press, 2978 – 2985. DOI:http://dx.doi.org/DOI10.3233/FAIA200472
+[24] Amjad Ibrahim and Alexander Pretschner. 2020. From Checking to Inference:
+Actual Causality Computations as Optimization Problems. In Automated Tech-
+nology for Verification and Analysis, Dang Van Hung and Oleg Sokolsky (Eds.).
+Springer International Publishing, Cham, 343–359.
+[25] Amjad Ibrahim, Simon Rehwald, and Alexander Pretschner. 2019. Efficient
+checking of actual causality with sat solving. Engineering Secure and Dependable
+Software Systems 53 (2019), 241.
+[26] Amin Jaber, Jiji Zhang, and Elias Bareinboim. 2019. Causal identification un-
+der markov equivalence: Completeness results. In International Conference on
+Machine Learning. 2981–2989.
+[27] Severin Kacianka, Kristian Beckers, Florian Kelbert, and Prachi Kumari. 2017.
+How accountability is implemented and understood in research tools. In Inter-
+national Conference on Product-Focused Software Process Improvement. Springer,
+199–218.
+[28] Severin Kacianka, Amjad Ibrahim, Alexander Pretschner, Alexander Trende, and
+Andreas Lüdtke. 2019. Extending Causal Models from Machines into Humans. In
+Proceedings of the 4th Workshop on Formal Reasoning about Causation, Responsi-
+bility, and Explanations in Science and Technology, CREST@ETAPS 2019, Prague,
+Czech Republic, 7th April 2019 (EPTCS), Georgiana Caltais and Jean Krivine (Eds.),
+Vol. 308. 17–31. DOI:http://dx.doi.org/10.4204/EPTCS.308.2
+[29] Severin Kacianka and Alexander Pretschner. 2018. Understanding and Formaliz-
+ing Accountability for Cyber-Physical Systems. In 2018 IEEE International Con-
+ference on Systems, Man, and Cybernetics (SMC). IEEE, 3165–3170.
+[30] Mareile Kaufmann, Simon Egbert, and Matthias Leese. 2018. Predictive policing
+and the politics of patterns. The British Journal of Criminology 59, 3 (2018),
+674–692.
+[31] Ralf Küsters, Tomasz Truderung, and Andreas Vogt. 2010. Accountability: defini-
+tion and relationship to verifiability. In Proceedings of the 17th ACM conference
+on Computer and communications security. ACM, 526–535.
+[32] Leslie Lamport. 1978. Time, Clocks, and the Ordering of Events in a Distributed
+System. Commun. ACM (1978).
+[33] Staffan I Lindberg. 2013. Mapping accountability: core concept and subtypes.
+International review of administrative sciences 79, 2 (2013), 202–226. DOI:http:
+//dx.doi.org/10.1177/0020852313477761
+[34] Richard G Lomax and Randall E Schumacker. 2004. A beginner’s guide to structural
+equation modeling. Psychology Press.
+[35] Tim Miller. 2018. Explanation in artificial intelligence: Insights from the social
+sciences. Artificial Intelligence (2018).
+[36] Brent Mittelstadt, Chris Russell, and Sandra Wachter. 2019. Explaining Ex-
+planations in AI. In Proceedings of the Conference on Fairness, Accountabil-
+ity, and Transparency (FAT* ’19). ACM, New York, NY, USA, 279–288. DOI:
+http://dx.doi.org/10.1145/3287560.3287574
+[37] Michael Moore. 2019. Causation in the Law. In The Stanford Encyclopedia of
+Philosophy (winter 2019 ed.), Edward N. Zalta (Ed.). Metaphysics Research Lab,
+Stanford University.
+[38] Helen Nissenbaum. 1996. Accountability in a computerized society. Science and
+engineering ethics 2, 1 (1996), 25–42.
+[39] Safiya Umoja Noble. 2018. Algorithms of oppression: How search engines reinforce
+racism. NYU Press.
+[40] NTSB. 2018. Collision Between Vehicle Controlled by Developmental Automated
+Driving System and Pedestrian. https://www.ntsb.gov/investigations/Pages/
+HWY18FH010.aspx. (2018). [Online; acc. 2020-10-01].
+[41] Cathy O’Neil. 2016.Weapons of math destruction: How big data increases inequality
+and threatens democracy. Broadway Books.
+[42] Judea Pearl. 2000. Causality: models, reasoning, and inference.
+[43] Judea Pearl. 2009. Causality. Cambridge University Press.
+[44] Judea Pearl, Madelyn Glymour, and Nicholas P Jewell. 2016. Causal inference in
+statistics: A primer. John Wiley & Sons.
+[45] Judea Pearl and Dana Mackenzie. 2018. The Book of Why. New York, NY: Basic
+Books.
+[46] PMI. 2017. A guide to the project management body of knowledge (PMBOK guide).
+Project Management Institute, Inc.
+[47] Nikolaus Pöchhacker and Severin Kacianka. 2020. Algorithmic Accountability in
+Context. Socio-technical perspectives on structural causal model. Frontiers in Big
+Data 3 (2020), 55.
+[48] A Radhakrishnan, Liam Solus, and C Uhler. 2017. Counting Markov equivalence
+classes by number of immoralities. In 33rd Conference on Uncertainty in Artificial
+Intelligence, UAI 2017, Sydney, Australia, 11 August 2017 through 15 August 2017.
+AUAI Press Corvallis.
+[49] Michael L Smith, James Erwin, and Sandra Diaferio. 2005. Role & responsibility
+charting (RACI). In Project Management Forum (PMForum). 5.
+[50] Ray Stern. 2020. Uber Backup Driver Indicted in 2018 Self-Driving Crash That
+Killed Woman. https://www.phoenixnewtimes.com/news/uber-backup-driver-
+in-phoenix-indicted-over-fatal-self-driving-car-crash-in-18-11494111. (2020).
+[Online; acc. 2020-10-01].
+[51] Santtu Tikka and Juha Karvanen. 2017. Identifying Causal Effects with the R
+Package causaleffect. Journal of Statistical Software, Articles 76, 12 (2017), 1–30.
+DOI:http://dx.doi.org/10.18637/jss.v076.i12
+[52] Thomas Verma and Judea Pearl. 1992. An algorithm for deciding if a set of
+observed independencies has a causal explanation. In Uncertainty in artificial
+intelligence. Elsevier, 323–330.
+[53] Sandra Wachter, Brent Mittelstadt, and Chris Russell. 2017. Counterfactual
+Explanations without Opening the Black Box: Automated Decisions and the
+GPDR. Harv. JL & Tech. 31 (2017), 841.
+[54] Daniel J. Weitzner, Harold Abelson, Tim Berners-Lee, Joan Feigenbaum, James
+Hendler, and Gerald Jay Sussman. 2008. Information Accountability. Commun.
+ACM 51, 6 (June 2008), 82–87. DOI:http://dx.doi.org/10.1145/1349026.1349043
+[55] Maranke Wieringa. 2020. What to account for when accounting for algorithms:
+a systematic literature review on algorithmic accountability. In Proceedings of the
+2020 Conference on Fairness, Accountability, and Transparency. 1–18.
+434
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Severin Kacianka and Alexander Pretschner
+A ACTUAL CAUSALITY
+The Halpern-Pearl (HP) definition25 uses the following formaliza-
+tion of a causal model, based on Pearl’s work on type causality
+[19]:
+Definition A.1 (Actual Causal Model). A causal modelM is a tuple
+M = ((U,V,R),F ), where
+• U is a set of exogenous variables,
+• V is a set of endogenous variables,
+• R : associates every variable with a nonempty set R(Y ) of
+possible values Y ,
+• F associates with each variableX ∈ V a function that deter-
+mines the value of X (from the set of possible values R(X ))
+given the values of all other variables FX : (×U ∈UR(U )) ×
+(×Y ∈V−{X }R(Y )) → R(X ).
+A primitive event, given (U,V,R), is a formula of the form
+X = x for X ∈ V and x ∈ R(X ). A causal formula is of the form
+[Y1 ← y1, . . . ,Yk ← yk ]φ, where φ is a Boolean combination of
+primitive events. Y1, . . . ,Yk (abbreviated −→Y ) are distinct variables
+inV , and yi ∈ R(Yi ). Intuitively, this notation says that φ would
+hold if Yi were set toyi for each i . (M,−→u ) |= X = x if the variableX
+has value x in the unique solution to the equations inM in context
+−→u (i.e., the specific values of the variables). An intervention on a
+model is expressed either by setting the values of −→X to −→x , written
+as [X1 ← x1, ..,Xk ← xk ], or by fixing the values of −→X in the
+model, written asM−→
+X←−→x . So, (M,
+−→u ) |= [−→Y ← −→y ]φ is identical to
+(M−→
+Y←−→y ,
+−→u ) |= φ.
+Using this definition of a causal model, an actual cause is defined
+as [19]:
+Definition A.2 (Actual Cause).
+−→
+X = −→x is an actual cause of φ in
+(M,−→u ) if the following three conditions hold:
+AC1. (M,−→u ) |= (−→X = −→x ) and (M,−→u ) |= φ.
+AC2. There is a set −→W of variables inV and a setting −→x ′ of the
+variables in −→X such that if (M,−→u ) |= −→W = −→w , then (M,−→u ) |= [−→X ←
+−→x ′,−→W ← −→w ]¬φ.
+AC3.
+−→
+X is minimal, i.e., no subset of −→X fulfills AC1 and AC2.
+Informally26 AC1 just says that a specific event −→X = −→x actually
+happened, otherwise it cannot be a cause. The minimality condition
+AC3 ensures that only relevant events are part of a cause. In Figure 2,
+for example, it would remove the detail that Alice is alive from the
+cause. AC2 is the most complex condition and is thus traditionally
+explained last in any text. Here the idea is that we can show that
+ϕ depends on −→X as long as we keep the variables in −→W fixed. This
+allows us to find that only the variables in −→X are affecting the
+outcome (and none of the variables in −→W do).
+25It is important to note that the HP definition is just one possible way to define
+causality. As [20, Ch. 2.2.2] puts it so eloquently after introducing all the details of
+the HP definition: “At this point, ideally, I would prove a theorem showing that some
+variant of the HP definition of actual causality is the ‘right’ definition of actual causality.
+But I know of no way to argue convincingly that a definition is the ‘right’ one; the
+best we can hope to do is to show that it is useful.”
+26For an in-depth discussion of all conditions and especially AC2,[20, Ch. 2.2.2] is the
+most thorough resource.
+X
+Z
+Y
+Ux
+Uz
+Uy
+(a) Chain.
+Y
+X
+Z
+Uy
+Ux
+Uz
+(b) Fork.
+X
+Z
+Y
+Ux
+Uz
+Uy
+(c) Collider.
+Figure 8: Three common structures in causalmodels.Ux ,Uy,
+and Uz denote the exogenous variables. X , Y , and Z are the
+endogenous variables.
+Coming back to the example depicted in Figure 2, we would
+have three endogenous variables: AT for Alice texted, BR for Bob
+runs a red light, and AH for accident happens as well the exogenous
+variablesUa andUb that set the value of the endogenous variables.
+For simplicity, all variables can be true or false. It is important to
+note that this example assumes that there are no other factors that
+could influence the chain of events. If there were, the model would
+be wrong and would need to be improved. It is thus important
+that each causal model is discussed and ideally peer reviewed. It
+is not enough to have a model: we also need a clear rational for
+that model. Of course this will then cause second order questions
+of the correctness of models, the bias of the modelers, and even
+who is allowed to create the models.27 Here we simply assume that
+a causal model is a correct and detailed enough representation of
+reality.
+B SPECIAL STRUCTURES IN SCMS
+B.1 Chains, Forks, and Colliders
+In graphical causal models, some basic structures will arise repeat-
+edly. Chains, forks, and colliders exhibit very specific rules for
+causal (in-)dependence [44, p. 35ff]. Figure 8 depicts these three
+structures. In contrast to the usual convention, we also model the
+exogenous variables Ux , Uy, and Uz here. In most causal mod-
+els, only the endogenous variables, here X , Y , and Z are modeled.
+Exogenous variables “stand for any unknown or random effect
+27See [47] for some discussions of this topic.
+435
+Designing Accountable Systems FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+that may alter the relationship between endogenous variables” [44,
+p. 36] and they are assumed to be independent of each other.
+The important advantage of causal models is that in these struc-
+tures several (in-)dependencies hold, regardless of the function
+between those variables. If we now look at Figure 8a, Z is always
+dependent on X . So, if we see the value of X change, we will usu-
+ally also see the value of Z change. Next, Y is likely dependent on
+X . The reason for this is that Y depends on Z for its value and Z
+depends on X for its value. However, there are rare cases where
+changes in X will not affect Y .28 And finally, X and Y are inde-
+pendent, conditional on Z . The reason is that conditioning on a
+variable means that we fix its value. If we had a dataset consisting
+of three values, X , Y , and Z , we would only look at the values of X
+and Y , where Z has a specific value. What happens here is that Uz
+changes to keep Z at this specific value. So whenever X changes,
+Uz would compensate for that change to keep Z constant and as Y
+only depends on Z and not on Uz, its value is independent of the
+changes in X .
+Figure 8b depicts a fork. Here, Y and Z both depend on X and
+this also means that Y and Z are likely dependent. The reason is
+that since both depend onX , a change in one will inform us that the
+other will also likely change. However, there are also cases where
+this is not the case. Finally,Y and Z are independent, conditional on
+X . Similar to the chain above, once we hold X constant, a change
+in either Y or Z no longer indicates a change in the other. In this
+structure, X is called a common cause.
+The third basic structure, a collider, is depicted in Figure 8c.
+Here, we can see that Z is dependent on X and Y and X and Y are
+independent, because they are not in a parent-child relationship and
+their exogenous variableUx andUy are assumed to be independent.
+The most surprising property of a collide is that X and Y become
+dependent, conditional on Z . While it might be surprising that two
+independent variables can suddenly become dependent, it can be
+illustrated with a simple example [44, p. 41]: If, we assumeX+Y = Z
+andX and Y are independent, knowing thatX = 3 does not tell you
+anything about Y . However, the moment you know that Z = 10,
+knowing that X = 3 lets you deduce that Y = 7.
+This concept of (in-)dependence can now be generalized for
+all graphs with the concept of d-separation. This means that two
+variables are independent if every path between them is blocked.
+Formally [44, p. 46],
+Definition B.1 (d-seperation). A pathp is blocked by a set of nodes
+Z if and only if
+(1) p contains a chain of nodesA→ B → C , or a forkA← B →
+C , such that the middle node B is in Z (i.e., B is conditioned
+on), or
+(2) p contains a collider A → B ← C such that the collosion
+node B is not in Z , and no descendant of B is in Z .
+If Z blocks every path between two nodes X and Y , then X
+and Y are d-separated, conditional on Z , and thus are independent
+conditional on Z .
+B.2 Analyzing Causal Models
+[45, p. 157] distills these properties of causal models into four rules:
+28See [44, p. 38] for an example.
+(1) In a chain junction, A → B → C , controlling for B prevents
+information about A from getting to C or vice versa.
+(2) Likewise, in a fork or confounding junction, A ← B → C ,
+controlling for B prevents information about A from getting to
+C and vice versa.
+(3) In a collider, A→ B ← C , exactly the opposite rules hold. The
+variables A and C start out independent, so that information
+about A tells you nothing about C . But if you control for B,
+then information starts flowing through the “pipe”, due to the
+explain-away effect.
+(4) Controlling for descendants (or proxies) of a variable is like
+“partially” controlling for the variable itself. Controlling for a
+descendant of a mediator partly closes the pipe; controlling for
+a descendant of a collider partly opens the pipe.
+Even if we have a long causal path, it is enough that one junction
+blocks the information flow. To deconfound two variables, we need
+to block any noncausal path while not blocking any causal path.
+This leads to two prominent criteria to identify causal independence:
+The Back-Door and the Front-Door Criterion.29
+B.2.1 The Back-Door Criterion.
+Definition B.2 (The Back-Door Criterion). Given an ordered pair
+of variables (X ,Y ) in a directed acyclic graph G, a set of variables
+Z satisfies the Back-Door Criterion relative to (X ,Y ) if no node in
+Z is a descendant of X , and Z blocks every path between X and Y
+that contains an arrow into X .
+Intuitively, the Back-Door Criterion [44, p. 61] ensures that (1)
+all spurious paths between X and Y are blocked, (2) all directed
+paths from X to Y are not perturbed, and (3) no new spurious paths
+are added.30
+B.3 The Front-Door Criterion
+Definition B.3 (The Front-Door Criterion). A set of variables Z is
+said to satisfy the Front-Door Criterion relative to an ordered pair
+of variables (X ,Y ) if
+(1) Z intercepts all directed paths from X to Y .
+(2) There is no unblocked path from X to Z .
+(3) All back-door paths from Z to Y are blocked by X .
+Intuitively, the Front-Door Criterion [44, p. 69] relies on the
+fact that one can identify the effect of X on Z and the effect of
+Z on Y separately. This works because Z , so the mechanism (or
+mediator) by which X affects Y , is not affected by any unobserved
+confounders.31 Having identified the separate effect, we can then
+calculate the effect from X on Y .32
+B.4 Comparing an SCM to an Accountability
+Definition
+In our approach, we end upwith two causalmodels.M = ((U,V,R),F )
+is an SCM of the system that should be accountable and D =
+29All of the following examples are based on examples given by [45]; [51] provide a
+tool to automate the analysis.
+30[17] give a detailed and in-depth explanation of the Back-Door Criterion and why it
+works on graphical models.
+31The Front-Door Criterion will also work if Z is only weakly affected by a confounder.
+The results will, however, get more imprecise the bigger Z is influenced.
+32See [5] for an in-depth discussion of the application of the front-door criterion.
+436
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Severin Kacianka and Alexander Pretschner
+A C
+(a) F = {C = A}
+A B C
+(b) F = {C = B, B = A}
+Figure 9: Two models that are equivalent with regard to A
+and C.
+A C
+(a) F = {C = A}
+A C
+(b) F = {C = ¬A}
+Figure 10: Despite their similar structure, these two models
+are not equivalent.
+((U ′,V ′,R ′),F ′) is an SCM of an accountability definition. Here
+it is very important to notice that in general the signatures of the
+two models will be different, i.e. (U,V,R) , (U ′,V ′,R ′). The
+reason for this is that the model of a system will usually contain
+more nodes than those of a definition. This is in so far a problem
+because much of the literature on the equivalence of causal models
+is concerned with so called Markov Equivalence Classes33, which
+requires the signatures of the models to be identical. This, however,
+is not useful in comparing accountability models to system models
+because their signature will always be different. D is supposed to
+be a small model focused on the important aspects of accountability,
+whileM is supposed to represent a whole system.
+Figure 9 depicts two causal models. In Figure 9a, A causes C
+directly, whereas in Figure 9b A causes C via a mediator B. The
+question now is if these two models are equivalent and if so what
+this means. If we just look at the graph structure, these two models
+are different. One has three endogenous variables and the other
+only two. However, if we look at structural equations of this model,
+we can see that B does not affect the influence of A on C . So any
+useful notion of equivalence would need to find that these two
+models are equivalent. If it would not, this notion of equivalence
+would be next to useless because one can always include additional
+intermediate variables in any causal model. Figure 10 depicts two
+models that have a similar structure, but are functionally their
+complete opposite. Any notion of equivalence should find these
+two models distinct.
+33See for example [2, 48, 52] and [26] for recent advances.
+437

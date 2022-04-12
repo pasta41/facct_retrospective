@@ -1,0 +1,1289 @@
+Fair Clustering via Equitable Group Representations∗
+Mohsen Abbasi
+mohsen@cs.utah.edu
+University of Utah
+Aditya Bhaskara
+bhaskara@cs.utah.edu
+University of Utah
+Suresh Venkatasubramanian
+suresh@cs.utah.edu
+University of Utah
+ABSTRACT
+What does it mean for a clustering to be fair? One popular approach
+seeks to ensure that each cluster contains groups in (roughly) the
+same proportion in which they exist in the population. The norma-
+tive principle at play is balance: any cluster might act as a repre-
+sentative of the data, and thus should reflect its diversity.
+But clustering also captures a different form of representative-
+ness. A core principle in most clustering problems is that a cluster
+center should be representative of the cluster it represents, by be-
+ing “close" to the points associated with it. This is so that we can
+effectively replace the points by their cluster centers without sig-
+nificant loss in fidelity, and indeed is a common “use case” for
+clustering. For such a clustering to be fair, the centers should “rep-
+resent” different groups equally well. We call such a clustering a
+group-representative clustering.
+In this paper, we study the structure and computation of group-
+representative clusterings. We show that this notion naturally paral-
+lels the development of fairness notions in classification, with direct
+analogs of ideas like demographic parity and equal opportunity.
+We demonstrate how these notions are distinct from and cannot be
+captured by balance-based notions of fairness. We present approx-
+imation algorithms for group representative 𝑘-median clustering
+and couple this with an empirical evaluation on various real-world
+data sets. We also extend this idea to facility location, motivated by
+the current problem of assigning polling locations for voting.
+KEYWORDS
+algorithmic fairness, clustering, representation
+ACM Reference Format:
+Mohsen Abbasi, Aditya Bhaskara, and Suresh Venkatasubramanian. 2021.
+Fair Clustering via Equitable Group Representations. In Conference on Fair-
+ness, Accountability, and Transparency (FAccT ’21), March 3–10, 2021, Virtual
+Event, Canada. ACM, New York, NY, USA, 11 pages. https://doi.org/10.1145/
+3442188.3445913
+1 INTRODUCTION
+Growing use of automated decision making has sparked a debate
+concerning bias, and what it means to be fair in this setting. As a
+result, an extensive literature exists on algorithmic fairness, and
+∗
+This research was funded in part by the NSF under grants IIS-1633724 and CCF-
+2008688.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+© 2021 Association for Computing Machinery.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+https://doi.org/10.1145/3442188.3445913
+in particular on how to define fairness for problems in supervised
+learning [18, 19, 22, 34–36]. However, these notions are not readily
+applicable to unsupervised learning problems such as clustering.
+One reason is that unlike in the supervised setting, a well-defined
+notion of ground truth does not exist in such problems. In 2017,
+[15] proposed the idea of balance as a notion of fairness in cluster-
+ing. Given a set of data points with a type assigned to each one,
+balance asks for a clustering where each cluster has roughly the
+same proportion of types as the overall population. This definition
+spawned a flurry of research on efficient algorithms for fair clus-
+tering [3, 14, 15, 27, 28, 37, 39]. Further work by other researchers
+has extended this definition, but with the same basic principle of
+proportionality [2, 6, 7, 9, 23, 24, 42].
+Balance draws its meaning from the perspective of clustering as
+a generalization of classification from two to many categories. If
+we select individuals into multiple categories where each category
+has some associated benefits (or harms), balance asks that differ-
+ent groups receive these benefits or harms in similar proportions.
+For example, a tool that assigns individuals to different categories
+based on the loan packages being offered might attempt to ensure
+demographic balance across all categories.
+But an important purpose of clustering is to find representatives
+for points by grouping them and choosing a representative (like a
+cluster center). Consider for example the problem of redistricting
+– where the goal is to partition a region into districts, each served
+by one representative who can speak to the concern of the district.
+The criterion of balance, applied (say) to partisan affiliation, will
+result in districts that have a proportional number of residents
+associated with each party. This is unfortunately the worst kind of
+redistricting! It is a form of gerrymandering known as cracking, and
+results in the majority party being able to control representation in
+all the districts.
+In fact the vast majority of clustering formulations focus on the
+problem of quality representation. And the quality of representa-
+tion is usually measured by some form of distance to the chosen
+representative – the greater the distance, the poorer the represen-
+tation. There are serious implications for fairness as measured in
+terms of "access", and we illustrate this with an example of current
+concern.
+Consider the placement of polling locations. A study showed
+that in the 2016 US presidential election, voters in predominantly
+black neighborhoods waited 29 percent longer at polling locations,
+than those in white neighborhoods [13], and in 2020 we are cur-
+rently seeing polling locations removed or merged because of the
+pandemic. The clustering here is the induced clustering where each
+resident is associated with a specific polling location (the repre-
+sentative) and the quality of representation can be measured as a
+function both of the distance to the polling location and the waiting
+time at the location itself.
+504
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Abbasi, et al.
+Figure 1: Balance is preserved in the left hand figure but the
+centers are much more representative of the red points. In
+contrast the clustering on the right represents both groups
+comparably
+It is easy to see that balance criteria cannot accurately capture
+the goal of representation equity. To illustrate why, see the example
+presented in Figure 1, which shows a balance-preserving 𝑘-means
+clustering on the left for two groups denoted by the colors red
+and blue, and regular 𝑘-means clustering on the right. Here, the
+number of red points is larger than the other group. Therefore, each
+cluster center is chosen close to its respective red group’s centroid.
+As a result, red points are better represented by chosen centers
+compared to blue points.
+1.1 Our contributions
+In this paper we introduce a new way to think about fairness in
+clustering based on the idea of equity in representation for groups.
+We present a number of different ways of measuring representative-
+ness and interestingly, show that they a) naturally parallel standard
+notions of fairness in the supervised learning literature and b) are
+incompatible in the same way that different notions of fairness
+in supervised learning are. We present algorithms for computing
+fair clusterings under these notions of fairness. These algorithms
+come with formal approximation guarantees – we also present an
+empirical study of their behavior in the context of the problem of
+polling location placement.
+A second key contribution of this work takes advantage of the
+relation between clustering and the associated problem of facility
+location. In most clustering problems, the number of clusters that
+the algorithm must produce is fixed in advance. In the context
+of polling, this is equivalent to specifying the number of polling
+locations to be established ahead of time. But we can associate
+a cost with opening a new facility (or cluster center), giving us
+a choice of either assigning a point to a center that might be far
+away or opening a new center that might be closer. This is the
+well known problem of facility location[40] – it is closely related to
+clustering
+1
+. Again returning to the context of polling, the framing
+in terms of facility location allows for the possibility of creating
+new polling locations if the cost of opening can be “paid for” in
+terms of improved access. We define what representation equity
+means in the context of facility location and present algorithms
+(and experimental support) as well. Our algorithms also allow us
+to incorporate load balancing between different facilities. In the
+context of polling, we can ensure that no more than 𝑈 voters are
+assinged to a polling location, for a user-specified threshold𝑈 .
+1
+We can think of facility location as the Lagrangian relaxation of clustering where the
+hard constraint on the number of clusters is replaced by a term in objective function.
+1.2 Related Work
+Chierichetti et al. [15] introduced balance as a fairness constraint
+in clustering for two groups. Considering the same setting with
+binary attribute for groups, Backurs et al. improved the running
+time of their algorithm for fair 𝑘-median [6]. Rösner and Schmidt
+[37] proposed a constant-factor approximation algorithm for fair
+𝑘-center problem with multiple protected classes. Bercea et al. [9]
+proposed bicriteria constant-factor approximations for several clas-
+sical clustering objectives and improved the results of Rösner and
+Schmidt. Bera et al. [8] generalized previous works by allowing
+maximum over- and minimum under-representation of groups in
+clusters, and multiple, non-disjoint sensitive types in their frame-
+work. Other works have studied multiple types setting [42], mul-
+tiple, non-disjoint types [23] and cluster dependent proportions
+[24].
+In a different line of work, Ahmadian et al. [3] studied fair 𝑘-
+center problemwhere there is an upper bound onmaximum fraction
+of a single type within each cluster. Chen et al. [14] studied a variant
+of fair clustering problem where any large enough group of points
+with respect to the number of clusters are entitled to their own
+cluster center, if it is closer in distance to all of them.
+A large body of works in the area of algorithmic fairness have
+focused on ensuring fair representation of all social groups in the
+machine learning pipeline [1, 10, 38]. Recent work by Mahabadi et
+al. [33], studies the problem of individually fair clustering, under the
+fairness constraint proposed by Jung et al. [25]. In their framework,
+if 𝑟 (𝑥) denotes the minimum radius such that the ball of radius 𝑟 (𝑥)
+centered at 𝑥 has at least 𝑛/𝑘 points, then at least one center should
+be opened within 𝑟 (𝑥) distance from 𝑥 . In recent independent work,
+Ghadiri et al. [20] propose a fair 𝑘-means objective similar to one
+of our objectives, and study a variant of Lloyd’s algorithm for
+determining cluster centers.
+2 FAIR CLUSTERING
+In this section we introduce notions of fair clustering that are rooted
+in the idea of equitable representation. To that end, we introduce
+different ways to measure the cost of group representation. We can
+then define a fair clustering.
+We start with some basic definitions. Given a set of points 𝑋 , a
+clustering is a partitioning
+2
+of 𝑋 into clusters 𝐶1,𝐶2, . . . ,𝐶𝑘 . For
+most of the paper we will consider clustering objectives that sat-
+isfy the Voronoi property: the optimal assignment for a point is
+the cluster center nearest to it. This includes the usual cluster-
+ing formulations like 𝑘-center, 𝑘-means and 𝑘-median. For such
+clusterings, the cluster center defines the cluster and thus we can
+represent a clustering more compactly as the set of cluster centers
+𝐶 = {𝑐1, 𝑐2, . . . , 𝑐𝑘 }. The cost of a clustering 𝐶 of a set of points 𝑃
+is given by the function cost𝐶 (𝑃). For any subset of points 𝑆 , we
+denote the cost of assigning 𝑆 to cluster centers in a given clustering
+𝐶 as cost𝐶 (𝑆). Finally, given a cost function cost and a set of points
+𝑋 we denote the set of centers in an optimal clustering of 𝑋 by
+Optcost (𝑋 ). When the context is clear, we will drop the subscript
+and merely write this as Opt(𝑋 ). As usual, an 𝛼-approximation
+2
+It is possible to define so-called soft clusterings in which a point might be assigned
+fractionally to multiple clusters. We do not consider such clusterings in this paper.
+505
+Fair Clustering FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+algorithm is that one that returns a solution that is within an 𝛼-
+multiplicative factor of Opt(𝑋 ).
+Each point in 𝑋 is associated with one of𝑚 groups (e.g., demo-
+graphic) that we wish to ensure fairness with respect to. We define
+the subset of points in group 𝑖 as 𝑋𝑖 .
+Definition 1. (Fair Clustering). Given𝑚 groups 𝑋1, 𝑋2, . . . , 𝑋𝑚 ,
+fair clustering minimizes the maximum average (representation)
+cost across all groups:
+argmin
+𝐶∈C
+max
+(
+1
+|𝑋1 |
+cost𝐶 (𝑋1), . . . ,
+1
+|𝑋𝑚 |
+cost𝐶 (𝑋𝑚)
+)
+where C is the set of all possible choices of cluster centers.
+Note that we are not trying to force all groups to have the same
+representation cost; that constraint can be trivially satisfied by
+ensuring all groups have a large cost (i.e via a poor representation).
+Rather, we want to ensure all groups have good representation
+while still ensuring that the gap between groups (measured by the
+group with the maximum cost) is small. This also distinguishes our
+definition from proposals for clustering cost that try to minimize
+the maximum cost across clusters [41] instead of across groups.
+2.1 Quality of group representation
+We now introduce different ways to measure the group representa-
+tion cost cost𝐶 (𝑋𝑖 ).
+Absolute Representation Error. In supervised learning, statistical
+parity captures the idea that groups should have similar outcomes.
+Rephrasing, it says that groups should be represented equally well
+in the output. In the case of binary classification, statistical parity
+requires
+Pr(ℎ(𝑥) = 1|𝑆 = 𝑎) = Pr(ℎ(𝑥) = 1|𝑆 = 𝑏)
+for two groups 𝑎 and 𝑏, where 𝑆 denotes the sensitive attribute.
+When clustering, the equivalent notion of statistical parity asks
+that cluster centers represent all groups equally well, regardless
+of their potentially different distributions. More specifically, the
+average distance between members of a group and their respective
+cluster centers should look the same across groups. Motivated by
+this, we introduce the following definition of representation cost.
+Definition 2 (AbsError). The absolute (representation) error of a
+clustering is defined as
+AbsError𝐶 (𝑋 ) =
+∑
+𝑥 ∈𝑋
+𝑑 (𝑥,𝐶),
+where 𝑋 is a set of points, 𝐶 is a set of centers and 𝑑 (𝑥,𝐶) is a an
+arbitrary distance function between 𝑥 and nearest center to it in 𝐶 .
+An AbsError-fair clustering is a fair clustering that uses AbsError
+to measure group representation cost in Definition 1.
+Relative representation error. AbsError does not take underlying
+distributions of demographic groups into account. However, in
+cases where different groups have drastically different underlying
+distributions, it may be necessary to acknowledge such a difference.
+Consider the example provided in Figure 2, where one demographic
+group (orange) has a much smaller variance compared to the other
+(blue). Assume that the within-group distances for the orange group
+can be ignored compared to distance 𝑑 . An AbsError-fair clustering
+d
+CAbsErrorFair CRelErrorFair
+Figure 2: For groups with different underlying distributions,
+AbsError andRelError lead to different locations for the cen-
+ter.
+picks 𝐶
+AbsErrorFair
+as the center which minimizes the maximum
+average AbsError. However, such a clustering may seem unfair, as
+it induces a large cost on the orange group compared to its “optimal”
+representation cost, which is close to zero if the orange group’s
+center is picked.
+The issue of differences in base distributions motivates fairness
+measures like equality of opportunity based on balancing error rates
+rather than outcomes [22]. As with statistical parity, we can define
+a natural analog in the context of representation. Rather than look
+at the error in representation in absolute terms, we compare the
+average distance between members of a group and their respective
+cluster centers, to the corresponding “optimal” value for that group
+(if we only clustered the members of that group).
+This relativemeasure of representation error yields the following
+definition.
+Definition 3 (RelError). The relative (representation) error of a
+clustering is given by
+RelError𝐶 (𝑋 ) =
+∑
+𝑥 ∈𝑋 𝑑 (𝑥,𝐶)∑
+𝑥 ∈𝑋 𝑑 (𝑥,Opt(𝑋 ))
+where 𝑋 is a set of points, 𝐶 is a set of centers and 𝑑 (𝑥,𝐶) is a an
+arbitrary distance function between 𝑥 and nearest center to it in 𝐶 .
+One can also try to capture the relative error via a difference
+instead of a division.
+RelErrorDiff𝐶 (𝑋 ) =
+1
+|𝑋 |
+(∑
+𝑥 ∈𝑋
+𝑑 (𝑥,𝐶) −
+∑
+𝑥 ∈𝑋
+𝑑 (𝑥,Opt(𝑋 ))
+)
+This is similar to the formulation used by [38] in their work on fair
+PCA. However, in the case of clustering, this quantity can be NP-
+hard to compute even for a given set of centers 𝐶 . This is because∑
+𝑥 𝑑 (𝑥,Opt(𝑋 )) cannot be computed exactly. For this reason, we
+will not discuss this formulation further.
+2.2 How the different measures of fairness
+compare
+We have drawn on an analogy to fairness in supervised learning
+to formulate two measures of group representation fairness. We
+now make the informal case that the analogy also carries over to
+the incompatibility between the two notions, similar to the well-
+known result in the supervised learning setting [16, 26]. To see this,
+consider a point set 𝑋 with two defined groups 𝐴 and 𝐵. Without
+loss of generality, assume that 𝐵 can be clustered better than 𝐴
+i.e that cost𝑜𝑝𝑡𝐴 (𝐴) > cost𝑜𝑝𝑡𝐵 (𝐵). Now consider Figure 3 where
+506
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Abbasi, et al.
+RelError fair
+AbsError fair
+cost(A)
+cost(B)
+costoptA (A)
+costoptB (B)
+c
+Figure 3: Unless the two groups have the same base rates,
+we cannot achieve fairness with respect to AbsError and
+RelError.
+any clustering of 𝑋 is represented as a point whose 𝑥-coordinate
+is the cost cost𝐶 (𝐴) and whose 𝑦-coordinate is the cost cost𝐶 (𝐵).
+The AbsError fair line represents all clusterings where the two
+groups have equal AbsError costs and the RelError fair line (which
+passes through the point (cost𝑜𝑝𝑡𝐴 (𝐴), cost𝑜𝑝𝑡𝐵 (𝐵))) represents all
+clusterings where the two groups have equal RelError costs.
+Consider an optimal unconstrained clustering represented by
+point 𝑐 . Consider the position of a fair clustering under either of
+the above two measures relative to 𝑐 . Clearly such a clustering
+would not be in either of the areas marked in red dots (because
+either the costs for both groups increase, making it inferior to 𝑐
+or both costs decrease, contradicting the optimality of 𝑐). Further
+note that a clustering that is better with respect to AbsError must
+be closer to AbsError fair line compared to 𝑐 , and one that is better
+with respect to RelError must be closer to RelError line compared
+to 𝑐 . The only way in which these two notions can coincide in a
+single clustering is if either both groups have the same optimal cost
+(cost𝑜𝑝𝑡𝐴 (𝐴) = cost𝑜𝑝𝑡𝐵 (𝐵)) in which case the two lines coincide
+(analogous to the two groups having the same base distribution),
+or if the optimal clustering happens to achieve zero cost for both
+groups (analogous to the point set admitting perfect clustering).
+This (informal) reasoning hints at a more general incompatibility
+theorem (for > 2 clusters) analogous to the works of [16, 26], which
+we leave as an open direction.
+2.3 Fairness using standard clustering methods
+Sections 3 and 4 will present algorithms for fair clustering under
+the measures of fairness introduced above. Before that, we make a
+simple observation about approximation guarantees we can achieve
+by using standard clustering algorithms with minor modification.
+If our data 𝑋 is composed of groups 𝑋1, 𝑋2, . . . , 𝑋𝑚 as we dis-
+cussed, then optimizing the cost function on 𝑋 would correspond
+to the minimization problem:
+min
+𝐶
+∑
+𝑖∈𝑋𝑖
+cost𝐶 (𝑋𝑖 ) .
+For most known cost functions and algorithms, it turns out that
+adding a weight for each point still allows for efficient algorithms.
+Let us consider assigning a weight of 1/|𝑋𝑖 | to all the points in 𝑋𝑖 .
+Then the weighted minimization problem is
+min
+𝐶
+∑
+𝑖∈𝑋𝑖
+1
+|𝑋𝑖 |
+cost𝐶 (𝑋𝑖 ) . (1)
+The observation is now the following.
+Observation 4. Let𝐶 be a clustering produced by an𝛼-approximation
+algorithm for the problem (1). Then 𝐶 achieves an 𝛼𝑚 approxima-
+tion to the fair clustering problem (definition 1) with the same cost
+function.
+Proof. Let Θ be the objective value for the fair clustering prob-
+lem, and let𝐶∗ be the corresponding clustering. Then by definition,
+we have
+max
+𝑖
+1
+|𝑋𝑖 |
+cost𝐶∗ (𝑋𝑖 ) = Θ =⇒
+∑
+𝑖
+1
+|𝑋𝑖 |
+cost𝐶∗ (𝑋𝑖 ) ≤ 𝑚Θ.
+Because the solution found by the algorithm (𝐶) is an 𝛼 approxima-
+tion, we have that∑
+𝑖
+1
+|𝑋𝑖 |
+cost𝐶 (𝑋𝑖 ) ≤ 𝛼 ·
+∑
+𝑖
+1
+|𝑋𝑖 |
+cost𝐶∗ (𝑋𝑖 ) ≤ 𝑚Θ.
+This implies that each term is ≤ 𝑚Θ, implying the desired approxi-
+mation bound. □
+This observation implies, for example, that for the fair versions of
+𝑘-means and 𝑘-median, we can use known constant factor approx-
+imation algorithms to get 𝑂 (𝑚) factor approximation algorithms
+directly.
+3 APPROXIMATION ALGORITHMS FOR FAIR
+𝑘-CLUSTERING
+For the fair 𝑘-median and 𝑘-means problem, we now develop ap-
+proximation algorithms by writing down a linear programming
+relaxation and developing a rounding algorithm.
+3.1 Relaxation for AbsError-Fair clustering
+We start by considering the AbsError objective for fair clustering
+(definitions 1 and 2). To recap, we have a set of points 𝑋 that is
+composed of𝑚 (disjoint) groups, 𝑋1, 𝑋2, . . . , 𝑋𝑚 . We first describe
+the algorithm for 𝑘-median, and then discuss how to adapt it to the
+𝑘-means objective (see Remark 8).
+At a high level, the algorithm aims to “open” a subset of the 𝑋 as
+centers, and assign the rest of the points to the closest open point.
+The choice of the points as well as the assignment is done by using a
+linear programming (LP) relaxation for the problem, and rounding
+the obtained solution. The variables of the LP are as follows: for
+𝑢, 𝑣 ∈ 𝑋 , 𝑧𝑢𝑣 is intended to denote if point 𝑢 is assigned to center 𝑣 .
+These are called assignment variables. We also have variables 𝑦𝑣
+that are intended to denote if 𝑣 is chosen as one of the centers (or
+medians). The LP (called FairLP-AbsError) is now the following:
+507
+Fair Clustering FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+min _ subject to∑
+𝑣
+𝑧𝑢𝑣 = 1 for all 𝑢,
+𝑧𝑢𝑣 ≤ 𝑦𝑣 for all 𝑢, 𝑣,
+∑
+𝑣∈𝑋
+𝑦𝑣 ≤ 𝑘,
+0 ≤ 𝑧𝑢𝑣, 𝑦𝑣 ≤ 1 for all 𝑢, 𝑣 .
+1
+|𝑋𝑖 |
+·
+∑
+𝑢∈𝑋𝑖
+∑
+𝑣∈𝑋
+𝑑 (𝑢, 𝑣)𝑧𝑢𝑣 ≤ _ for all groups 𝑖, (2)
+The only new constraint compared to the standard LP formu-
+lation for 𝑘-median (e.g., [11]) is the constraint for all groups 𝑖 ,
+Eq. (2). This is to ensure that we minimize the maximum 𝑘-median
+objective over the groups.
+Theorem 5. The integrality gap of FairLP-AbsError is ≥ 𝑚.
+Proof. Consider an instance in which we have𝑚 groups, each
+consisting of a single point. Formally, let 𝑋𝑖 = {𝑥𝑖 } for all 𝑖 ∈ [𝑚].
+Suppose that 𝑑 (𝑥𝑖 , 𝑥 𝑗 ) = 𝐷 for all 𝑖 ≠ 𝑗 , and let 𝑘 =𝑚 − 1.
+Now, consider the fractional solution in which 𝑦𝑖 = 1 − 1
+𝑚 for
+all 𝑖 . Also, let 𝑧𝑖𝑖 = 1 − 1
+𝑚 , and let 𝑧𝑖 𝑗 = 1/𝑚 for some 𝑗 ≠ 𝑖 (it does
+not matter which one). It is easy to see that this solution satisfies
+all the constraints. Moreover, the LP objective value is _ = 𝐷/𝑚.
+However, in any integral solution, one of the points is not chosen
+as a center, and thus the objective value is at least 𝐷 . Thus the
+integrality gap is ≥ 𝑚. □
+Theorem 5 makes it difficult for an LP based approach to give
+an approximation factor better than 𝑚 (which is easy to obtain
+as we saw in Observation 4. However, the LP can still be used to
+obtain a “bi-criteria” approximation, where we obtain a constant
+approximation to the objective, while opening slightly more than 𝑘
+clusters.
+Theorem 6. Consider a feasible solution (𝑧,𝑦) for FairLP-AbsError
+with objective value _. For any 𝜖 > 0, there is a rounding algorithm
+that produces an integral solution (𝑧,𝑦) such that
+∑
+𝑣 𝑦𝑣 ≤ 𝑘/(1− 𝜖),
+all other constraints of the LP are satisfied, and the objective value is
+≤ 2_/𝜖 .
+There has been extensive literature on the problem of rounding
+LPs for problems like 𝑘-median (see, e.g., [31]). However, due to
+our additional fairness condition, we are interested in rounding
+schemes with an additional property, that we define below.
+Definition 7 (Faithful rounding). A rounding procedure for FairLP-
+AbsError is said to be 𝛼-faithful if it takes a fractional solution
+(𝑧,𝑦) and produces an integral solution (𝑧,𝑦) with the guarantee
+that for every 𝑢 ∈ 𝑋 ,∑
+𝑣∈𝑋
+𝑑 (𝑢, 𝑣) 𝑧𝑢𝑣 ≤ 𝛼 ·
+∑
+𝑣∈𝑋
+𝑑 (𝑢, 𝑣) 𝑧𝑢𝑣 .
+A weaker notion that holds for some known rounding schemes
+is the following: a rounding algorithm is said to be 𝛼-faithful in
+expectation if
+E
+[∑
+𝑣∈𝑋
+𝑑 (𝑢, 𝑣) 𝑧𝑢𝑣
+]
+≤ 𝛼 ·
+∑
+𝑣∈𝑋
+𝑑 (𝑢, 𝑣) 𝑧𝑢𝑣 .
+The advantage of having a faithful rounding procedure is that
+it automatically gives a per-group (indeed, a per-point) guaran-
+tee on the objective value, which enables us to prove the desired
+approximation bound.
+Proof of Theorem 6. The proof is based on the well-known
+“filtering” technique ([11, 32]). Define 𝑅𝑢 to be the fractional con-
+nection cost for the point 𝑢, formally, 𝑅𝑢 =
+∑
+𝑣 𝑑 (𝑢, 𝑣) 𝑧𝑢𝑣 . Now,
+construct a subset 𝑆 of the points 𝑋 as follows. Set 𝑆 = ∅ and𝑇 = 𝑋
+to begin with, and in every step, find 𝑢 ∈ 𝑇 that has the smallest 𝑅𝑢
+value (breaking ties arbitrarily) and add it to 𝑆 . Then, remove all
+𝑣 such that 𝑑 (𝑢, 𝑣) ≤ 2𝑅𝑣/𝜖 from the set 𝑇 . Suppose we continue
+this process until 𝑇 is empty.
+The set 𝑆 obtained satisfies the following property: for all𝑢, 𝑣 ∈ 𝑆 ,
+𝑑 (𝑢, 𝑣) ≥ (2/𝜖) ·max{𝑅𝑢 , 𝑅𝑣}. This is true because if 𝑢 was added
+to 𝑆 before 𝑣 , then 𝑅𝑢 ≤ 𝑅𝑣 , and further, 𝑣 should not have been
+removed from 𝑇 , which gives the desired bound. The property
+above implies that the set of metric balls {𝐵(𝑢, 𝑅𝑢/𝜖)}𝑢∈𝑆 are all
+disjoint.
+Next, we observe that each such ball contains a fractional 𝑦-
+value (in the original LP solution) of at least (1 − 𝜖). This is by
+a simple application of Markov’s inequality. By definition, 𝑅𝑢 =∑
+𝑣 𝑑 (𝑢, 𝑣) 𝑧𝑢𝑣 , and thus
+∑
+𝑣∉𝐵 (𝑢,𝑅𝑢/𝜖) 𝑧𝑢𝑣 ≤ 𝜖 . This means that∑
+𝑣∈𝐵 (𝑢,𝑅𝑢/𝜖) 𝑥𝑢𝑣 ≥ 1−𝜖 , and thus ∑
+𝑣∈𝐵 (𝑢,𝑅𝑢/𝜖) 𝑦𝑣 ≥ 1−𝜖 . As the
+balls are disjoint, we have that |𝑆 | ≤ 𝑘/(1 − 𝜖).
+Now, consider an algorithm that opens all the points of 𝑆 as
+centers. By construction, all 𝑣 ∉ 𝑆 are at a distance ≤ 2𝑅𝑣/𝜖
+from some point in 𝑆 , and thus for any group 𝑖 , we have that∑
+𝑢∈𝑋𝑖
+𝑑 (𝑢, 𝑆) ≤ ∑
+𝑢∈𝑋𝑖
+2𝑅𝑢/𝜖 ≤ 2_/𝜖 . Setting 𝑦 to be the indi-
+cator vector for 𝑆 and 𝑧 to be the assignment mapping each point
+to the closest neighbor in 𝑆 , the theorem follows. □
+Remark 8 (Extension to 𝑘-means). The argument above can be
+extended easily to obtain similar results for the 𝑘-means objective.
+We simply replace all distances with the squared distances. The
+metric ball around each point can be replaced with the ℓ22 ball, and
+the same approximation factors can be shown to hold.
+Beyond bi-criteria: an LP based heuristic. While Theorem 6 can
+achieve
+∑
+𝑦𝑣 = 𝑘/(1 − 𝜖) for any 𝜖 > 0, it is still weaker than what
+is possible for the standard 𝑘-median problem. The integrality gap
+instance shows that this is unavoidable in the worst case (using
+this LP). However, it turns out that there exist rounding algorithms
+for 𝑘-median that are faithful in expectation (as in Definition 7),
+and end up with
+∑
+𝑦𝑣 being precisely 𝑘 . Specifically,
+Theorem 9 ([12]). There exists a rounding algorithm for FairLP-
+AbsError that is 𝛼-faithful in expectation with 𝛼 ≤ 4, and outputs
+precisely 𝑘 clusters.
+Corollary 10. Let (𝑧,𝑦) be a solution to FairLP-AbsError. There
+exists a rounding algorithm that (a) produces precisely 𝑘 clusters,
+and (b) ensures that the expected connection cost for every group
+is ≤ 4_.
+The corollary follows directly from Theorem 9, by linearity of
+expectation. This does not guarantee that the rounding simultane-
+ously produces a small connection cost for all groups, but it gives a
+good heuristic rounding algorithm. In examples where every group
+has many points well-distributed across clusters, the costs tend
+508
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Abbasi, et al.
+to be concentrated around the expectation, leading to small con-
+nection costs for all clusters. We will see this via examples in the
+experiments section 5.1.
+3.2 Relaxation for RelError-Fair clustering
+We now show that the rounding methods introduced in Section 3.1
+can also be used for RelError-fair clustering. We consider the fol-
+lowing auxiliary LP:
+min _ subject to∑
+𝑣
+𝑧𝑢𝑣 = 1 for all 𝑢,
+𝑧𝑢𝑣 ≤ 𝑦𝑣 for all 𝑢, 𝑣,
+∑
+𝑣∈𝑋
+𝑦𝑣 ≤ 𝑘,
+0 ≤ 𝑧𝑢𝑣, 𝑦𝑣 ≤ 1 for all 𝑢, 𝑣,∑
+𝑢∈𝑋𝑖
+∑
+𝑣∈𝑋
+𝑑 (𝑢, 𝑣)𝑧𝑢𝑣 ≤ _ · K-Med-Approx(𝑋𝑖 ) for all 𝑖 . (3)
+The constraint (3) now involves a new term, K-Med-Approx(𝑋𝑖 ),
+which is an approximation to the optimum 𝑘-median objective of
+the set𝑋𝑖 . For our purposes, we do not care how this approximation
+is achieved — it can be via an LP relaxation [11, 30], local search [5,
+21], or any other method. We assume that if 𝜗𝑖 is the optimum
+𝑘-median objective for 𝑋𝑖 , then for all 𝑖 ,
+K-Med-Approx(𝑋𝑖 )
+𝜗𝑖
+≤ 𝜌 for
+some constant 𝜌 . (From the works above, we can even think of 𝜌
+as being ≤ 3.)
+Lemma 11. Suppose there is a rounding procedure that takes a
+solution (_, 𝑧,𝑦) to FairLP-RelError and outputs a set of centers
+𝑆 with the property that for some parameter [,∑
+𝑢∈𝑋𝑖
+𝑑 (𝑢, 𝑆) ≤ [_ · K-Med-Approx(𝑋𝑖 ) for all groups 𝑖 . (4)
+Then, this algorithm provides an[ ·𝜌 approximation to RelError-fair
+clustering.
+Proof. Let Opt be the optimum value of the ratio-fair objective
+on the instance {𝑋1, . . . , 𝑋𝑚}. The main observation is that the LP
+provides a lower bound onOpt. This is true because any solution to
+ratio-fair clustering leads to a feasible integral solution to FairLP-
+RelError, where the RHS of the constraint (3) is replaced by _ ·
+𝜗𝑖 . Since 𝜗𝑖 ≤ K-Med-Approx(𝑋𝑖 ), it is also feasible for FairLP-
+RelError, showing that the optimum LP value is ≤ Opt.
+Next, consider a rounding algorithm that takes the optimum LP
+solution (_∗, 𝑧∗, 𝑦∗) and produces a set 𝑆 that satisfies (4) (with _∗
+replacing _ on the RHS). Then, since K-Med-Approx(𝑋𝑖 ) ≤ 𝜌𝜗𝑖 ,
+we have ∑
+𝑢∈𝑋𝑖
+𝑑 (𝑢, 𝑆) ≤ (𝜌[)_∗ · 𝜗𝑖 for all groups 𝑖,
+and using _∗ ≤ Opt completes the proof of the lemma. □
+Thus, it suffices to develop a rounding procedure for FairLP-
+RelError that satisfies (4). Here, we observe that the rounding
+from Theorem 6 directly applies (because ensures that every 𝑢 ∈ 𝑋 ,
+𝑑 (𝑢, 𝑆) ≤ 2𝑅𝑢/𝜖), giving us the same bi-criteria guarantee (and the
+same adjustment under faithful rounding).
+Corollary 12 (Corollary to Theorem 6). For any 𝜖 > 0, there is an
+efficient algorithm that outputs 𝑘/(1 − 𝜖) clusters and achieves a
+(6/𝜖) approximation to the optimum value of the RelError objective.
+4 FACILITY LOCATION
+As we discussed earlier, the objective in 𝑘-means and 𝑘-median
+clustering measures how close the points are (on average) to their
+cluster centers. There can be situations in which this objective
+is more important than having a strict bound on the number of
+clusters produced. Consider the example we saw earlier, where
+points correspond to clients located in a metric space, and we open
+a facility at the cluster center with the goal of serving the clients in
+the cluster. In such a context, it is reasonable to open more facilities
+if it serves clients better, as long as they collectively “pay” for
+opening. This is the motivation for the well-known facility location
+problem [17].
+Definition 13. Let 𝑋 be a set of clients and L be a set of locations
+in a metric space with distance function 𝑑 . For each location 𝑣 ,
+we have an opening cost 𝑓𝑣 , which is the cost of opening a facility
+at 𝑣 . The objective is now a sum of the connection costs and the
+opening costs. Formally, the goal is to select a subset 𝐿 of L, so as
+to minimize ∑
+𝑢∈𝑋
+𝑑 (𝑢, 𝐿) +
+∑
+𝑣∈𝐿
+𝑓𝑣 .
+Now consider the setting in which clients fall into different
+demographic groups. We propose our objective based on an equal
+division of the facility opening costs among all the clients. Thus,
+every client pays an opening cost of
+1
+|𝑋 |
+∑
+𝑣∈𝐿 𝑓𝑣 . Our definition
+of fair facility location aims to ensure that the average total cost
+(opening plus connection) is small for all the groups.
+Definition 14. Let𝑋 be a set of clients composed of groups𝑋1, 𝑋2, . . . , 𝑋𝑚 ,
+and let L be a set of locations. The goal of fair facility location is to
+select a subset 𝐿 of the locations, so as to minimize
+max
+𝑖
+
+1
+|𝑋𝑖 |
+∑
+𝑢∈𝑋𝑖
+𝑑 (𝑢, 𝐿) + 1
+|𝑋 |
+∑
+𝑣∈𝐿
+𝑓𝑣
+ .
+We remark that the second term in the objective is independent
+of the group (as this is the cost paid by every client).
+Our first result is a constant factor approximation algorithm.
+Theorem 4.1. There is an efficient (polynomial time) algorithm
+for fair facility location with an approximation ratio of 4.
+Proof. The proof turns out to follow easily from classic results
+on facility location. Consider the following linear program:
+min _ + 1
+|𝑋 |
+∑
+𝑣
+𝑦𝑣 · 𝑓𝑣 subject to∑
+𝑣
+𝑧𝑢𝑣 = 1 for all 𝑢,
+𝑧𝑢𝑣 ≤ 𝑦𝑣 for all 𝑢, 𝑣,
+0 ≤ 𝑧𝑢𝑣, 𝑦𝑣 ≤ 1 for all 𝑢, 𝑣 .
+1
+|𝑋𝑖 |
+·
+∑
+𝑢∈𝑋𝑖
+∑
+𝑣∈𝑋
+𝑑 (𝑢, 𝑣)𝑧𝑢𝑣 ≤ _ for all groups 𝑖, (5)
+Now we note the rounding algorithm from [40] is a 4-faithful
+rounding procedure (as in Definition 7), and also ensures that for
+the produced integral solution 𝑦,
+∑
+𝑣 𝑦𝑣 𝑓𝑣 ≤ 4
+∑
+𝑣 𝑦𝑣 𝑓𝑣 . Using this,
+the desired approximation factor follows. □
+509
+Fair Clustering FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+It is an interesting open problem to improve the approximation
+ratio above. We note that there are many better approximation al-
+gorithms for facility location (see, e.g., [29] and references therein).
+However, many of these algorithm are either faithful only in ex-
+pectation, or they use primal-dual rounding schemes which do not
+seem applicable in our context.
+4.1 Ensuring uniform load for facilities
+Definition 14 captures the requirement that all the demographic
+groups have a small cost for accessing the opened facilities. How-
+ever, this objective does not fully capture real life constraints. Con-
+sider the example in Figure 4. Suppose that 𝑅1 has a population
+Figure 4: Geometrically similar regions 𝑅1 and 𝑅2, with
+vastly different population density.
+density of 𝛿 and 𝑅2 has a population density of 100𝛿 . Suppose 𝑅1
+consists all the people of the first group, 𝑋1, and 𝑅2 has people
+of 𝑋2. Now, opening 2 facilities in each region is a better solution
+(in the objective above), compared to opening 3 in 𝑅2 and 1 in 𝑅1,
+because the connection cost term in the objective is normalized by
+the size of the group. (This is justified in order to avoid an unfair
+treatment for a smaller group.)
+However, in a time-sensitive application (such as polling), having
+a lot of clients allocated to a facility can lead to over-crowding, and
+thus a loss of utility. One way to repair this is by adding a delay
+term to the utility. This leads to a quadratic objective function,
+which appears difficult to optimize. Instead, we propose enforcing
+load-balance using a capacity constraint for facilities, the simplest
+of which is that for some 𝑈 , each facility can serve at most 𝑈
+clients (in total, across all the groups). In practice, these are not
+hard constraints, and it is reasonable for an algorithm to violate it
+by a small factor.
+Most of the standard clustering formulations (including facil-
+ity location) have been studied in the presence of capacity con-
+straints. Constant factor approximations are known, both using
+local search [5] and LP relaxations [4]. In our setting with multiple
+groups, we show that the LP methods can be adapted to obtain
+approximation algorithms.
+Notation. As before, the set of clients 𝑋 is composed of𝑚 groups
+𝑋1, 𝑋2, . . . , 𝑋𝑚 and the set of valid locations for facilities is L. They
+lie in a metric space whose distance function is denoted by 𝑑 . 𝑈
+will always denote the capacity bound. A solution will consist of a
+subset 𝑆 ⊆ L and an assignment function 𝑔 : 𝑋 ↦→ 𝑆 . The quantity
+Opt will denote
+min
+𝑆, 𝑔
+1
+|𝑋 |
+∑
+𝑖∈𝑆
+𝑓𝑖 + max
+𝑡 ∈[𝑚]
+1
+|𝑋𝑡 |
+∑
+𝑥 ∈𝑋𝑡
+𝑑 (𝑥,𝑔(𝑥)),
+where the minimization is over 𝑔 such that |𝑔−1 (𝑠) | ≤ 𝑈 for all
+𝑠 ∈ 𝑆 . We prove that it is possible to achieve a constant factor
+approximation, as long as there is a constant (any fixed constant
+> 1) slack in the capacity constraint.
+Theorem 4.2. Let 𝑋,L, 𝑑,𝑈 be defined as above, and let Opt
+denote the optimum objective value. Then for every 𝜖 > 0, there is an
+efficient (polynomial time) algorithm that finds a solution 𝑆, 𝑔 with
+the following properties:
+(1) the objective value is ≤ 𝑂𝜖 (1) · Opt.
+(2) for every 𝑠 ∈ 𝑆 , we have |𝑔−1 (𝑠) | ≤ (1 + 𝜖) 𝑈 .
+Remark. It is an interesting open problem to study the case of
+hard capacity constraints. Likewise, we are assuming that the capac-
+ity bound𝑈 is independent of the facility. Modifying the rounding
+algorithm to allow different capacities at different locations is also
+an interesting direction. We note that both can be achieved using LP
+methods for standard facility location (e.g., [4]), but known round-
+ing algorithms are not faithful to the best of our knowledge, thereby
+making it tricky to apply to the setting with multiple groups. Mean-
+while, we note that in our motivating applications, both uniform
+capacities and soft constraints are reasonable assumptions.
+Proof. The proof follows along the lines of [40], but we slightly
+adapt it to get a stronger bound on |𝑔−1 (𝑠) |. We start by solving a
+slight variant of the LP (5), where we add the capacity constraint:∑
+𝑢∈𝑋
+𝑧𝑢𝑣 ≤ 𝑈 · 𝑦𝑣 for all 𝑣 ∈ L . (6)
+In an integer solution, the RHS is zero if 𝑦𝑣 = 0 (𝑣 is not opened)
+and𝑈 if 𝑦𝑣 = 1 (𝑣 is opened), as intended. Starting with the optimal
+fractional solution for this LP, the rounding algorithm is then as
+follows:
+Algorithm 1 FFL-Rounding (𝑧,𝑦), parameters \, 𝛿 ∈ (0, 1)
+1: Perform Filtering with parameter \ on (𝑧,𝑦) to obtain (𝑧′, 𝑦′)
+2: Define 𝐹 = {𝑣 ∈ L : 𝑦′𝑣 ≥ 1/2}, update 𝑦′𝑣 = 1 for all 𝑣 ∈ 𝐹
+3: Define 𝐶𝛿 = {𝑢 ∈ 𝑋 :
+∑
+𝑣∈𝐹 𝑧
+′
+𝑢𝑣 < (1 − 𝛿)}
+4: while 𝐶𝛿 ≠ ∅ do
+5: Let 𝑢 be the client in 𝐶𝛿 with smallest 𝑅𝑢
+6: Let 𝑆 be the set of facilities in 𝐵(𝑢, 𝑅𝑢
+\
+) with 𝑦′𝑣 ∈ (0, 1)
+7: Let 𝑟 = ⌈∑𝑣∈𝑆 𝑦
+′
+𝑣⌉
+8: Open the 𝑟 cheapest facilities in 𝑆 (call this set 𝑂)
+9: Update the set 𝐹 , setting 𝐹 ← 𝐹 ∪𝑂
+10: Update 𝑦𝑣 values, setting 𝑦𝑣 = 1 for 𝑣 ∈ 𝑂 and 𝑦𝑣 = 0 for
+𝑣 ∈ 𝑆 \𝑂
+11: Move all fractional assignment 𝑧′𝑢𝑣 from 𝑆 \𝑂 to 𝑂
+12: Update the set 𝐶𝛿 using the definition in step 3
+13: Close all remaining fractionally open facilities
+14: Let 𝛽𝑢 =
+∑
+𝑣∈𝐹 𝑧
+′
+𝑢𝑣 . If 𝛽𝑢 < 1, re-scale all 𝑧′𝑢𝑣 by 1/𝛽𝑢
+15: Use bipartite matching to round fractional assignment to an
+integral one, denoted 𝑔
+16: return 𝐹, 𝑔
+510
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Abbasi, et al.
+The first step is filtering [40], where we convert a feasible frac-
+tional solution (𝑧,𝑦) to the LP to another fractional solution (𝑧′, 𝑦′),
+with the additional constraint that if 𝑧′𝑢𝑣 > 0 (i.e., client 𝑢 has a
+non-zero fractional assignment to facility 𝑣), then 𝑣 ∈ 𝐵(𝑢, 𝑅𝑢
+\
+).
+This fractional solution satisfies all the constraints of the LP except
+the capacity constraint (6), and also satisfies (6) up to a slack factor
+of
+1
+(1−\ ) on the RHS. The parameters \, 𝛿 > 0 used here will be
+chosen later. In the process, the opening cost term in the objective
+increases by a factor at most 1/(1 − \ ).
+The next step is to consider all the facilities 𝑣 ∈ L with𝑦′𝑣 ≥ 1/2,
+and set 𝑦′𝑣 = 1, and add all such facilities to the opened set 𝐹 . Again,
+this step only increases the opening cost term in the objective by a
+factor of 2.
+At every point of time, the algorithm maintains a set 𝐶𝛿 , which
+is the set of clients 𝑢 such that∑
+𝑣∈𝐹
+𝑧′𝑢𝑣 < (1 − 𝛿).
+In other words, 𝑢 has a significant (≥ 𝛿) fractional assignment
+to unopened facilities. As long as 𝐶𝛿 is non-empty, the algorithm
+chooses𝑢 ∈ 𝐶𝛿 with the smallest value of 𝑅𝑢 . It then opens facilities
+in the vicinity of𝑢. Define 𝐵𝑢 = 𝐵(𝑢, 𝑅𝑢
+\
+), for convenience. Suppose
+𝑆 is the set of fractionally open facilities in 𝐵𝑢 . Because 𝑢 ∈ 𝐶𝛿 , we
+have that
+∑
+𝑣∈𝑆 𝑧𝑢𝑣 > 𝛿 , which in turn implies that
+∑
+𝑣∈𝑆 𝑦
+′
+𝑣 > 𝛿
+(because of the LP constraint 𝑦′𝑣 ≥ 𝑧𝑢𝑣 for all 𝑢).
+The algorithm opens 𝑟 = ⌈∑𝑣∈𝑆 𝑦
+′
+𝑣⌉ centers from 𝑆 , of the least
+cost. We claim that in the process, the sum
+∑
+𝑣∈𝑆 𝑓𝑣𝑦
+′
+𝑣 increases by
+at most max{2, 1/𝛿}. This is easy to see by considering two cases:
+if
+∑
+𝑣∈𝑆 𝑦
+′
+𝑣 ≤ 1, then the algorithm opens exactly one center, and
+the cost increases by at most 1/𝛿 . If the sum is > 1, then since all
+the𝑦′𝑣 values were < 1/2, there must have been > 𝑟 non-zero terms
+in the summation, and we can argue that the cost increase is at
+most 2 (see [40]). As our choice of 𝛿 will be < 1/2, the (1/𝛿) term
+dominates. We thus have that this step of the algorithm increases
+only the facility opening cost, and by a factor at most 1/𝛿 .
+The next step is the re-allocation of clients from 𝑆 \𝑂 to 𝑂 . Let
+𝑢 ′ be one such client. If 𝑢 ′ = 𝑢, we simply note that for all 𝑣 ∈ 𝑂 ,
+𝑑 (𝑢, 𝑣) ≤ 𝑅𝑢
+\
+, and thus all the (fractional) demand is still routed
+to a facility at distance at most
+𝑅𝑢
+\
+away. Likewise, if 𝑢 ′ ≠ 𝑢, then
+because 𝑅𝑢 ≤ 𝑅𝑢′ , demand is still routed to a facility at distance at
+most
+3𝑅𝑢′
+\
+away.
+Following this, we are only left with clients most of whose de-
+mand (at least (1 − 𝛿) fraction) has already been routed to facilities
+in 𝐹 . The scaling by 𝛽𝑢 (as defined in the algorithm) increases the
+objective by a factor at most 1/(1 − 𝛿).
+The steps above together help obtain a solution in which 𝑦′ is
+integral, but the 𝑧′𝑢𝑣 may be fractional. Also, the connection cost
+term in the objective is scaled by at most
+3
+\
+· 1
+(1 − 𝛿) .
+Moreover, this bound holds for every point (thus the rounding is
+faithful). The facility opening cost is scaled by at most
+1
+1 − \ · 2 ·
+1
+𝛿
+.
+The capacity constraint is violated by a factor of
+1
+(1−\ ) (1−𝛿) .
+The final step of the rounding is bipartite matching. Here, since
+the demands are all unit, we can show that it is possible to convert
+the fractional assignment into an integral one (by solving an in-
+stance of the transportation problem, see [40]). Setting \ = 𝛿 = 𝜖/3,
+the result follows. □
+5 EXPERIMENTS
+In the first two parts of this section we evaluate the proposed
+fair 𝑘-median and fair facility location algorithms and provide an
+empirical assessment for their performance. In the final part, we
+compare the balance-based approach to fair clustering with respect
+to our representation-based notions. Throughout the experiments,
+we consider five datasets:
+• Synthetic. Synthetic dataset with three features. First fea-
+ture is binary (“majority" or “minority"), and determines
+the group example belongs to. Second and third attributes
+are generated using distribution N(0, 0.52) in the majority
+group, and distributionN(3, 0.52) in minority group. Major-
+ity and minority groups are of size 250 and 50, respectively.
+• Iris.3 Data set consists of 50 samples from each of three
+species of Iris: Iris setosa, Iris virginica and Iris versicolor.
+Selected features are length and width of the petals.
+• Census.4 Dataset is 1994 US Census and selected attributes
+are “age",“fnlwgt", “education-num", “capital-gain" and “hours-
+per-week". groups of interests are “female" and “male".
+• Bank.5 The dataset contains records of a marketing cam-
+paign based on phone calls, ran by a Portuguese banking
+institution. Selected attributes are “age", “balance", “duration"
+and groups of interest are “married" and “single".
+• North Carolina voters. 6 In this dataset, we are interested
+in “latitude” and “longitude” values of each voter’s residence,
+and use “race” attribute to identify different demographic
+groups.
+We do not evaluate the capacitated version of fair facility location
+that we discuss in Section 4.1. This algorithm is more complex and is
+beyond the scope of this work. We should also note that throughout
+this section we compare the results of proposed fair algorithms to
+standard 𝑘-median, which is implemented using the standard linear
+program formulation.
+5.1 Fair 𝑘-median
+In this section we employ two algorithms to compute𝑘-median clus-
+terings which are group-representative. We call these algorithms
+LP-Fair 𝑘-median and LS-Fair 𝑘-median.
+LP-Fair 𝑘-median. LP-Fair 𝑘-median first solves the FairLP linear
+program presented in Section3.2. Since it is not possible to compare
+the results of bi-criteria algorithm to standard 𝑘-median algorithms
+due to the varying number of centers, we chose to obtain integral
+solutions via the faithful rounding procedure described in Corol-
+lary 10. The rounding is based on the matching idea proposed by
+Charikar et al. [12], and is done in four phases:
+3
+https://archive.ics.uci.edu/ml/datasets/iris
+4
+https://archive.ics.uci.edu/ml/datasets/adult
+5
+https://archive.ics.uci.edu/ml/datasets/Bank+Marketing
+6
+https://www.ncsbe.gov/results-data/voter-registration-data
+511
+Fair Clustering FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Filtering: Similar to the filtering technique described in sec-
+tion 3, we construct a subset 𝑆 of the points with a small
+adjustment that after adding a point 𝑢 to the set 𝑆 , all points
+𝑣 from the original set such that 𝑑 (𝑢, 𝑣) ≤ 4𝑅𝑣 will not be
+considered to be added to 𝑆 anymore.
+Bundling: For each point 𝑢 ∈ 𝑆 , we create a bundle 𝐵𝑢 which
+is comprised of the centers that exclusively serve 𝑢. In the
+rounding procedure, each bundle 𝐵𝑢 is treated as a single
+entity, where at most one center from it will be opened. The
+probability of opening a center from a bundle, 𝐵𝑢 , is the sum
+of 𝑦𝑐 , 𝑐 ∈ 𝐵𝑢 , which we call bundle’s volume.
+Matching: The generated bundles have the nice property that
+their volume lies within 1/2 and 1. So given any two bundles,
+at least one center from them should be opened. Therefore,
+while there are at least two unmatched points in 𝑆 , we match
+the corresponding bundles of the two closest unmatched
+points in 𝑆 .
+Sampling: Given the matching generated in the last phase, we
+iterate over its members and consider the bundle volumes
+as probabilities, to open 𝑘 centers in expectation.
+The centers picked in the sampling phase are returned as the final
+𝑘 centers.
+LS-Fair 𝑘-median. In this section, we propose a heuristic local
+search algorithm in addition to LP-Fair 𝑘-median. Arya et al. pro-
+posed a local search algorithm to approximately solve the 𝑘-median
+problem [5]. Their algorithm starts with an arbitrary solution, and
+repeatedly improves it by swapping a subset of the centers in the
+current solution, with another set of centers not in it.Wemodify this
+algorithm to minimize the maximum average cost over all groups.
+Assuming we’re given a cost function and𝑋1, 𝑋2, . . . , 𝑋𝑚 as groups
+where 𝑋 = ∪𝑖𝑋𝑖 , LS-Fair 𝑘-median is presented in Algorithm 2.
+Algorithm 2 LS-Fair 𝑘-median(𝑘, 𝑐𝑜𝑠𝑡, 𝑋, 𝑋1, . . . , 𝑋𝑚)
+𝑆 ← an arbitrary set of 𝑘 centers from 𝑋
+𝑜𝑙𝑑_𝑐𝑜𝑠𝑡 ← 𝑖𝑛𝑓
+𝑛𝑒𝑤_𝑐𝑜𝑠𝑡 ←𝑚𝑎𝑥 (𝑐𝑜𝑠𝑡𝑆 (𝑋1), . . . , 𝑐𝑜𝑠𝑡𝑆 (𝑋𝑚))
+while there is 𝑡 ′ ∈ 𝑋 and 𝑡 ∈ 𝑆 s.t.
+𝑚𝑎𝑥 (𝑐𝑜𝑠𝑡𝑆\𝑡∪𝑡 ′ (𝑋1), . . . , 𝑐𝑜𝑠𝑡𝑆\𝑡∪𝑡 ′ (𝑋𝑚)) < 𝑜𝑙𝑑_𝑐𝑜𝑠𝑡 ) do
+𝑆 ← 𝑆\𝑡 ∪ 𝑡 ′
+𝑜𝑙𝑑_𝑐𝑜𝑠𝑡 ←𝑚𝑎𝑥 (𝑐𝑜𝑠𝑡𝑆\𝑡∪𝑡 ′ (𝑋1), . . . , 𝑐𝑜𝑠𝑡𝑆\𝑡∪𝑡 ′ (𝑋𝑚))
+return 𝑆
+Unlike the LP-Fair 𝐾-Medians, we do not provide any theoretical
+bounds on LS-Fair 𝐾-Median. In fact, the following example shows
+that LS-Fair 𝐾-Medians algorithm with the AbsError-fair objective
+can have local optima that are arbitrarily worse than the global
+optimum.
+Description of the instance. Let𝐴 and 𝐵 two sets that are far apart
+(think of the distance between any pair as𝑀 →∞). 𝐴 = 𝐴1 ∪𝐴2,
+where |𝐴1 | = 1 and |𝐴2 | = 𝑡 , for some integer parameter 𝑡 . Likewise,
+suppose that 𝐵 = 𝐵1 ∪ 𝐵2, of sizes 1, 𝑡 respectively. Suppose that
+all the elements of 𝐴2 (so also 𝐵2) are at distance 𝜖 away from one
+another. Suppose the distance between 𝐴1 and 𝐴2 (so also 𝐵1 and
+𝐵2) is 𝑑 .
+Now, suppose the two groups are𝑋1 = 𝐴1∪𝐵2 and𝑋2 = 𝐵1∪𝐴2.
+Let 𝑘 = 2. The optimal solution is to choose one point in 𝐴2 and
+another in 𝐵2. This results in an objective value of
+max{𝑡𝜖 + 𝑑, 𝑡𝜖 + 𝑑} = 𝑡𝜖 + 𝑑.
+Consider the solution {𝑎1, 𝑏1} that chooses the unique points
+from 𝐴1 and 𝐵1. The 𝑘-median objective for both the groups is 𝑡𝑑 ,
+and thus the AbsError-fair objective is 𝑡𝑑 . Now, consider swapping
+𝑎1 with some point 𝑥 ∈ 𝐴2. This changes the 𝑘-median objective
+for group 1 from 𝑡𝑑 to 𝑡𝑑 + 𝜖 , and so even though the swap signifi-
+cantly decreases the objective for the second group, the local search
+algorithm will not perform the swap. The same argument holds for
+swapping 𝑏1 with a point 𝑦 ∈ 𝐵2. It is thus easy to see that {𝑎1, 𝑏1}
+is a locally optimum solution.
+However, the ratio between the AbsError-fair objectives of this
+solution and the optimum is
+𝑡𝑑
+𝑡𝜖+𝑑 ≈ 𝑡 for 𝜖 → 0. Thus the gap can
+be as bad as the number of points.
+Results. In this experiment, in order to save space, we focus on
+the Census and Bank datasets. However, we consider two subsam-
+ples of each dataset: 1:1 Census contains 150 female and 150 male
+examples, 1:5 Census contains 50 female and 250 male examples, 1:1
+Bank contains 150 married and 150 single examples, and 1:5 Bank
+contains 50 married and 250 single examples. The results are sum-
+marized in table 2. Group-optimal presents the optimal average cost
+for a group, when it is clustered by itself via 𝑘 centers. 𝑘-median
+presents a group’s average cost, in a clustering generated by the
+standard 𝑘-median algorithm performed on all groups together. The
+other rows in the table show the percentage increase/decrease in
+costs, for either of the described fair algorithms, using the two cost
+functions. In general, the results demonstrate the effectiveness of
+our algorithms. However, we emphasize on the difference between
+1:1 and 5:1 samples. In the 1:1 case, the groups have the same size
+and standard 𝑘-median treats them roughly the same. But in the 5:1
+case, if the groups have different distributions, standard 𝑘-median
+favors majority group over the other, and the effectiveness of our
+proposed algorithms are more evident. We should note that in all
+experiments, points were clustered using 3 centers.
+7
+5.2 Fair facility location
+In this section we empirically evaluate the algorithm presented in
+section 4. We also use the 4-Faithful rounding procedure proposed
+in [40] to obtain an integral solution. We use the data for voters
+in the state of North Carolina, specifically Brunswick county. This
+dataset contains race and ethnicity of each voter as well as latitude
+and longitude values of their residence. In this experiment we focus
+on black and white demographic groups, which roughly constitute
+7000 and 55000 voters, respectively. As for the facilities, we assume
+each voter’s residence could be used as a drop-off location. There-
+fore, in all experiments we use regular 𝑘-means clustering to select
+100 locations out of the total 62000 data points as the set of facilities.
+We also assume the setup cost for all facilities are equal. The results
+of this experiment are presented in Figure 5, for different values of
+the facility setup cost. The results show that fair facility location
+algorithm lowers the average distance to polling locations for the
+worse off group, namely black voters, in comparison to standard
+7
+Each dataset was sampled 10 times and we reported the overall average.
+512
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Abbasi, et al.
+Table 1: Effects of enforcing balance on group representations
+Datasets
+Synthetic Iris Census Bank
+majority minority Setosa Versicolor female male married single
+Standard 𝑘-median 0.514 0.678 0.169 0.256 34492 35083 627 682
+Balanced 𝑘-median 0.430 3.476 0.101 2.819 34019 35876 622 694
+Table 2: Clustering Bank and Census datasets using LS-Fair and LP-Fair algorithms. Standard 𝑘-median and group optimal
+rows present the actual groups’ average costs. AbsError and RelError rows are the percentage increase/decrease in group costs
+for proposed algorithms, compared to the corresponding values in standard 𝑘-median and group optimal rows, respectively.
+Datasets
+1:1 Census 1:5 Census 1:1 Bank 1:5 Bank
+female male female male married single married single
+Standard 𝑘-median 35264 32351 40212 32689 596 730 948 665
+AbsError (%)
+LS-Fair 98.7 102.9 94.2 110.5 105.2 98.3 79 111.2
+LP-Fair 98.3 105 95.5 109.1 105.7 98.2 78 114.7
+Group optimal 34499 31528 35349 32619 569 686 659 655
+RelError (%)
+LS-Fair 102.5 102.5 107.7 106.3 107.3 105.9 113 114
+LP-Fair 102.6 102.5 107.6 103.8 107.7 105.2 116.3 113.4
+Figure 5: Average distance to polling location for black and
+white voters
+version. Also, as we increase the setup cost for facilities, since fewer
+number of facilities will be opened, the average distance grows
+larger for both groups. We should also note that by opening fewer
+number of facilities, it will be harder for the algorithm to find a fair
+solution as it is more restricted. This is apparent from the larger
+discrepancies between the two groups in the fair(er) solution for
+higher values of setup cost.
+5.3 On balance and representations
+In this section, we empirically study the effects of enforcing bal-
+ance on group representations. More specifically, we compare each
+group’s average cost for standard 𝑘-median to the corresponding
+value under balance constraint. As for the balance-fair 𝑘-median,
+we chose to use the algorithm proposed by Backurs et al. [6].
+8
+In
+this experiment, we used the entire Synthetic and Iris datasets, and
+sampled 300 examples from each of Census (150 male, 150 female)
+and Bank (150 married, 150 single) datasets. In table 1, we present
+the average costs for all groups within each dataset, in two cluster-
+ings generated by standard 𝑘-median and balanced 𝑘-median. In
+all datasets, we observe enforcing balance amplifies representation
+disparity across groups and leads to a higher maximum average
+cost. However, it is especially more noticeable in Synthetic and Iris
+datasets, where different groups have vastly different distributions.
+9
+6 CONCLUSION
+In this work we presented a novel approach to think of and formu-
+late fairness in clustering tasks, based on group representativeness.
+Our main contributions are introducing a fairness notion which par-
+allels the development of fairness in classification setting, proposing
+bicritera approximation algorithms for 𝑘-medians under different
+variations of this notion, as well as approximation algorithms for
+facility location problem and providing theoretical bounds for both.
+Our results suggest that our formulation provides better quality
+representations especially when the groups are skewed in size.
+7 ACKNOWLEDGEMENT
+We would like to thank our colleagues Sorelle Friedler and Calvin
+Barrett from Haverford College, who provided us with voter loca-
+tion data in the state of North Carolina.
+8
+Implementation could be found here.
+9
+The algorithm proposed by Backurs et al. works on only two groups. We chose two
+groups out of three from Iris. Repeating the experiment with other groups lead to
+similar results.
+513
+Fair Clustering FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+REFERENCES
+[1] M. Abbasi, S. A. Friedler, C. Scheidegger, and S. Venkatasubramanian. Fairness in
+representation: quantifying stereotyping as a representational harm. In Proceed-
+ings of the 2019 SIAM International Conference on Data Mining, pages 801–809.
+SIAM, 2019.
+[2] S. S. Abraham, S. S. Sundaram, et al. Fairness in clustering with multiple sensitive
+attributes. arXiv preprint arXiv:1910.05113, 2019.
+[3] S. Ahmadian, A. Epasto, R. Kumar, and M. Mahdian. Clustering without over-
+representation. In Proceedings of the 25th ACM SIGKDD International Conference
+on Knowledge Discovery & Data Mining, pages 267–275, 2019.
+[4] H.-C. An, M. Singh, and O. Svensson. Lp-based algorithms for capacitated facility
+location. SIAM Journal on Computing, 46(1):272–306, 2017.
+[5] V. Arya, N. Garg, R. Khandekar, A. Meyerson, K. Munagala, and V. Pandit. Local
+search heuristics for k-median and facility location problems. SIAM Journal on
+computing, 33(3):544–562, 2004.
+[6] A. Backurs, P. Indyk, K. Onak, B. Schieber, A. Vakilian, and T. Wagner. Scalable
+fair clustering. arXiv preprint arXiv:1902.03519, 2019.
+[7] S. Bera, D. Chakrabarty, N. Flores, and M. Negahbani. Fair algorithms for clus-
+tering. In Advances in Neural Information Processing Systems, pages 4955–4966,
+2019.
+[8] S. K. Bera, D. Chakrabarty, and M. Negahbani. Fair algorithms for clustering.
+arXiv preprint arXiv:1901.02393, 2019.
+[9] I. O. Bercea, M. Groß, S. Khuller, A. Kumar, C. Rösner, D. R. Schmidt, and
+M. Schmidt. On the cost of essentially fair clusterings. arXiv preprint
+arXiv:1811.10319, 2018.
+[10] T. Bolukbasi, K.-W. Chang, J. Y. Zou, V. Saligrama, and A. T. Kalai. Man is to
+computer programmer as woman is to homemaker? debiasing word embeddings.
+In Advances in neural information processing systems, pages 4349–4357, 2016.
+[11] M. Charikar, S. Guha, É. Tardos, and D. B. Shmoys. A constant-factor approxi-
+mation algorithm for the k-median problem. Journal of Computer and System
+Sciences, 65(1):129–149, 2002.
+[12] M. Charikar and S. Li. A dependent lp-rounding approach for the k-median
+problem. In International Colloquium on Automata, Languages, and Programming,
+pages 194–205. Springer, 2012.
+[13] M. K. Chen, K. Haggag, D. G. Pope, and R. Rohla. Racial disparities in voting
+wait times: Evidence from smartphone data. Technical report, National Bureau
+of Economic Research, 2019.
+[14] X. Chen, B. Fain, C. Lyu, and K. Munagala. Proportionally fair clustering. arXiv
+preprint arXiv:1905.03674, 2019.
+[15] F. Chierichetti, R. Kumar, S. Lattanzi, and S. Vassilvitskii. Fair clustering through
+fairlets. In Proc. NIPS, pages 5029–5037, 2017.
+[16] A. Chouldechova. Fair prediction with disparate impact: A study of bias in
+recidivism prediction instruments. Big data, 5(2):153–163, 2017.
+[17] G. Cornuéjols, G. Nemhauser, and L. Wolsey. The uncapicitated facility location
+problem. Technical report, Cornell University Operations Research and Industrial
+Engineering, 1983.
+[18] C. Dwork, M. Hardt, T. Pitassi, O. Reingold, and R. Zemel. Fairness through
+awareness. In Proc. of Innovations in Theoretical Computer Science, 2012.
+[19] M. Feldman, S. A. Friedler, J. Moeller, C. Scheidegger, and S. Venkatasubramanian.
+Certifying and removing disparate impact. Proc. of KDD, pages 259–268, 2015.
+[20] M. Ghadiri, S. Samadi, and S. Vempala. Fair k-means clustering. arXiv preprint
+arXiv:2006.10085, 2020.
+[21] A. Gupta and K. Tangwongsan. Simpler analyses of local search algorithms for
+facility location. CoRR, abs/0809.2554, 2008.
+[22] M. Hardt, E. Price, N. Srebro, et al. Equality of opportunity in supervised learning.
+In Proc. NIPS, pages 3315–3323, 2016.
+[23] L. Huang, S. Jiang, and N. Vishnoi. Coresets for clustering with fairness con-
+straints. In Advances in Neural Information Processing Systems, pages 7587–7598,
+2019.
+[24] I. M. Z. E. G. Jing and Y. I. B. Ayed. Clustering with fairness constraints: A flexible
+and scalable approach. 2019.
+[25] C. Jung, S. Kannan, and N. Lutz. A center in your neighborhood: Fairness in
+facility location. arXiv preprint arXiv:1908.09041, 2019.
+[26] J. Kleinberg, S. Mullainathan, and M. Raghavan. Inherent trade-offs in the fair
+determination of risk scores. arXiv preprint arXiv:1609.05807, 2016.
+[27] M. Kleindessner, P. Awasthi, and J. Morgenstern. Fair k-center clustering for data
+summarization. arXiv preprint arXiv:1901.08628, 2019.
+[28] M. Kleindessner, S. Samadi, P. Awasthi, and J. Morgenstern. Guarantees for
+spectral clustering with fairness constraints. arXiv preprint arXiv:1901.08668,
+2019.
+[29] S. Li. A 1.488 approximation algorithm for the uncapacitated facility location
+problem. Information and Computation, 222:45 – 58, 2013. 38th International
+Colloquium on Automata, Languages and Programming (ICALP 2011).
+[30] S. Li and O. Svensson. Approximating k-median via pseudo-approximation. In
+Proceedings of the Forty-Fifth Annual ACM Symposium on Theory of Computing,
+STOC ’13, page 901–910, New York, NY, USA, 2013. Association for Computing
+Machinery.
+[31] S. Li and O. Svensson. Approximating k-median via pseudo-approximation. SIAM
+Journal on Computing, 45(2):530–547, 2016.
+[32] J.-H. Lin and J. S. Vitter. Approximation algorithms for geometric median prob-
+lems. Information Processing Letters, 44(5):245 – 249, 1992.
+[33] S. Mahabadi and A. Vakilian. (individual) fairness for 𝑘-clustering. arXiv preprint
+arXiv:2002.06742, 2020.
+[34] S. Mitchell, E. Potash, S. Barocas, A. D’Amour, and K. Lum. Prediction-based
+decisions and fairness: A catalogue of choices, assumptions, and definitions, 2018.
+[35] A. Narayanan. 21 definitions of fairness and their politics. Tutorial, ACM
+Conference on Fairness, Accountability and Transparency, 2019.
+[36] A. Romei and S. Ruggieri. A multidisciplinary survey on discrimination analysis.
+The Knowledge Engineering Review, pages 1–57, April 3 2013.
+[37] C. Rösner and M. Schmidt. Privacy preserving clustering with constraints. arXiv
+preprint arXiv:1802.02497, 2018.
+[38] S. Samadi, U. Tantipongpipat, J. H. Morgenstern, M. Singh, and S. Vempala. The
+Price of Fair PCA: One Extra dimension. In Proc. NeurIPS, pages 10999–11010,
+2018.
+[39] M. Schmidt, C. Schwiegelshohn, and C. Sohler. Fair coresets and streaming
+algorithms for fair k-means clustering. arXiv preprint arXiv:1812.10854, 2018.
+[40] D. B. Shmoys, É. Tardos, and K. Aardal. Approximation algorithms for facility
+location problems. In Proceedings of the twenty-ninth annual ACM symposium on
+Theory of computing, pages 265–274, 1997.
+[41] G. Tzortzis and A. Likas. The minmax k-means clustering algorithm. Pattern
+Recognition, 47(7):2505–2516, 2014.
+[42] B. Wang and I. Davidson. Towards fair deep clustering with multi-state protected
+variables. arXiv preprint arXiv:1901.10053, 2019.
+514

@@ -1,0 +1,914 @@
+Towards Cross-Lingual Generalization of
+Translation Gender Bias
+Won Ik Cho∗
+Dept. of ECE and INMC
+Seoul National University
+Seoul, Korea
+wicho@hi.snu.ac.kr
+Jiwon Kim∗
+Independent Researcher
+Daegu, Korea
+kimjiwon08@snu.ac.kr
+Jaeyeong Yang
+Dept. of Linguistics
+Seoul National University
+Seoul, Korea
+tastymango@snu.ac.kr
+Nam Soo Kim
+Dept. of ECE and INMC
+Seoul National University
+Seoul, Korea
+nkim@snu.ac.kr
+ABSTRACT
+Cross-lingual generalization issues for less explored languages have
+been broadly tackled in recent NLP studies. In this study, we apply
+the philosophy on the problem of translation gender bias, which
+necessarily involves multilingualism and socio-cultural diversity.
+Beyond the conventional evaluation criteria for the social bias, we
+aim to put together various aspects of linguistic viewpoints into
+the measuring process, to create a template that makes evaluation
+less tilted to specific types of language pairs. With a manually
+constructed set of content words and template, we check both the
+accuracy of gender inference and the fluency of translation, for
+German, Korean, Portuguese, and Tagalog. Inference accuracy and
+disparate impact, namely the biasedness factors associated with
+each other, show that the failure of bias mitigation threatens the
+delicacy of translation. Furthermore, our analyses on each system
+and language indicate that the translation fluency and inference
+accuracy are not necessarily correlated. The results implicitly sug-
+gest that the amount of available language resources that boost up
+the performance might amplify the bias cross-linguistically.
+CCS CONCEPTS
+• Computing methodologies → Machine translation; Model
+verification and validation.
+KEYWORDS
+machine translation, gender bias, evaluation, cross-linguality
+ACM Reference Format:
+Won Ik Cho, Jiwon Kim, Jaeyeong Yang, and Nam Soo Kim . 2021. Towards
+Cross-Lingual Generalization of Translation Gender Bias. In Conference on
+Fairness, Accountability, and Transparency (FAccT ’21), March 3–10, 2021,
+∗Both authors contributed equally to this research.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+ACM ISBN 978-1-4503-8309-7/21/03.
+https://doi.org/10.1145/3442188.3445907
+Figure 1: Outputs of publicly available machine translation
+services incorporating the social bias, observable by a pro-
+noun (left) and the feminine article uma (right). Both cases
+yield wrong results, even though given a clue to the gender
+in the preceding clause.
+Virtual Event, Canada. ACM, New York, NY, USA, 9 pages. https://doi.org/
+10.1145/3442188.3445907
+1 INTRODUCTION
+Research on the detection and mitigation of social bias in arti-
+ficial intelligence (AI) models is not only of social concerns but
+also an engineering issue that should be resolved regarding the
+accuracy of models. Natural language processing (NLP) is the rep-
+resentative area where the injection of bias is visible, since its main
+ingredient, corpus, incorporates various social concepts that largely
+influence the inductive learning procedure of machines. Among
+such phenomena, the gender bias projected during automatic ma-
+chine translation (MT) (Figure 1) is one of the most significant that
+its identification [17, 22, 26] and resolution [10, 23] have been dis-
+cussed in many regards. While dealing with the definition of the
+problem [14], formulation of the template [20], and measurement
+[6], recent approaches made an expansion to both genealogically
+and typologically diverse languages rather than just concentrating
+on Germanic, Romance, or other Indo-European languages.
+So far, however, few papers took a cross-lingual stance, where
+different types of gender bias in the translation are integrated into
+449
+This work is licensed under a Creative Commons Attribution-ShareAlike International 
+4.0 License.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Won Ik Cho, Jiwon Kim, Jaeyeong Yang, and Nam Soo Kim
+the measure. For example, the aspect of bias observed in Korean-
+English translation differs from that of English-Portuguese (Figure
+1); thus, the template and the measurement must accommodate
+this diversity. Here, we tackle the lack of this kind of approach by
+selecting the source or target languages based on various linguistic
+viewpoints, generating a set of template sentences considering
+various factors such as occupations, sentiment words, and contexts
+for coreference. Our contribution to this field can be summarized
+as follows:
+• Criteria on grouping the languages on the basis of common
+characteristics, making the investigation of the translation
+gender bias more typological and cross-linguistically gener-
+alizable
+• A new template and content word-based evaluation that
+can be used to measure the bias across different types of
+language pairs
+As a core motivation of our research, we focus on the direct
+harms to the end-users of public MT systems that call for consider-
+ations in ethics and multilingualism. It is prevalent that the users
+face biased and offensive output, which might induce incorrectness
+and harassment even if one is not familiar with either the source
+or target language. We aim to expand the preceding analyses to
+see how the tendency differs by language typology and resource.
+For further description and justification, we shall provide a brief
+summary of the literature on bias in AI and NLP.
+2 RELATEDWORK
+Ever since Friedman and Nissenbaum [11] gave a definition of com-
+puter system bias, researchers have examined stereotypes thereof,
+its influence on society, and how to remove it. These studies focused
+on traditional computer systems, which worked differently from
+nowadays. In that regard, Binns [2] elucidated emerging arguments
+on machine learning bias, which increasingly affects people and
+society.
+One pioneer work on gender issues deals with image semantic
+role labeling, mainly on AIs’ prejudice in comprehending pictures
+depicting real-life topics [30]. The paper attacks the biased inference
+of image comprehension tasks, such as describing the man cooking
+in the kitchen as a woman cooking if the kitchen interior is bright
+and fancy. Also, the paper aggregates gender-related constraints in
+the training phase for the mitigation.
+Alongside such visual factors, NLP takes up a significant portion
+of recent machine learning studies. Though not as visible and intu-
+itive as in the vision area, people using various NLP applications
+face explicit or implicit types of bias as well.
+Accordingly, in purely text-based settings, many studies cen-
+tered on evaluating the biasedness of gender-context correlation
+throughout the corpus [16] and mitigating it by, e.g., swapping the
+gender [21]. Especially, in the context of widely used pre-trained
+language models, Bolukbasi et al. [4] shed light on the word relation
+test, revealing phenomena such as man : computer programmer ≈
+woman : homemaker. Up-to-date studies claimed that such kind of
+experiment could not represent the bias in its entirety [18], but the
+tendency is still preserved in that the learning-based NLP frame-
+works integrate corpus-level bias projected onto it.
+Figure 2: A simplified diagram for the typological approach
+regarding language selection. GNP exists in KO& TL but not
+in DE & PT; gender agreement/derivation in DE & PT but
+not in KO & TL. This framework will allow us to reflect on
+various types of gender bias in translators.
+In this study, we focus on making up a more cross-lingually gen-
+eralizable measure for evaluating the gender bias of MT systems
+as an application of NLP. To this end, we thoroughly sought how
+the previous approaches set up the measurements and target lan-
+guages. There are two main aspects of the experiments performed
+depending on the type of language pair. One side measured the bias
+regarding the translation of gender-neutral pronouns, which exist
+in languages such as Korean, Japanese, or Turkish. In Prates et al.
+[20], a dozen languages were investigated with a template “The per-
+son is ## ” via to-English translation, finding out that the output is
+tilted towards male-related expressions in the target language. The
+analysis was done with p-value, to show the biasedness of Google
+Translator1 for more than a thousand occupation words and about
+twenty adjectives. In Cho et al. [6], the authors suggested an ad-
+vanced measure for the evaluation with occupation and sentiment
+words in Korean, and checked the validity of the measure when the
+answer is indeterminate due to the translation of gender-neutral
+pronouns being ambiguous.
+The other side measured the bias in translation that brings up
+gendered articles. It was comprehensively investigated in Stanovsky
+et al. [25], using from-English translation into eight languages. In
+our study, the aforementioned types of analyses on translation
+gender bias are unified, to construct a prototype of a more cross-
+linguistically generalizable measurement.
+3 PROPOSED METHOD
+Our approach differs from the previous studies in that the multiple
+typological factors that affect the translation gender bias are taken
+into account. In the subsections below, the processes of language
+selection, template generation, and measure decision are described.
+3.1 Language Selection
+Here we present the grounds on which we decided the specific
+languages to utilize (Figure 2) and how the directions (KO-EN, TL-
+EN, EN-DE, and EN-PT) are selected.
+1https://translate.google.com/
+450
+Towards Cross-Lingual Generalization of
+Translation Gender Bias FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+3.1.1 Languages of Interest. The languages of our interest here
+(hereafter referred to as LOI), namely German (DE), Korean (KO),
+Portuguese (PT), and Tagalog (TL), can be categorized both linguis-
+tically and concerning their publicly available language resources.
+The following three linguistic properties were crucial to our inves-
+tigation: (a) presence of gender-neutral pronouns (GNP), (b) gender
+agreement of articles, and (c) noun derivation according to its gen-
+der.
+(a) GNP is an umbrella term, defined here as a third-person sin-
+gular pronoun that is not marked for gender distinction. Unlike
+English, where the GNP singular they is far from in general use2,
+Korean and Tagalog GNPs are frequently deployed in colloquial
+contexts [24, 28]. The presence or lack of GNP in specific languages
+can often reflect the algorithmic bias of translation services. For
+example, it can be observed in some translators that the Korean
+sentences “걔는경찰이야 (S/he is a cop.)” and “걔는간호사야 (S/he
+is a nurse.)” are translated into English as “He is a cop.” and “She
+is a nurse.” respectively [6], where걔 (kyay) is a Korean GNP that
+can indicate either gender3. Similar holds for Tagalog siya.
+(b) The agreement of the determiners with the gender of the head
+noun occurs in German and Portuguese but not in the other two
+LOIs [13, 24, 28, 32]. For example, when English “She is a cop.” is
+translated into German as “Sie ist (eine) Polizistin.”, the article a in
+the source sentence turns into a gendered article eine, which agrees
+with the feminine noun Polizistin. This phenomenon sometimes
+induces errors such as “Sie ist ein Polizist.”, on which the social bias
+regarding the occupation has an effect.
+(c) Derivation of gendered nouns, where a gendered noun is as-
+signed to a different gender by changing its form, often occurs in
+German and Portuguese [13, 32]. However, detecting errors in noun
+derivation can be tricky. In the aforementioned example, Polizistin
+is a feminine counterpart of masculine Polizist, whereas most loan-
+words (e.g., ein Barista, ein Model) or invariably gendered words
+(e.g., ein Genie; a genius) does not change according to the gender
+of the referent although grammatically correct. This factor affects
+the evaluation of the gender agreement of articles since machine
+translators quite often yielded invariable nouns or loanwords as
+the output.
+Note that the concept of ‘gender’ utilized in (a) slightly differs with
+the one used in (b) and (c), since the gender of pronouns more
+regards the biological gender while the genderedness of articles
+and nouns is more grammatical. We may refer to the former when
+we deal with from-KO/TL translation, and the latter if the direction
+heads DE/PT, given that the errors in both types of gender mapping
+might cause a poor user experience.
+3.1.2 Measure Language. Albeit we mainly analyze the languages
+above, the gap of grammatical genderedness between DE/PT and
+KO/TL is considerable, that it is challenging to evaluate translation
+2Although Bjorkman [3] suggests the recent shift of usage regarding singular they in
+modern English, it is not guaranteed that such tendency is well revealed in the corpora
+exploited in MT training phase so as to replace s/he in the real machine inferences.
+3It must be noted that the neuter gender pronouns of German and Portuguese are
+distinguished from GNPs, and that the absence of GNP is not always equivalent with
+genderedness of the language. The latter is well illustrated with the example in the
+next subsection by contrasting English with German, a language with a full gender
+system.
+Languages Documents Sentences Tokens (en) Tokens
+German 161,963 93.3M 1.9G 2.2G
+Portuguese 162,430 77.7M 1.5G 1.4G
+Korean 36,601 5.1M 77.4M 69.2M
+Tagalog 17,031 1.3M 36.3M 26.9M
+Table 1: The search result from OPUS.
+gender bias using only the LOIs directly. Apart from LOIs, we need
+a language that is not the subject of analysis but used as the source
+or target language in the experiments. The following properties of
+English qualify it as a measure language.
+First of all, although there exists ‘singular they’ in English, as
+described above, their appearance in MT inference is not significant
+to let English be considered as a language with GNP. This is relevant
+to examining errors in machine translation from KO or TL, even
+when an overt antecedent is given, as in Figure 1.
+Secondly, English does not have a gender system with an article
+agreement or active derivation of gendered nouns. In this way, the
+gender-related prejudice can be captured experimentally in EN-DE
+or EN-PT translation procedure.
+3.1.3 Resource Issue. On top of the linguistic factors, we took the
+amount of available translation resources into consideration, since
+it is assumed to directly or indirectly affect the overall performance
+of (public) MT systems, either with training or pre-training [7, 12].
+A recent article on the linguistic diversification [1] suggests that the
+resourcefulness in NLP is related to the amount of distributed usable
+libraries, models, and corpora, but it is difficult to quantitatively
+determine how under-resourced a language is.
+For simple and effective comparison, we exploit the statistics
+of OPUS4, a repository of open MT datasets. The searched cases
+were EN-DE, EN-PT, KO-EN, and TL-EN. These include the number
+of documents, sentences, and tokens for English and the LOIs (as
+either target or source language).
+One might claim that Portuguese is a high-resource language
+compared to Korean. However, here we intend to posit Portuguese
+and Tagalog as lower in resources than German and Korean, respec-
+tively (Figure 2), and compare the effect of the amount of resource
+on translator fairness between languages with similar grammatical
+properties regarding GNP or genderedness.
+To add more on the measure language, English is dominating
+in the scale of publicly available resources [1] that adopting it as a
+measure language is less likely to affect the result regarding each
+language. Also, English is well supported in almost all translation
+services.
+3.2 Template
+In this section, we describe how we constructed the template sen-
+tences for the experiment. The general format is as:
+One thing about the man/woman, (clue)
+[he/she] is [a ##] (inference)
+where [he/she] is either GNP or gender-specific terms depending
+on the language. is [a ##] refers to the predicate of the preceding
+4http://opus.nlpl.eu/, as of October 2020.
+451
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Won Ik Cho, Jiwon Kim, Jaeyeong Yang, and Nam Soo Kim
+pronoun, which contains occupation or sentiment noun/adjectives,
+along with a copula and/or a nominative particle.
+Further detail of the template: as shown in the previous section,
+the grammatical properties of a language largely influence the way
+that gender bias in translation is measured. Thus, we intended to
+create a sentence format that can render the projected gender bias
+relatively straightforward in the given types of languages. This is
+the background for the addition of a strong and straightforward
+context, One thing about the man/woman, which turns the task into
+a problem with an unambiguous answer. Previous works on lan-
+guages with GNPs [6, 20] had limitations in this aspect, where there
+was no definite referent in the tasks. Although a less ambiguous
+approach was taken in Stanovsky et al. [25], the target languages
+were not without gender systems, and the template sentences in-
+volved indirect semantic cues rather than an overt expression of
+gender.
+Another consideration was to make the template as independent
+as possible from sociocultural dependency. For example, in some
+of the previous studies on gender bias focusing on mono-lingual
+tendency [27, 31], we found it afraid to confirm that the adopted
+template can be utilized as well in multilingual settings, in the sense
+that they sometimes incorporate culture-specific contents. There-
+fore, by providing a strict condition that guides the coreference, we
+attempted to avoid inference depending on social context so that
+we can transparently measure the bias regarding gender, given a
+trained MT system. Though templates can reflect bias to varying
+degrees and the extent may depend upon language pair, we aimed
+to achieve reliable quantitative analysis by evaluating the accuracy
+of gender-related prediction.
+3.3 Measure
+As noted in Section 3.1, we identify three5 types of language by the
+existence of the gender system and gender-neutral pronouns. The
+first type is genderless languages with GNPs, such as Korean or
+Tagalog (Type 1). Another type displays agreement and derivation
+according to the grammatical gender, represented here byGerman
+or Portuguese (Type 2). The others are genderless languages with
+less dominance of conventional GNPs, viz. measure languages,
+to which English belongs. To disclose the gender bias, we could
+theoretically pair the languages in three ways: Type 1 to measure
+language, measure language to Type 2, and Type 1 to Type 2. In
+this paper, we only cover the first two6.
+GNPs to non-GNPs: For the pairs Type 1 to measure language,
+i.e., KO or TL to EN, we checked if the translation of the gender-
+neutral pronoun is in accordance with the information given in
+the preceding clause. As the task is relatively straightforward, we
+measured the accuracy, which approximately equals to the F1 score
+here. It should be noted that although evaluating gender bias in
+the translation of GNPs has been treated as describing a tendency
+rather than checking what is correct or not [6, 20], in this study, we
+regard it as a problem with an uncontroversial answer. Here, the
+5In principle, there is yet another type of language, where there are both GNPs and
+a gender system, the most populous example being Hindi. We plan to explore such
+types of languages, but not at this point, mainly due to the problem formulation being
+challenging in translation.
+6The last one, e.g., Korean to German, was omitted due to the difficulty in setting up
+the measure, possibly three or more factors, and will be investigated in future analysis.
+content words are either names of occupation or sentiment words7
+(e.g., gentle, sweet, greedy), as will be described below.
+Agreement and derivation: For the pairs measure language to
+Type 2, i.e., EN to DE or PT, we first checked the gender of the
+translated lexical item. We mainly encountered three cases.
+-When the lexical item is compatiblewith both genders (e.g., um/uma
+agente de leilões, an auction agent), we checked if the gendered arti-
+cle corresponds with the subject pronoun.
+- When the gendered item has its counterpart in the other gender
+(e.g., um agricultor and uma agricultora, a farmer) we investigated
+if the gender of both the article and the noun matches with that of
+the subject.
+- When the item is invariably assigned a single-gender as in anjo
+(angel in Portuguese), we made a tolerable judgment, e.g., both OK
+for ele é um anjo and ela é um anjo.
+In this phase, the content words are solely comprised of nouns in
+the source sentences, i.e. names of occupations and sentimental
+prescriptions (e.g., fraud, pervert). However, if a non-noun or un-
+seen expression emerges in the target languages, article agreement
+is checked upon the gender of the sentence subject. This is to be
+described in detail with the survey questions in the experiment
+section.
+Thefluency of translation:Besides gender-relatedmeasurements,
+we also checked whether the translation had been fluently per-
+formed. As to be described in the following section, we made up the
+gold standard for the template sentences and checked if the trans-
+lation output matches with it, utilizing a conventional objective
+measure BLEU [19] and a recently proposed automatic semantic
+similarity checking system, BERTScore [29].
+BLEU employs n-grams of the language to calculate the preci-
+sion and brevity penalty within the predicted sentence. BERTScore
+adopts a large-scale unsupervised pre-trained language model [8]
+to gauge the pairwise cosine distance of the abstracted sentence
+representations. For the latter, one can claim that the approach
+incorporates existing biases into the pre-trained language model.
+However, our template sentences and resulting translation outputs
+are structured quite simple. Thus, we believe that the automatic
+evaluation methods would be free from the sentence style or nu-
+ance enough to judge only the semantic similarity of the predicted
+content word.
+Miscellaneous: One may assert that severely flawed translations
+should not be counted as a valid test sample in checking the gen-
+der inferences. It might be reasonable to take into account only
+the cases the initial meaning is well preserved. Notwithstanding
+such concern, we investigated the whole output sentences because
+translation services primarily aim to assist people who are not fa-
+miliar with either the source or the target language. In other words,
+gender specification occurring in the result is the first visible fea-
+ture that can offend the user, perhaps more significantly than the
+fluency of the translation. In this regard, we divide between pro-
+cesses concerning gender assignment and fluency, and examine
+them separately.
+7Sentiment words are adjectives in Type 1 to EN, while nouns in EN to Type 2. This
+will be explained in Section 4.
+452
+Towards Cross-Lingual Generalization of
+Translation Gender Bias FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Figure 3: Flow chart for dataset construction and evaluation.
+Another consideration is on the disparate impact, a measure
+to examine how the system performance of an underrepresented
+group, here the female, is not as significant as that of the other. This
+measure is not calculated in sentence-level, but after evaluating the
+whole corpus. We define it here as a female case accuracy divided
+by the male case accuracy, per each language pair.
+4 DATASET CONSTRUCTION
+We constructed gold standard sentences for all the languages used
+in the experiment, both the LOIs and the measure language.
+4.1 Content Words in Korean
+First, for the sake of public accessibility, we adopted the Korean
+content words (occupations and sentiment words) suggested in Cho
+et al. [6], and reexamined them to ensure that the phrases are not
+outdated in the spoken language. In this process, synonymous and
+related items were merged into one expression (e.g., home nurse
+and hospice nurse) so as to prevent the bias coming from the num-
+ber of the branches. Also, only the expressions that are expected
+to be available cross-culturally were subject to consideration, al-
+though their validity may be further verified later in the translation
+phase. For that reason, three Korean native speakers searched and
+examined if the word is socially accepted (used with the public) or
+not.
+Next, with the remaining content words, sentences were written
+in Korean in accordance with the template (Section 3.2). While
+doing so, the natives checked the naturalness of the expression in
+colloquial circumstances. The ones which failed to get consensus
+were removed or modified.
+4.2 Translation to English
+For the fluent and accurate translation to the other LOIs, we moved
+on to obtain a fairly reliable translation of the sentence set in the
+measure language. We achieved the translated version via the hu-
+man and machine hybrid approach.
+First, given the Korean template as the original, the initial Eng-
+lish version was created with Google Translator, which was largely
+analyzed in the previous studies [6, 20]. The output contained lit-
+tle amount of misinterpretations regarding gender and content,
+but was decent enough to be served as a draft translation that is
+independent with the tendency of the translators utilized in the
+validation phase8.
+Consequently, four people who speak both Korean and English,
+including an English native, an L2 English speaker (Korean native),
+and two English learners (Korean native), checked the validity of
+the translation and only left the candidates that pass the felicity test.
+If the terms are dropped, the correspondings are simultaneously
+removed from the corpus of the other languages. This process is
+depicted in the top part of Figure 3.
+The limitation here is that the sentiment words are merely pre-
+pared for the translation of Type 1 to measure language, as the LOIs
+of Type 2 sometimes may not show gender agreement for the trans-
+lated terms of the adjectives. Thus, alternative sentiment nouns
+are required, especially those which prescribe the personality or
+behavior of people. We consulted the Senti-WordNet [9] for English
+sentiment words, and sorted out the nouns of which the gloss starts
+with either ‘A person who’ or ‘Someone who’. Then we arranged the
+items by positivity and negativity scores, leaving only 230 of which
+either score is 0.25 or above. Terms that do not meet the ethical
+standard applied to sentiment words were removed referring to
+Cho et al. [6], that is, those related to appearance, economic status,
+sexuality, level of education, disability, etc.
+4.3 Translation to LOIs
+As a final step, we translated the English template sentences into
+the other LOIs, i.e. German, Portuguese, and Tagalog to get the
+gold standard. As in English, the draft MT output was post-edited
+by a native or at least bilingual speaker of each language, familiar
+with English and/or Korean. In specific, Tagalog native, Portuguese
+native, and L2 German speaker (Korean native), all native or expert
+in English, participated in making up the gold data.
+In case the content word does not guarantee that it has consis-
+tent connotations inter-culturally, we asked the speakers to look
+carefully for that. For example, as military service is mandatory
+to most Korean males, the Korean language incorporates lots of
+widely used professions regarding military service: ‘private first
+class’, ‘corporal’, ‘sergeant’. However, for a country like the Philip-
+pines, where the government policy differs from Korea, the job
+8We do not use Google Translator in the experiment, since the translation fluency
+may be boosted in an unintended way for using it in the draft translation.
+453
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Won Ik Cho, Jiwon Kim, Jaeyeong Yang, and Nam Soo Kim
+POS Content Volume Template Source
+Adj. Sentiment 68 KO, TL Cho et al. [6]
+Noun Occupation 187 KO, TL, EN
+Sentiment 64 EN Senti-WordNet
+Table 2: The composition of the final content words.
+Language Pair Content Size of Gold Set
+KO/TL-EN Occupation Senti. Adj. 255 × 2 (EN)
+EN-DE/PT Senti. Noun 251 × 2 (DE/PT)
+Table 3: Language pairs of interest and the size of gold
+standard dataset. × 2 denotes the augmentation by gender-
+swapping.
+market is not usually known for such levels. As a result, about
+20 more content words were removed in the process9. Eventually,
+we achieved the complete list of the template sentences in all the
+languages, where KO/TL, EN serve as the source language (Table
+2), and EN, DE/PT as the target language (Table 2, 3).
+In summary, we obtained 187 nouns denoting occupations and
+68 adjectives and 64 nouns concerning sentiments, which can be
+used flexibly depending on the language pair. This procedure is
+also described by the top part of Figure 3, only with the difference
+in the sentiment words of KO/TL-EN and EN-DE/PT (Table 3).
+It is viable to claim that creating the template sentences from Ko-
+rean and English might compromise the generalizability. However,
+it does not hinder our goals from building an inter-culturally appli-
+cable template, since all the involved languages undergo inspection
+regardless of the process being simultaneous or sequential10. By
+eliminating disputable terms andmaking the gold standard template
+vis-à-vis each language, we were able to extend the cross-linguistic
+utility of our equity evaluation corpus. All the data and further
+experiment results are to be shared in the public repository11.
+5 EXPERIMENT
+We studied three online translation services12, namely Yandex13,
+Microsoft Bing14, and Amazon AWS15, because they support all
+the LOIs, are freely available, and have numerous users worldwide.
+This follows the process depicted at the bottom of Figure 3. The
+other public MT module, which assisted us in obtaining the gold
+standard translations, was ruled out to guarantee a fair comparison.
+As stated above, the primary measure is the accuracy of the
+prediction on the gender-related features, particularly the use of he
+or she for the Type 1 to measure language, and article agreement
+and noun derivation for the measure language to Type 2 pairs. We
+state a simplified guideline of the human evaluation below:
+9The full sentence list is to be released with the paper.
+10The weak point is that the initial lexicon pool concerns only Korean and English.
+However, we believe that the simultaneous creation of the profession list from all the
+languages would have also resulted in a similar outcome after the filtering.
+11https://github.com/nolongerprejudice/tgbi-x
+12As of July 2020.
+13https://translate.yandex.com/
+14https://www.bing.com/translator
+15console.aws.amazon.com/translate/
+(1) Type 1 (KO/TL) to EN: One should check if the gender
+of the pronoun in the second clause, e.g., s/he or her/him,
+corresponds with the preceding. This does not necessitate
+the grammatical or semantic appropriateness of the output
+sentence.
+(2) EN toType 2 (DE/PT): It should be first checked thatwhether
+the translated gendered noun expression has been correctly
+derived.
+• In case it matches with the gender of given pronoun (e.g.,
+er or sie in German16), or is neutral, then one can check if
+the article agrees with the noun.
+• In case not, one should check if the noun has the counter-
+part regarding gender. For example, Polizist (cop) in Ger-
+man has its counterpart Polizistin, while a loanwordModel
+does not necessarily. If there exists, the noun derivation
+is decided wrong, and the article agreement is considered
+wrong as well. If no counterpart, we assume it correct, and
+the evaluation of the article agreement follows the noun.
+(3) OKforno article: Some outputs in EN-PT translation showed
+no article. However, considering that in Portuguese, the arti-
+cle may be omitted under some conditions when the speaker
+does not want to judge the object, we annotated the result as
+correct. A similar holds for the occupation words in German.
+For DE/PT, the total accuracy is counted only if both noun and
+article are appropriate.
+The human evaluation of the gender-related factors was done
+with at least two bilinguals17, accompanied by the discussion with
+the authors, for all the language pairs. For the fluency check, we
+adopt corpus-level BLEU18 and BERTScore19. The total accuracy
+regarding human evaluation and fluency check are denoted as Total
+Acc. and Total Auto. in Table 4.
+5.1 Analysis
+The overall statistics suggest that accuracy is much lower for the
+female than the male, especially in DE and PT20, showing low
+disparate impact. Particularly, low disparate impact implies that the
+coreferencemight have beenwrongly performed for some cases that
+require female inference. Also, the difference was displayed small
+between occupation and sentiment items in most cases, suggesting
+that the projection of bias is not restricted to social roles but also
+affects judgments on personality. Besides, there was little gap shown
+between the evaluatedMT systems in total, while the details on each
+language pair differ upon the criteria. Beyond a mere numerical
+comparison of the MT modules and of the language pairs, below
+we provide a more detailed account of the results.
+5.1.1 Per Occupation Group. One significant point is the stereo-
+types projected into the inference process. For example, in EN-DE,
+mistakes such as she is a game programmer to Sie ist ein profes-
+sioneller Spieler, where ein and professioneller are both in male-
+gendered, were commonly observed in all the translators. Also, in
+16We found no errors in the pronoun decision in DE/PT.
+17For KO-EN and TL-EN, the biological gender of the inferred pronouns was checked.
+For EN-DE and EN-PT, two bilinguals each (at least with ten years of language experi-
+ence for both languages) marked the machine inference.
+18Smoothings were applied [5] and BLEU was scored using NLTK library [15].
+19We utilized BERT multilingual, specifically bert-base-multilingual-cased, rescaled.
+20Except for KO in Bing.
+454
+Towards Cross-Lingual Generalization of
+Translation Gender Bias FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Systems Yandex Bing AWS
+Accuracy
+(%)
+Noun / Article GNP Noun / Article GNP Noun / Article GNP
+DE PT KO TL DE PT KO TL DE PT KO TL
+Occupation 81.3 / 81.0 98.7 / 97.9 100 99.7 96.3 / 97.3 96.8 / 95.7 92.8 100 84.5 / 96.3 98.1 / 98.1 100 100
+Sentiment 85.9 / 80.5 100 / 100 100 100 95.3 / 90.6 98.4 / 96.9 69.9 100 89.1 / 84.4 100 / 100 100 100
+Male 99.6 / 98.8 100 / 99.2 100 99.6 100 / 99.6 98.8 / 97.2 100 100 98.8 / 99.2 100 / 99.6 100 100
+Female 65.3 / 62.9 98.0 / 97.6 100 100 92.0 / 91.6 95.6 / 94.8 73.3 100 72.5 / 87.3 97.2 / 97.6 100 100
+Total Acc. 80.3 98.4 100 99.8 94.4 95.2 86.65 100 82.9 98.2 100 100
+D. I. 0.625 0.980 1 1 0.896 0.960 0.733 1 0.690 0.972 1 1
+BLEU 68.4 55.0 32.1 40.6 75.7 41.6 32.1 34.1 43.7 50.1 35.0 32.9
+BERTScore 71.2 72.6 73.0 74.0 81.9 83.0 82.1 83.3 78.8 79.3 79.3 80.1
+Total Auto. 69.8 63.8 52.55 57.3 78.8 62.3 57.1 58.7 61.25 64.7 57.15 56.5
+Per System 94.6 / 0.903 / 60.9 94.1 / 0.897 / 64.2 95.3 / 0.920 / 59.9
+Table 4: The evaluation result. Except for Per System, bold are the cases with the highest value. For Per System, Total Acc.,
+disparate impact (D. I.), and Total Auto. are noted in the order.
+EN-PT, some occupations were expressed in inappropriate femi-
+nine form as in lenhador (lumberjack) rather than lenhadora, which
+led to the use of um instead of uma. This was also the case for
+aviador, soldado, and monge (airman, soldier, monk), which should
+be aviadora, soldada, and monja. The opposite case includes uma
+babysitter for men.
+In Type 1 to EN, where the errors rarely came up except for
+KO-EN (Bing), the bias was not manifested much. In Yandex, the
+only mistake found in TL-EN was the projection of male pronoun
+for guro sa elementarya (elementary school teacher), and no bias
+was shown in the content words in KO21.
+Exceptionally, as for KO-EN in Bing, the pronouns were guessed
+almost randomly, especially for the female cases. The wrong an-
+swers include 경찰 (cop), 경비원 (guard), 잠수부 (diver), 배관공
+(plumber), and some occupation group regarding programmer and
+developer, which are common gender stereotypical roles. We as-
+sume this phenomenon originated from the flaws in training KO-EN,
+e.g., wrong alignment of the tokens, which resulted in the nosedive
+of the total accuracy of the translator.
+5.1.2 Per Sentiment Class. The proportion of errors in sentiment
+words was, in general as well, more significant in Type 2 languages
+than Type 1. Especially in EN-DE, for example a villain turned into
+ein Bösewicht for both genders in all the modules, and several more
+similar cases occurred. Also, in EN-DE/PT overall, it was exhibited
+that the errors mostly occurred in negative words, incorrectly in-
+ferring the woman as male. Besides the wrong coreferences, these
+results lower the disparate impact in general, as a consequence of
+the findings in Cho et al. [6] related to the bias regarding the gender
+appearance in the training corpus. On the other hand, we had no
+error regarding sentiment for KO/TL-EN in Yandex and AWS.
+As stated above, the unexpected results came out with Bing,
+specifically for KO-EN. Although we experienced a malfunction,
+the tendency thereof was very helpful for the analysis regarding
+sentiment. It is straightforward that certain gender-stereotypical
+21The insufficient translation fluency in Tagalog and Korean shown is mostly due
+to the absence of third-person singular pronouns in the output, not the incorrect
+inferences.
+Languages DE PT KO TL
+Unbiasedness 85.8 97.2 95.5 99.9
+D. I. 0.737 0.971 0.911 1
+BLEU 62.6 48.9 33.1 35.9
+BERTScore 77.3 78.3 78.1 79.1
+Table 5: Aggregation of all the results of MT systems with
+respect to the languages. Unbiasedness denotes the total ac-
+curacy of the gender-related inferences.
+items such as약삭빨라 (weak22),허약해 (fragile), or귀여워 (cute)
+are likely to be correctly referred to as female, and that others
+such as논리적이야 (logical),용감해 (brave),유치해 (childish), or
+적극적이야 (active) are wrongly guessed as male.
+These wrong coreferences not only lessens the quality of the
+translation but also reveals the social bias within the trained system.
+In addition, though the incorrectness in KO-EN or TL-EN seems
+more superficial than in those of EN-DE/PT, we deemed that the
+severity of the potential offense caused by the inaccuracy should
+not be underestimated for its simplicity.
+5.1.3 Fluency and Biasedness. Beyond the numerics, we noted the
+relation between the translation fluency and the shown biasedness.
+At first, we suspected that the low translation fluency, which might
+be intertwined with the poverty of resources [12], would bring
+increased gender bias as a result. However, the high performance
+of translation fluency does not guarantee the same in bias issue.
+Comparing translation fluency and disparate impact within [DE
+vs. PT] and between [DE & PT vs. KO & TL] language types (Table
+5), we learned that the MT systems with high translation fluency
+for some languages might also acquire the gender stereotypes on
+occupation or sentiment words, which is visible from the contrast
+of unbiasedness factors and fluency scores.
+More on the fluency measures, we focused on the contrast of
+BLEU and BERTScore, which shows an inversed tendency overall
+22The original meaning is more close to clever and weak is a mistranslation, but we
+leave it to the measurement of fluency and bypass these errors to focus more on the
+failure of gender coreference.
+455
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Won Ik Cho, Jiwon Kim, Jaeyeong Yang, and Nam Soo Kim
+(Table 5). It is also observed that BERTScore corresponds with
+the two gender bias measures, unlike BLEU that mainly concerns
+the token overlap of the prediction and the gold standard. This
+suggests that BERTScore can catch the gender-related aspects of
+the translation that BLEU might not get, though some kind of
+syntactic similarity can be overlooked.
+Low-resourcedness. We took a further step to integrate the issue
+of semantic faithfulness of translation with the low-resourcedness.
+In general, the languages with more resources23 recorded better
+fluency index in to-English translation. Though indirectly, it can be
+a clue for a guess that large-scale resources boost the translation
+fluency but might make the system more biased.
+The analyses above bases on the observation of the public MT
+models; thus, it is inevitable to face a missing link between the ‘gen-
+uine’ training resource and the shown biasedness. It is probable that
+for some language pairs, a data-efficient approach is working, while
+not for the others. Though we contrasted two factors unbiasedness
+and fluency in terms of language resource, the direct connection is
+not guaranteed.
+Without a doubt, this might be well displayed if we train our own
+MT model, with controlled resources, and then compare the result
+as clearly as possible. However, it is unfortunate that the systems we
+train do not necessarily reflect the systems the MT users currently
+encounter. Moreover, such information on training resources is
+usually not provided by the service maintainers, making the in-
+depth survey more challenging. In this regard, here we adhere to
+our original hypothesis that grounds on the survey over language
+resources, albeit the gap should be filled by further investigation.
+5.2 Discussion
+Upon the results, we hesitantly argue that the supplement of train-
+ing resources may not be a solution for the mitigation of gender
+bias, but instead can be a trigger of the amplification. Although
+our observation cannot touch the core part of the training, the
+discussion is an extension of inductive bias in machine learning.
+Thus, further regularization is required to alleviate the bias, apart
+from collecting data and updating the performance.
+One of such can be the detection of gender-specified or gender-
+neutral context and modifying the related terms, as done in the
+recent approach of Google Translation24. In training-centered view-
+point, Saunders and Byrne [23] suggested a domain adaptation for
+the mitigation, by making up a small handcrafted set with a tem-
+plate “The [PROFESSION] finished [his|her] work” which gives the
+MT model a corresponding regularization in an additional training
+phase. The above works are concurrent with our approach, and we
+expect to extend our work, especially regarding language diver-
+sity and non-profession-related expressions, to real-world training.
+Notwithstanding such achievements, we raise two more issues here:
+English-centeredness and ethics.
+Multilingualism. Despite the limitations that the languages in-
+vestigated here do not and cannot fully represent the diverse human
+23Although the information on public data (Table 1) has no direct link to the training
+procedure of the online MT systems, we hesitantly claim that the high translation
+fluency is partly supported by the amount of available MT resources.
+24https://ai.googleblog.com/2020/04/a-scalable-approach-to-reducing-gender.html
+languages, we believe that the direction of our research is to be bene-
+ficial for multilingual extension and generalization of the studies on
+translation gender bias. Though it is inevitably true that translation
+is a multilingual process, a large portion of the literature concen-
+trated on measuring the bias in English, either as the source or the
+target. Here we attempted to shed more light on various properties
+of the languages on the other side, including morphosyntax, GNPs,
+low-resourcedness, and evaluation methodology. Nonetheless, we
+guess that the future research should incorporate the procedure of
+direct non-English-to-non-English translation, e.g., KO-DE, since
+the aspect of gender bias projected within would not be fully cov-
+ered by the schemes proposed in this work and the previous studies.
+Ethics. One may concern that there is no explicit discussion on
+ethics in this paper, either politically or philosophically. However,
+in the theoretical and sociolinguistic view, the struggle for deriving
+balancedness out of a biased system or data is itself a pursuit of
+ethical standards. Referring again to Friedman and Nissenbaum
+[11] and Binns [2], our approach is related to egalitarianism against
+data-driven biases, mainly regarding the areas of gender and mul-
+tilingualism. For instance, our result was designed to imply the
+positive correlation between system performance and bias, not
+merely to evaluate the translation fluency. We further attempted to
+demonstrate that the systems trained with low-resourced languages
+generally have less (gender) bias-related errors compared to those
+of high-resourced ones.
+We want to emphasize that we concentrated on the empirical
+perspective of fairness and transparency, although the underlying
+philosophy is obviously desired for a theoretical grounding, e.g.,
+discrimination, egalitarianism, and justice [2]. We aimed to evoke
+both bias and cross-lingual issues by making up less controversial
+datasets, templates, and evaluation schemes.
+6 CONCLUSION
+In this paper, we argued for the stringent necessity of a cross-
+lingual and sociolinguistic approach to measuring the gender bias
+in an inherently multilingual process: machine translation. Building
+on an equity evaluation corpus that incorporates inter-culturally
+present occupation and sentiment words, we chose the language
+pairs that highlight the various aspects of bias in gender-neutral
+pronouns, agreement of articles, and gendered noun derivation. The
+measurements, including the accuracy in gender-specific terms and
+the lexical-semantic similarity, were applied to three widely-used
+open-source MT modules.
+We observed that there exists a trade-off between the amount
+of bias and translation fluency. The lower inference accuracy in
+the high-resource languages implicitly suggests the irony that the
+language resources could have provided the gender stereotype to
+the model being trained, thus calling for the algorithmic mitigation
+process to prevent possible errors that may offend anonymous
+users. To figure out the transparent cause and effect of bias, we
+could have built our model and found out factors. However, since
+such systems may not necessarily be used as a product, it would be
+challenging to estimate their influence on society. It would also be
+more meaningful to assess the bias within the publicly accessible
+models and in high demand, which are more likely to propagate and
+even amplify bias to NLP applications if adopted without inspection.
+456
+Towards Cross-Lingual Generalization of
+Translation Gender Bias FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+As future work, we plan to explore different aspects of gender
+bias manifestation (e.g., gender agreement of other parts of speech,
+and other combinations of language pairs, not necessarily involving
+EN), and to parlay our research into laying the foundation for an
+easily downloadable and deployable gender bias evaluation toolkit.
+All the templates and gold standard used in this research are to
+be released to the public25, and will be available for the service
+providers that deal with the gender-related errors of MT systems.
+ACKNOWLEDGMENTS
+The authors greatly thank Jihyung Moon and Sangwhan Moon
+for proofreading and giving important comments. Also, we highly
+appreciate the substantial feedback and thoughtful encouragement
+from all the anonymous reviewers. Most of all, we were fortunate
+to work with the great language specialists; Dong Sun Lim, Do Na
+Lee, Cheongwon Jang, Andreia Carvalho, Junwoo Song, Soohong
+Park, and Jieun Kim, without whom this research would have been
+impossible.
+The open-access publication of this manuscript was sponsored
+by Technology Innovation Program (10076583, Development of
+free-running speech recognition technologies for embedded ro-
+bot system) funded by the Ministry of Trade, Industry & Energy
+(MOTIE, Korea).
+REFERENCES
+[1] Emily M Bender. 2019. The# BenderRule: On Naming the Languages We Study
+and Why It Matters.
+[2] Reuben Binns. 2018. Fairness in Machine Learning: Lessons from Political Philos-
+ophy. In Conference on Fairness, Accountability and Transparency. PMLR, 149–159.
+[3] Bronwyn M Bjorkman. 2017. Singular they and the syntactic representation of
+gender in English. Glossa: a journal of general linguistics 2, 1 (2017), 80.
+[4] Tolga Bolukbasi, Kai-Wei Chang, James Y Zou, Venkatesh Saligrama, and Adam T
+Kalai. 2016. Man is to Computer Programmer as Woman is to Homemaker? De-
+biasing Word Embeddings. In Advances in neural information processing systems.
+4349–4357.
+[5] Boxing Chen and Colin Cherry. 2014. A Systematic Comparison of Smoothing
+Techniques for Sentence-Level BLEU. In Proceedings of the Ninth Workshop on
+Statistical Machine Translation. 362–367.
+[6] Won Ik Cho, Ji Won Kim, Seok Min Kim, and Nam Soo Kim. 2019. On Measuring
+Gender Bias in Translation of Gender-neutral Pronouns. In Proceedings of the
+First Workshop on Gender Bias in Natural Language Processing. 173–181.
+[7] Stephane Clinchant, Kweon Woo Jung, and Vassilina Nikoulina. 2019. On the
+use of BERT for Neural Machine Translation. In Proceedings of the 3rd Workshop
+on Neural Generation and Translation. 108–117.
+[8] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2019. BERT:
+Pre-training of Deep Bidirectional Transformers for Language Understanding. In
+Proceedings of the 2019 Conference of the North American Chapter of the Association
+for Computational Linguistics: Human Language Technologies, Volume 1 (Long and
+Short Papers). 4171–4186.
+[9] Andrea Esuli and Fabrizio Sebastiani. 2006. Sentiwordnet: A Publicly Available
+Lexical Resource for Opinion Mining. In LREC, Vol. 6. Citeseer, 417–422.
+[10] Joel Escudé Font and Marta R Costa-jussà. 2019. Equalizing Gender Bias in Neural
+Machine Translation with Word Embeddings Techniques. In Proceedings of the
+First Workshop on Gender Bias in Natural Language Processing. 147–154.
+[11] Batya Friedman and Helen Nissenbaum. 1996. Bias in Computer Systems. ACM
+Transactions on Information Systems (TOIS) 14, 3 (1996), 330–347.
+[12] Joel Hestness, Sharan Narang, Newsha Ardalani, Gregory Diamos, Heewoo Jun,
+Hassan Kianinejad, Md Patwary, Mostofa Ali, Yang Yang, and Yanqi Zhou. 2017.
+Deep Learning Scaling is Predictable, Empirically. arXiv preprint arXiv:1712.00409
+(2017).
+[13] Amélia P Hutchinson and Janet Lloyd. 2003. Portuguese: An essential grammar.
+Psychology Press.
+[14] James Kuczmarski and Melvin Johnson. 2018. Gender-Aware Natural Language
+Translation. (2018).
+25https://github.com/nolongerprejudice/tgbi-x
+[15] Edward Loper and Steven Bird. 2002. NLTK: The Natural Language Toolkit.
+In Proceedings of the ACL-02 Workshop on Effective Tools and Methodologies for
+Teaching Natural Language Processing and Computational Linguistics. 63–70.
+[16] Kaiji Lu, Piotr Mardziel, Fangjing Wu, Preetam Amancharla, and Anupam Datta.
+2020. Gender Bias in Neural Natural Language Processing. (2020), 189–202.
+[17] Shachar Mirkin, Scott Nowson, Caroline Brun, and Julien Perez. 2015. Motivating
+Personality-Aware Machine Translation. In Proceedings of the 2015 Conference on
+Empirical Methods in Natural Language Processing. 1102–1108.
+[18] Malvina Nissim, Rik van Noord, and Rob van der Goot. 2020. Fair Is Better than
+Sensational: Man Is to Doctor as Woman Is to Doctor. Computational Linguistics
+46, 2 (June 2020), 487–497. https://doi.org/10.1162/coli_a_00379
+[19] Kishore Papineni, Salim Roukos, Todd Ward, and Wei-Jing Zhu. 2002. BLEU: A
+Method for Automatic Evaluation of Machine Translation. In Proceedings of the
+40th annual meeting on association for computational linguistics. Association for
+Computational Linguistics, 311–318.
+[20] Marcelo OR Prates, Pedro HAvelar, and Luís C Lamb. 2018. Assessing Gender Bias
+in Machine Translation: A Case Study with Google Translate. Neural Computing
+and Applications (2018), 1–19.
+[21] Yusu Qian, Urwa Muaz, Ben Zhang, and Jae Won Hyun. 2019. Reducing Gender
+Bias in Word-Level Language Models with a Gender-Equalizing Loss Function.
+In Proceedings of the 57th Annual Meeting of the Association for Computational
+Linguistics: Student Research Workshop. 223–228.
+[22] Ella Rabinovich, Raj Nath Patel, Shachar Mirkin, Lucia Specia, and Shuly Wintner.
+2017. Personalized Machine Translation: Preserving Original Author Traits. In
+Proceedings of the 15th Conference of the European Chapter of the Association for
+Computational Linguistics: Volume 1, Long Papers. 1074–1084.
+[23] Danielle Saunders and Bill Byrne. 2020. Reducing Gender Bias in Neural Machine
+Translation as a Domain Adaptation Problem. In Proceedings of the 58th Annual
+Meeting of the Association for Computational Linguistics. Association for Com-
+putational Linguistics, Online, 7724–7736. https://doi.org/10.18653/v1/2020.acl-
+main.690
+[24] Paul Schachter and Fe T Otanes. 1983. Tagalog reference grammar. Univ of
+California Press.
+[25] Gabriel Stanovsky, Noah A Smith, and Luke Zettlemoyer. 2019. Evaluating Gender
+Bias in Machine Translation. In Proceedings of the 57th Annual Meeting of the
+Association for Computational Linguistics. 1679–1684.
+[26] Eva Vanmassenhove, Christian Hardmeier, and Andy Way. 2018. Getting Gender
+Right in Neural Machine Translation. In Proceedings of the 2018 Conference on
+Empirical Methods in Natural Language Processing. 3003–3008.
+[27] Kellie Webster, Marta Recasens, Vera Axelrod, and Jason Baldridge. 2018. Mind
+the GAP: A Balanced Corpus of Gendered Ambiguous Pronouns. Transactions of
+the Association for Computational Linguistics 6 (2018), 605–617.
+[28] Jaehoon Yeon and Lucien Brown. 2019. Korean: A comprehensive grammar.
+Routledge.
+[29] Tianyi Zhang, Varsha Kishore, Felix Wu, Kilian Q Weinberger, and Yoav Artzi.
+2019. BERTScore: Evaluating Text Generation with BERT. arXiv preprint
+arXiv:1904.09675 (2019).
+[30] Jieyu Zhao, Tianlu Wang, Mark Yatskar, Vicente Ordonez, and Kai-Wei Chang.
+2017. Men Also Like Shopping: Reducing Gender Bias Amplification using
+Corpus-level Constraints. In Proceedings of the 2017 Conference on Empirical
+Methods in Natural Language Processing. 2979–2989.
+[31] Jieyu Zhao, Tianlu Wang, Mark Yatskar, Vicente Ordonez, and Kai-Wei Chang.
+2018. Gender Bias in Coreference Resolution: Evaluation and Debiasing Meth-
+ods. In Proceedings of the 2018 Conference of the North American Chapter of the
+Association for Computational Linguistics: Human Language Technologies, Volume
+2 (Short Papers). 15–20.
+[32] Gisela Zifonun, Ludger Hoffmann, Ursula Brauße, Bruno Strecker, and Joachim
+Ballweg. 1997. Grammatik der deutschen Sprache. Vol. 1. Walter de Gruyter.
+457

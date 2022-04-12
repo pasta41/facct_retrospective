@@ -1,0 +1,168 @@
+
+The long-term impact of algorithmic decision making is shaped
+by the dynamics between the deployed decision rule and individu-
+als’ response. Focusing on settings where each individual desires
+a positive classi￿cation—including many important applications
+such as hiring and school admissions, we study a dynamic learning
+setting where individuals invest in a positive outcome based on
+their group’s expected gain and the decision rule is updated to max-
+imize institutional bene￿t. By characterizing the equilibria of these
+dynamics, we show that natural challenges to desirable long-term
+outcomes arise due to heterogeneity across groups and the lack of
+realizability. We consider two interventions, decoupling the deci-
+sion rule by group and subsidizing the cost of investment. We show
+that decoupling achieves optimal outcomes in the realizable case
+but has discrepant e￿ects that may depend on the initial conditions
+otherwise. In contrast, subsidizing the cost of investment is shown
+to create better equilibria for the disadvantaged group even in the
+absence of realizability.
+CCS CONCEPTS
+• Computing methodologies → Machine learning; • Applied
+computing→ Law, social and behavioral sciences; Economics;
+KEYWORDS
+fairness; machine learning; dynamics; statistical discrimination
+ACM Reference Format:
+Lydia T. Liu, Ashia Wilson, Nika Haghtalab, Adam Tauman Kalai, Christian
+Borgs, and Jennifer Chayes. 2020. The Disparate Equilibria of Algorithmic
+Decision Making, when Individuals Invest Rationally. In Conference on
+Fairness, Accountability, and Transparency (FAT* ’20), January 27–30, 2020,
+Barcelona, Spain. ACM, New York, NY, USA, 11 pages. https://doi.org/10.
+1145/3351095.3372861
+1 INTRODUCTION
+Automated decision-making systems that rely on machine learning
+are increasingly used for high-stakes applications, yet their long-
+term consequences have been controversial and poorly understood.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for pro￿t or commercial advantage and that copies bear this notice and the full citation
+on the ￿rst page. Copyrights for components of this work owned by others than the
+author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or
+republish, to post on servers or to redistribute to lists, requires prior speci￿c permission
+and/or a fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 978-1-4503-6936-7/20/02.
+https://doi.org/10.1145/3351095.3372861
+On one hand, deployed decision making models are updated peri-
+odically to assure high performance on the target distribution. On
+the other hand, deployed models can reshape the underlying popu-
+lations thus biasing how the model is updated in the future. This
+complex interplay between algorithmic decisions, individual-level
+responses, and exogeneous societal forces can lead to pernicious
+long term e￿ects that reinforce or even exacerbate existing social
+injustices [13, 44]. Harmful feedback loops have been observed in
+automated decision making in several contexts including recom-
+mendation systems [7, 11, 38], predictive policing [18], admission
+decisions [5, 35], and credit markets [1, 20]. These examples under-
+score the need to better understand the dynamics of algorithmic
+decision making, in order to align decisions made about people
+with desirable long-term societal outcomes.
+Automated decision-making algorithms rely on observable fea-
+tures to predict some variable of interest. In a setting such as hiring,
+decision making models assess features such as scores on standard-
+ized tests, resume, and recommendation letters, to identify individ-
+uals that are quali￿ed for the job. However, equally quali￿ed people
+from di￿erent demographic groups tend to have di￿erent features,
+due to implicit societal biases (e.g., letter writers describe compe-
+tent men and women di￿erently), gaps in resources (e.g., a￿uent
+students can a￿ord di￿erent extra-curriculars) and even distinct
+tendencies in self-description (e.g., gender can be inferred from
+biographies [16]). Therefore, a model’s ability to identify quali￿ed
+individuals can widely vary across di￿erent groups.
+The deployed model’s ability to identify quali￿ed members of a
+group a￿ects an individual’s incentive to invest in their quali￿cation.
+This is because one’s decision to acquire quali￿cation—not observed
+directly by the algorithm—comes at a cost. Moreover, individuals
+that are identi￿ed by the model as quali￿ed (whether or not they
+are truly quali￿ed) receive a reward. Consequently, people invest
+in acquiring quali￿cations only when their expected reward from
+the assessment model beats the investment cost.
+Rational individuals are aware that upon investing they would
+develop features that are similar to those of quali￿ed individuals
+in their group, so they gauge their own expected reward from in-
+vesting by the observed rewards of their group.1 If quali￿ed people
+from one group are not duly identi￿ed and rewarded, fewer people
+from that group are incentivized to invest in quali￿cations in the
+future. This reduces the overall fraction of quali￿ed people in that
+group, or the quali￿cation rate. As the assessment model is updated
+to maximize overall institutional pro￿t on the new population dis-
+tribution, it may perform even more poorly on quali￿ed individuals
+1Strong group identi￿cation e￿ects can also be seen in empirical studies [24].
+from a group with relatively low quali￿cation rate, further reducing
+the group’s incentive to invest.
+To understand and mitigate the challenges to long-term welfare
+and fairness posed by such dynamics, we propose a formal model
+of sequential learning and decision-making where at each round
+a new batch of individuals rationally decide whether to invest in
+acquiring quali￿cation and the institution updates its assessment
+rule (a classi￿er) for assessing and thus rewarding individuals. We
+study the long-term behavior of these dynamics by characterizing
+their equilibria and comparing these equilibria based on several
+metrics of social desirability. Our model can be seen as an extension
+of Coate and Loury [10]’s widely cited work to explicitly address
+heterogeneity in observed features across groups. While Coate
+and Loury [10]’s model focuses on a single-dimensional feature
+space, i.e., scores, and assessment rules that act as thresholds on
+the score, our model considers general, possibly high-dimensional,
+feature spaces and arbitrary assessment rules, which are typical in
+high-stakes domains such as hiring and admissions.
+We ￿nd that twomajor obstacles to obtaining desirable long-term
+outcomes are heterogeneity across groups and lack of realizability
+within a group. Realizability—the existence of a (near) perfect way
+to assess quali￿cations of individuals from visible features—leads
+to equilibria that are (near) optimal on several metrics, such as
+the resulting quali￿cation rates, their uniformity across groups,
+and the institution’s utility. We study (near) realizability and the
+lack thereof in Sections 3 and 5 respectively. Heterogeneity across
+groups, i.e., lack of a single assessment rule that perfectly assesses
+individuals from all groups, necessitates tradeo￿s in the quality of
+equilibria across di￿erent groups. We study heterogeneity, as well
+as interventions for mitigating its negative e￿ects, in Section 4. In
+Section 6, we empirically study a more challenging setting where
+the groups are heterogeneous as well as highly non-realizable, via
+simulations with a FICO credit score dataset [42] that has been
+widely used for illustration in the algorithmic fairness literature.
+Interventions. To mitigate the aforementioned tradeo￿s, we con-
+sider two common interventions: decoupling the decision policy by
+group and subsidizing the cost of investment, especially when the
+cost distribution inherently di￿ers by group. Our model of dynam-
+ics sheds a di￿erent light on these interventions, complementary to
+previous work. We show that decoupling [17]—using group-speci￿c
+assessment rules—achieves optimal outcomes when the problem
+is realizable within each group, but can signi￿cantly hurt certain
+groups when the problem is non-realizable and there exist multiple
+equilibria after decoupling. In particular, decoupling can hurt a
+group with low initial quali￿cation rate if the utility-maximizing
+assessment rule for a single group is more disincentivizing to indi-
+viduals than a joint assessment rule, thereby reinforcing the status
+quo and preventing the group from reaching an equilibrium with
+higher quali￿cation rate.
+We also study subsidizing individuals’ investment cost (e.g. sub-
+sidizing tuition for a top high school), especially when the cost
+distribution is varied across di￿erent groups. We ￿nd that these
+subsidies increase the quali￿cation rate of the disadvantaged group
+at equilibrium, regardless of realizability. We note that our sub-
+sidies, which a￿ect the quali￿cation of individuals directly, are
+di￿erent than those studied under strategic manipulation [26] that
+involve subsidizing individual’s cost to manipulate their features
+Y
+X
+ 
+A
+Figure 1: Causal graph for the individual investment model.
+The individual intervenes on the node for quali￿cation, Y—
+this corresponds to do(Y =  ))—which then a￿ects the distri-
+bution of their features X , depending on the group A.
+without changing the underlying quali￿cation (e.g. subsidizing SAT
+exam preparation without changing the student’s quali￿cation for
+college) and could have adverse e￿ects on disadvantaged groups.
+Instead, our theoretical ￿ndings resonates with extensive empirical
+work in economics on the e￿ectiveness of subsidizing opportunities
+for a disadvantaged group to directly improve their outcomes, such
+as moving to better neighborhoods to access better educational and
+environmental resources [8].
+Related work. Our work is related to a rich body of work on
+algorithmic fairness in dynamic settings [23, 25, 33, 37, 45], strate-
+gic classi￿cation [26, 31, 36], as well as statistical discrimination
+in economics [2, 3, 10]. We present a detailed discussion of the
+similarities and di￿erences in Section 7.

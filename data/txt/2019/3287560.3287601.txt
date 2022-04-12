@@ -1,0 +1,1280 @@
+Controlling Polarization in Personalization: An Algorithmic Framework
+L. Elisa Celis
+Yale University
+elisa.celis@yale.edu
+Sayash Kapoor
+IIT Kanpur
+sayash@iitk.ac.in
+Farnood Salehi
+École Polytechnique Fédérale de Lausanne (EPFL)
+farnood.salehi@ep￿.ch
+Nisheeth Vishnoi
+Yale University
+nisheeth.vishnoi@yale.edu
+ABSTRACT
+Personalization is pervasive in the online space as it leads to higher
+e￿ciency for the user and higher revenue for the platform by in-
+dividualizing the most relevant content for each user. However,
+recent studies suggest that such personalization can learn and prop-
+agate systemic biases and polarize opinions; this has led to calls
+for regulatory mechanisms and algorithms that are constrained to
+combat bias and the resulting echo-chamber e￿ect. We propose a
+versatile framework that allows for the possibility to reduce polar-
+ization in personalized systems by allowing the user to constrain
+the distribution from which content is selected. We then present a
+scalable algorithm with provable guarantees that satis￿es the given
+constraints on the types of the content that can be displayed to a
+user, but – subject to these constraints – will continue to learn and
+personalize the content in order to maximize utility. We illustrate
+this framework on a curated dataset of online news articles that
+are conservative or liberal, show that it can control polarization,
+and examine the trade-o￿ between decreasing polarization and the
+resulting loss to revenue. We further exhibit the￿ exibility and scal-
+ability of our approach by framing the problem in terms of the more
+general diverse content selection problem and test it empirically
+on both a News dataset and the MovieLens dataset.
+CCS CONCEPTS
+• Information systems→ Personalization; • Theory of compu-
+tation → Online learning algorithms.
+KEYWORDS
+Personalization, recommender systems, polarization, bandit opti-
+mization, group fairness, diversi￿cation
+ACM Reference Format:
+L. Elisa Celis, Sayash Kapoor, Farnood Salehi, and Nisheeth Vishnoi. 2019.
+Controlling Polarization in Personalization: An Algorithmic Framework. In
+FAT* ’19: Conference on Fairness, Accountability, and Transparency, January
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for pro￿t or commercial advantage and that copies bear this notice and the full citation
+on the￿ rst page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior speci￿c permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01.
+https://doi.org/10.1145/3287560.3287601
+29–31, 2019, Atlanta, GA, USA. ACM, Atlanta, GA, USA, 13 pages. https:
+//doi.org/10.1145/3287560.3287601
+1 INTRODUCTION
+News and social media feeds, product recommendation, online ad-
+vertising and other media that pervades the internet is increasingly
+personalized. Content selection algorithms consider a user’s prop-
+erties and past behavior in order to produce a personalized list of
+content to display [21, 27]. This personalization leads to higher util-
+ity and e￿ciency both for the platform, and for the user, who sees
+content more directly related to their interests [18, 19]. However, it
+is now known that such personalization may result in propagating
+or even creating biases that can in￿uence decisions and opinions. In
+an important study, [17] showed that user opinions about political
+candidates, and hence elections, can be manipulated by changing
+the personalized rankings of search results. Other studies show that
+allowing for personalization of news and other sources of informa-
+tion can result in a “￿lter bubble” [29] which results in a type of
+tunnel vision, e￿ectively isolating people into their own cultural or
+ideological bubbles; e.g., enabled by polarized information, many
+people did not expect a Brexit vote or Trump election [10]. This
+phenomenon has been observed on many social media platforms
+(see, e.g., [13, 23, 39]), and studies have shown that over the past
+eight years polarization has increased by 20% [20].
+Polarization, and the need to combat it, was raised as a problem
+in [32], where it was shown that Google search results di￿er sig-
+ni￿cantly based on political preferences in the month following
+the 2016 elections in the United States. In a di￿erent setting, the
+ease with which algorithmic bias can be introduced and the need
+for solutions was highlighted in [35] where it was shown that it
+is very easy to target people on platforms such as Facebook in a
+discriminatory fashion. Several approaches to quantify bias and
+polarization of online media have now been developed [31], and
+interventions for￿ ghting polarization have been proposed [11].
+One approach to counter such polarization would be to hide certain
+user properties so that they cannot be used for personalization.
+However, this could come at a loss to the utility for both the user
+and the platform – the content displayed would be less relevant
+and result in decreased attention from the user and less revenue
+for the platform (see, e.g., [34]).
+Can we design personalization algorithms that allow
+us to avoid polarization yet still optimize individual
+utility?
+1.1 Groups and Polarization
+Often, content is classi￿ed into di￿erent groups which are de￿ned
+by one or more multi-valued sensitive attributes; for instance, news
+stories can have a political leaning (e.g., conservative or liberal), and
+a topic (e.g., politics, business or entertainment). More generally,
+search engines and other platforms and applications maintain topic
+models over their content (see e.g., [8]). At every time-step, the algo-
+rithm must select a piece of content to display to a given user,1 and
+feedback is obtained in the form of whether they click on, purchase
+or hover over the item. The goal of the content selection algorithm
+is to select content for each user in order to maximize the positive
+feedback (and hence revenue) received; to do so, it must learn about
+the topics or groups the user is most interested in. Thus, as this
+optimal topic is a-priori unknown, the process is often modeled
+as an online learning problem in which a user-speci￿c probability
+distribution (from which one selects content) is maintained and
+updated according to feedback given [28]. As the content selection
+algorithm learns more about a user, the corresponding probabil-
+ity distribution begins to concentrate the mass on a small subset
+of topics; this results in polarization where the feed is primarily
+composed of a single type of content.
+1.2 Our Contributions
+To counter polarization, we introduce a simple framework which
+allows us to place constraints on the probability distribution from
+which content is sampled. The goal is to control polarization on
+the content displayed at all time steps (see Section 2.2) and ensure
+that the given recommendations do not specialize to a single group.
+Our constraints are linear and limit the total expected weight that
+can be allocated to a given group through lower and upper bound
+parameters on each group. These polarization constraints are taken
+as input and can be set according to the context or application.
+Importantly, though simple, these constraints are versatile enough
+to control polarization with respect to a variety of metrics which
+can measure the extent of polarization, or lack thereof, in a given
+algorithm. This is due to the fact that several fairness metrics de-
+pend, e.g., on the ratio or di￿erence between the probability mass
+on two groups, hence can be implemented by picking appropriate
+lower/upper bound parameters for the constraints in our setting
+to give an immediate fairness guarantee (such reductions can be
+formalized following standard techniques, see, e.g., [12]). Thus, by
+placing such constraints the content shown to di￿erent types of
+users is varied, and polarization is controlled.
+While there are several polynomial time algorithms for simi-
+lar settings, the challenge is to come up with a scalable content
+selection algorithm for the resulting optimization problem of max-
+imizing revenue (via personalization) subject to satisfying the po-
+larization constraints. We show how an adaptation of an existing
+algorithm for the unconstrained bandit setting, along with the spe-
+cial structure of our constraints, can lead to a scalable algorithm
+with provable guarantees for this constrained optimization problem
+(see Theorem 1). We evaluate this framework and our algorithm
+on a curated dataset of online news articles that are conservative
+1In order to create a complete feed, content can simply be selected repeatedly in this
+manner to￿ ll the screen as the user scrolls down; for ease of exposition, we describe
+the one-step process of selecting a single piece of content.
+or liberal, show that it can control polarization, and examine the
+trade-o￿ between decreasing polarization and the resulting loss to
+revenue. We further illustrate the￿ exibility and scalability of this
+approach by considering the problem of diverse content selection,
+and evaluate our algorithm on the MovieLens dataset for diverse
+movie recommendation as well as the YOW dataset for diverse
+article recommendation. To the best of our knowledge, this is the
+￿rst algorithm to control polarization in personalized settings that
+comes with provable guarantees, allows for the speci￿cation of
+general constraints, and is viable in practice.
+2 FORMAL DEFINITIONS AND OUR MODEL
+2.1 Polarization in Existing Models
+Algorithms for the general (unconstrained, and hence potentially
+biased) problem of displaying personalized content are often devel-
+oped in the multi-armed bandit setting (see e.g., [25, 26]). Framed in
+this manner, at each time step t = 1, . . . ,T , a user views a page (e.g.,
+Facebook, Twitter or Google News), and one piece of content (or
+arm) at 2 [k] must be selected to be displayed. A random reward
+r
+t
+a , which depends on the selected content is then received by the
+content selection algorithm. This reward captures resulting clicks,
+purchases, or time spent viewing the given content.
+More formally, at each time step t , a sample (r t1 , . . . , r
+t
+k ) is drawn
+from an unknown distribution D, the player (the content selection
+algorithm in this case) selects an arm a 2 [k] and receives reward
+r
+t
+a 2 [0, 1]. As is standard in the literature, we assume that the ras
+are drawn independently across a and t . The rewards ra0 for any
+a
+0 , a are assumed to be unknown – indeed, there is no way to
+observe what a user’s actions would have been had a di￿erent piece
+of content been displayed. The algorithm computes a probability
+distribution pt over the arms based on the previous observations
+(a1, r1a ), . . . , (a
+t 1, r t 1a ), and then selects arm a
+t ⇠ pt . The goal is
+to select pt s in order to maximize the cumulative rewards, and the
+e￿cacy of such an algorithm is measured with respect to how well
+it minimizes regret – the di￿erence between the algorithm’s reward
+and the reward obtained from the (unknown) optimal policy. The
+regret is de￿ned as
+RegretT := Ert⇠D
+t=1
+r
+t
+a?  
+TX
+t=1
+r
+t
+a
+377775 ,
+where a? 2 [k] is the arm with the highest expected reward: a? :=
+argmaxa2[k] Er⇠D[ra]. Note that D (and hence a
+?) is a-priori
+unknown. The regret is a random variable as at depends not only
+on the draws from p
+t , but also on the realized history of samples
+{(at , r ta )}Tt=1.
+The problem with this approach is that, bandit algorithms, by
+optimizing for that “ideal” a?, by de￿nition strive for polarization.
+To understand how, letG1, . . . ,G  ✓ [k] be   groups of arms which
+correspond to di￿erent types of content across which we do not
+want to polarize. In the simplest setting, the Gi s form a partition
+(e.g., conservative and liberal news articles when the arms represent
+news stories), but in general the group structure can be arbitrary. A
+feature of bandit algorithms is that the probability distribution on
+the arms, that the algorithm is learning, converges to the actionwith
+the best expected reward; i.e., the entire probability mass ends up
+(a) (b)
+Figure 1: Un￿ltered vs. balanced content delivery engines. (a) polarization can occur on using personalized platforms, e.g.,
+primarily showing ads for high-paying jobs (in red) to men and ads for low-paying jobs (in blue) to women (see [15]). (b) With
+constraints on the extent to which the feeds can di￿er, our model displays a more balanced feed.
+on a single arm, and hence in a single group – causing polarization
+(see e.g., [25]).
+2.2 Our Model
+We would like an approach that can control polarization with re-
+spect to the groups that the selected arms belong to. Towards this,
+for each group Gi , let `i be a lower bound and ui be an upper
+bound on the amount of weighted probability mass that we allow
+the content selection algorithm can place on this group. Formally,
+we impose the following constraints:
+`i 
+X
+a2Gi
+wa (Gi ) · pta  ui 8i 2 [ ],8t 2 [T ], (1)
+where wa (Gi ) 2 [0, 1] represents the group weight of arm a on
+group Gi .
+The group weightwa (Gi ) denotes the similarity between arm a
+and groupGi . For instance, following our earlier discussion on news
+articles, a conservative leaning news article might have a group
+weight of 0.9 for the conservative articles group and a group weight
+of 0.1 for the liberal articles group, whereas a neutral article might
+have both of these weights as 0.5. In case of categorical groups
+(e.g., men vs. women), the group weight can take a binary value.
+For more general cases (see, e.g., Section 5), this weight can take
+a real value between 0 and 1. The values for wa (Gi )s can be set
+using various methods depending on the application and can also
+take into account error bounds for classi￿ers that decide whether a
+given a 2 Gi or not. For the case of text documents (e.g., news and
+scienti￿c articles [37]), the weights can be set using techniques like
+topic modeling, which give us the percentage of a document that
+corresponds to a certain topic.
+The bounds `i s and ui s provide a handle with which we can
+ensure that the weighted probability mass placed on any given
+group is neither too high nor too low at each time step. Rather
+than￿ xing the values of ui s and `i s, we allow them to be speci￿ed
+as input. This allows one to control the extent of polarization of
+content depending on the application, and hence (indirectly) encode
+bounds on a wide variety of existing metrics for di￿erent notions
+of group fairness which, in e￿ect, encode the extent of polarization.
+This requires translating the metric parameters into concrete values
+of `i s and ui s. For instance, given   > 0, by setting ui s and `i s such
+that ui   `i    for all i , we can ensure that the risk di￿erence is
+bounded by   . An additional feature of our model is that no matter
+what the group structures, or the lower and upper bounds are, the
+constraints are always linear.
+Importantly, note that unlike ignoring user preferences entirely
+as in [29], the constraints still allow for personalization across
+groups. For instance, if the groups are conservative-leaning vs
+liberal-leaning articles, and the users are known conservatives or
+liberals, we may require thatw (C) ·ptC  0.75 andw (L) ·ptL  0.75
+for all t . This ensures that extreme polarization cannot occur –
+at least 25% of the content a conservative is presented with will
+be liberal-leaning. Despite these constraints, personalization at
+the group level can still occur, e.g., by letting w (C) · ptC = 0.75
+and w (L) · ptL = 0.25 for a conservative-leaning user. Further-
+more, this framework allows for complete personalization within
+a group; e.g., the conservative-leaning articles shown to conserva-
+tives and liberals may di￿er. This is crucial as the utility maximizing
+conservative-leaning articles for a conservative may di￿er from the
+utility maximizing conservative-leaning articles for a liberal.
+The next question we address is how to measure an algorithm’s
+performance against the best constrained solution. We say that a
+probability distribution p on [k] is constrained if it satis￿es the
+upper and lower bound constraints in (1), and let C be the set of all
+such probability distributions. Note that given the linear nature of
+the constraints, the set C is a polytope (an intersection of a set of
+half spaces), and hence we can formulate the problem of￿nding
+ 
+? as a linear programming problem.
+Algorithm 1 C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿
+Require: Constraint set C, a constrained probability distribution
+qf 2
+ 
+q : B1 (q, ) ⇢ C
+ 
+, a positive integer T , a constant L that
+controls the exploration
+1: Initialize µ̄1 := 0
+2: for t = 1, . . . ,T do
+3: Update  t := min{1, 4/( L2t )}
+4: Compute pt := argmaxp2C µ̄>t p
+5: Sample a from the probability distribution (1   t )pt +  tqf
+6: Observe reward rt = r ta
+7: Update empirical mean µ̄t+1
+8: end for
+An algorithm is said to be constrained if it only selects pt 2 C.
+The constrained regret for such an algorithm can be de￿ned as
+CRegretT := Ert⇠D, ãt⇠ ?
+t=1
+r
+t
+ã  
+TX
+t=1
+r
+t
+a
+377775 ,
+where  ? 2 C represents a point in the constraint set C with the
+highest expected reward:  ? := argmaxp2C Er⇠D, ã⇠p [rã] .
+R￿￿￿￿￿1. We note that there is nothing speci￿c to political polar-
+ization (e.g., news articles being grouped according to political leaning
+with a goal of avoiding polarization) in the model. Instead, we can
+think of content along with a topic model where the goal is to select
+content that is diverse across all topics. While the prior notion is our
+main motivator, the theorems apply to the more general case and
+we show the￿ exibility of the approach by considering both political
+polarization and diverse recommendation in the empirical evaluation
+of our approach in Section 5.
+The constraints on the probabilities in (1) can be translated to
+the constraints on the number of times nTa that the arms in groups
+Gi s are selected in T iterations of the algorithm,
+`i 
+X
+a2Gi
+wa (Gi ) ·
+n
+T
+a
+T
+ ui 8i 2 [ ], (2)
+see the appendix for more details.
+3 RELATEDWORK
+Approaches to Curtail Polarization. There is a large body of
+work studying the e￿ects of polarization, and ways in which we
+can combat it. A signi￿cant portion of this literature considers inter-
+ventions to inform or educate users on the e￿ects of personalization
+and is orthogonal to our work. Pariser, who coined the term “￿lter
+bubble”, proposes that we simply remove personalization entirely
+[29]. However, this would come at a complete loss to the utility and
+e￿ciency that personalization can bring to both the user and the
+platform. In contrast, our approach does allow for personalization –
+up to a point. It ensures that the content is not polarized beyond the
+given constraints, but within that personalizes in order to maintain
+high utility. Another approach would be to manipulate the user
+ratings (e.g., by adding noise or a regularizer to the recommender
+algorithm) in order to have only approximate preferences; this has
+been shown to help reduce polarization [4, 5, 38]. We compare
+against such an approach in our empirical results (C￿￿￿￿￿￿￿￿￿￿￿
+R￿￿), and observe that our algorithm signi￿cantly outperforms this
+method. The key di￿erence is that such an approach adds noise
+to attain de-polarization, while our approach de-polarizes in an
+informed manner that personalizes content as much as possible
+subject to the polarization constraints.
+Algorithms forConstrainedBanditOptimization.Constrained
+bandit optimization is a broad￿ eld that has arisen in the considera-
+tion of a variety of problems unrelated to polarization. For example,
+knapsack-like constraints on bandit optimization is studied in [6];
+however, this work only considers constraints that are placed on the
+￿nal probability vector pT , whereas in our setting it is important to
+satisfy fairness constraints at every time step {pt }Tt=1. A di￿erent
+line of work [24] considers online individual fairness constraints
+which require that the probability of selecting all arms be approxi-
+mately equal until enough information is gathered to con￿dently
+know which arm is the best. In a similar vein, another work [16]
+considered budgets on the number of times that any given arm
+can be selected. Both of these results can be loosely interpreted
+as working with the special case of our model in which each arm
+belongs to its own group; their results cannot be applied to our
+more general setting or be used to curtail polarization.
+4 ALGORITHMIC RESULTS
+For each arm a 2 [k], let its mean reward be µ
+?
+a . In this case,
+the unknown parameters are the expectations of each arm µ
+?
+a for
+a 2 [k]. We assume that the reward for the t-th time step is sampled
+from a Bernoulli distribution with probability of success µ?at . For a
+probability distribution q 2 C and a small enough constant   > 0,
+we de￿ne B1 (q, ) to be the set of all probability distributions that
+lie inside C, such that a probability distributionqf 2 B1 (q, ) has at
+least   probability mass on each arm. More formally, B1 (q, ) 2 C
+is an `1-ball of radius   centered at q. Let V (C) denote the set of
+vertices of C and  ? := argmax  2V (C)
+P
+a2[k] µ?a a .
+T￿￿￿￿￿￿1. Let   > 0 be a small enough constant. Given the de-
+scription of C, any probability distribution qf 2
+ 
+q : B1 (q, ) ⇢ C
+ 
+that lies in the constrained region, and the sequence of rewards, the
+C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ algorithm (Algorithm 1), run forT iterations,
+has the following constrained regret bound:
+E
+⇥
+CRegretT
+⇤
+= O
+ 
+lnT
+   2
+!
+,
+where  t = min{1, 4/( d2t )} and d = min
+ 
+  , 1/2
+ 
+. The algorithm
+works for any lower bound L on   , with a L instead of   in the
+regret bound. Here   is the di￿erence between the maximum and
+the second maximum expected rewards with respect to the µ?s over
+the vertices of the polytope C. More formally,   :=
+P
+a2[k] µ?a ?a  
+max  2V (C)\ ?
+P
+a2[k] µ?a a .
+Before we present the formal details, we￿ rst highlight some key
+aspects of the algorithm, theorem and proofs.
+For general convex sets,   can be 0 and the regret bound can at
+best only be O
+⇣p
+T
+⌘
+[14]. As our constraints result in a constraint
+set C which is a polytope, unless there are degeneracies,   is non-
+zero. In general,   may be hard to estimate theoretically. However,
+Algorithm Per iteration Running time Regret Bound
+C￿￿￿￿￿￿￿￿￿￿B￿￿￿2 [14] NP-Hard problem O
+✓
+k2
+  log3T
+◆
+OFUL [3] NP-Hard problem Õ
+⇣
+⇣
+k
+2 + log2T
+⌘⌘
+C￿￿￿￿￿￿￿￿￿￿B￿￿￿1 [14] O (k  ) + 2k LP-s O
+✓
+k3
+  log3T
+◆
+C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ (Algorithm 1) O (1) + 1 LP O
+✓
+k
+  2 logT
+◆
+C￿￿￿￿￿￿￿￿￿￿￿L1￿OFUL (Algorithm 2) O (k  ) + 2k LP-s Õ
+⇣
+k
+ 
+⇣
+k
+2 + log2T
+⌘⌘
+Table 1: The complexity and problem-dependent regret bounds for various algorithms when the decision set is a polytope.
+for the settings in which we conduct our experiments, we observe
+that the value of   is reasonably large.
+When the probability space is unconstrained, it su￿ces to solve
+argmaxi 2[k] µ̄i , where µ̄i is an estimate for the mean reward of the
+i-th arm. It can be an optimistic estimate for the armmean in case of
+the UCB algorithm [9], a sample drawn from the normal distribution
+with themean set as the empirical mean for the Thompson Sampling
+algorithm [7]. When the probability distribution is constrained to
+lie in a polytope C, instead of a maximum over the arm mean
+estimates, we need to solve argmaxp2C µ̄>p. This necessitates the
+use of a linear program for any algorithm operating in this fashion.
+At every iteration, C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ solves one LP. We can
+speed up the LP computation considerably in practice by using the
+interior points method and warm starting the LP solver from the
+optimal p found in the previous iteration (see Section 5.1.2).
+4.1 Overview of Algorithm 1:
+C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿.
+The algorithm, with probability 1     chooses the probability dis-
+tribution pt = argmaxp2C µ̄>p, and with probability   it samples
+from a feasible constrained distribution qf 2 C in the  -interior,
+i.e., there is at least   probability mass on each arm. The reward
+for each time step t is generated as rt ⇠ Bernoulli
+⇣
+µ
+?
+at
+⌘
+, where
+a
+t ⇠ (1     )pt +  qf is the arm the algorithm chooses at the t th
+time instant. The algorithm observes this reward and updates its
+estimate to µ̄t+1 for the next time-step appropriately.C￿￿￿￿￿￿￿￿￿￿￿
+ ￿G￿￿￿￿￿ is a variant of the classical  ￿G￿￿￿￿￿ approach [9]. Recall
+that in our setting, an arm is an article (corner of the k-dimensional
+simplex) and not a vertex of the polytope C. The polytope C sits
+inside this simplex and may have exponentially many vertices. This
+is not that case in the setting of [3, 14] – there may not be any
+ambient simplex in which their polytope sits, and even if there is,
+they do not use this additional information about which vertex of
+the simplex was chosen at each time t . Thus, while they are forced
+to maintain con￿dence intervals of rewards for all the points in C,
+this speciality in our model allows us to get away by maintaining
+con￿dence intervals only for the k arms (vertices of the simplex)
+and then use these intervals to obtain a con￿dence interval for any
+point in C. Similar to  ￿G￿￿￿￿￿, if we choose each arm enough
+number of times, we can build a good con￿dence interval around
+the mean of the reward for each arm. The di￿erence is that instead
+of converging to the optimal arm, our constraints maintain the
+point inside C and it converges to a vertex of C. To ensure that we
+choose each arm with high probability, we￿ x a constrained point
+qf 2  -interior of C and sample from the point (1     )pt +  qf .
+Then, as in  ￿G￿￿￿￿￿, we proceed by bounding the regret showing
+that if the con￿dence-interval is tight enough, the optimal of LP
+with true mean µ
+? and LP with the empirical mean µ̄ does not
+change.
+4.2 Proof of Theorem 1
+P￿￿￿￿. Let  ? =
+f
+ 
+?
+1 , · · · , ?k
+g
+2 C be the optimal probability
+distribution. Conditioned on the history at time t , the expected
+regret of C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ at iteration t can be bounded as
+follows
+R (t ) = µ
+?>
+ 
+?   *.
+,
+(1    t )µ?> ̄t +  t
+kX
+a=1
+qa,f µ
+?
+a
++/
+-
+ (1    t ) µ?>
+⇣
+ 
+?    ̄t
+⌘
++  t µ
+?>
+ 
+?
+ (1    t ) µ?> ?1
+(
+ ̄
+t ,  ?
+)
++  t µ
+?>
+ 
+?,
+where  ̄t = argmaxp2C µ̄>p.
+Let n = 4/( d2). For t  n, since  t = min{1, 4/( L2t )} we have
+ t = 1. The expected regret of the  -greedy is
+E
+⇥
+CRegretT
+⇤ 
+µ
+?>
+ 
+?
+TX
+t=n+1
+P
+⇣
+ ̄
+t ,  ?
+⌘
++ µ?> ?
+TX
+t=1
+ t . (3)
+Let  µ = µ̄   µ
+?. Without loss of generality, let µ?> i > µ
+?>
+ j
+for any  i , j 2 V (C ) with i < j. Hence,  1 =  
+?. Let  i =
+µ
+?> ( 1   i ). As a result  1 = 0 and  2 =   . The event  ̄t ,  
+?
+happens when µ̄
+>
+t  i > µ̄
+>
+t  1 for some i > 1, that is,
+⇣
+µ
+? +  µt
+⌘>
+( i   1) =   i +  µ>t ( i   1)   0.
+Dataset # Arms (k) # Instances # Iterations (T ) # Groups ( )
+PoliticalNews 1356 (avg.) 30 (# days) 10, 000 2
+MovieLens 25 943 (# users) 1000 19
+YOW 81 21 (# users) 10, 000 7
+Table 2: Overview of datasets used in the empirical results in Section 5.1.3.
+As a result, we have
+P
+⇣
+ ̄
+t ,  ?
+⌘
+= P *.
+,
+[
+ i 2V (C )\ 1
+ µ>t ( i   1)    i
++/
+-
+ P *.
+,
+[
+ i 2V (C )\ 1
+   µt   1 k i   1k1    i
++/
+-
+(4)
+ P *.
+,
+[
+ i 2V (C )\ 1
+   µt   1    i
+-
+= P
+✓
+k µt k1  
+ 
+= P *.
+,
+[
+j 2[k]
+| µt, j |  
+ 
+-
+
+X
+j 2[k]
+P
+✓
+| µt, j |  
+ 
+. (5)
+In (4) we use Holder’s inequality. Let Et =  
+Pt
+ =1  t/2 and let Nt, j
+be the number of times that we have chosen arm j up to time t .
+Next, we bound P
+(
+| µt, j |    2
+.
+P
+✓
+| µt, j |  
+ 
+= P
+✓
+| µt, j |  
+ 
+◆
+P
+⇣
+Nt, j   Et
+⌘
++ P
+✓
+| µt, j |  
+ 
+◆
+P
+⇣
+Nt, j < Et
+⌘
+ P
+✓
+| µt, j |  
+ 
+◆
++ P
+⇣
+Nt, j < Et
+⌘
+. (6)
+As qf 2
+ 
+q : B1 (q, ) ⇢ C
+ 
+, we have qa,f >  , i.e., the probability
+of selecting an arm a is at least  tqa,f . Next, we bound each term
+of (6). First, using Cherno￿-Hoe￿ding bound we have
+P
+✓
+| µt, j |  
+ 
+◆
+ 2 exp
+ 
+ Et 
+!
+. (7)
+Using the Bernstein inequality [36], we have
+P
+⇣
+Nt, j < Et
+⌘
+ exp
+✓
+ Et
+. (8)
+For t  n,  t = 1 and Et =  t/2. For t > n we have
+Et =
+  · n
+tX
+i=n+1
+  2
+d2
++
+ln
+✓
+t
+n
+◆
+=
+ln
+✓
+et
+n
+◆
+. (9)
+By plugging (7), (8) and (9) in (6) and noting that   < 1/2 we get
+P
+✓     µt, j       
+
+✓
+n
+et
+◆   2
+d2
++
+✓
+n
+et
+◆ 4
+10d2 
+✓
+n
+et
+◆
++
+✓
+n
+et
+◆ 4
+10d2  2
+✓
+n
+et
+◆
+.
+(10)
+Plugging (10) in (3) yields
+E
+⇥
+CRegretT
+⇤  µ
+?>
+ 
+?
+✓
+(1 +
+2n
+e
+) lnT + n
+◆
+. (11)
+By substituting n = 4/( d2 ) in the regret above and noting that
+   2d we conclude the proof
+E
+⇥
+CRegretT
+⇤  µ
+?>
+ 
+?
+  
+1 +
+!
+lnT +
+!
+= O
+ 
+lnT
+   2
+!
+.
+⇤
+4.3 Alternate Approaches and Special Cases
+In this section, we brie￿y outline an alternate approach for solving
+this problem that results in a di￿erent regret / runtime guarantee
+(see Table 1). We further show that, for certain special cases of the
+group structure, e.g., if the groups perfectly partition the arms, one
+can design even faster solutions to the LP.
+4.3.1 Algorithm 2: C￿￿￿￿￿￿￿￿￿￿￿L1￿OFUL. Any algorithm for solv-
+ing the linear bandit problem with an in￿nite, continuous set of
+arms can be adapted to solve the constrained multi-armed ban-
+dit problem. The constrained multi-armed bandit problem can be
+thought of as a special case of this type of linear bandit problem,
+where the continuous space of arms is simply the probability sim-
+plex over our discrete arms. Thus, each arm increases the dimen-
+sionality of the linear bandit problem by one, and the continuous
+arm selected at time t corresponds to the probability distribution we
+select at time t . The di￿erence between these settings is that while
+one gets rewards for points in the simplex in the case of linear bandit
+problems, we get rewards for the arms themselves (i.e. the vertices
+of the simplex) in the constrained multi-armed bandit problems. 2
+Using these algorithms as a black-box can be ine￿cient, and does
+not allow us to come up with practical algorithms for real-world
+applications.
+However, in some cases, we can adapt algorithms for linear ban-
+dits to our constrained setting in a way that makes the computations
+e￿cient. Consider the OFUL algorithm that appeared in [3]; we
+will adapt this algorithm to our constrained setting, and we call
+the adapted algorithm C￿￿￿￿￿￿￿￿￿￿￿L1￿OFUL. C￿￿￿￿￿￿￿￿￿￿￿L1￿
+OFUL is an example of algorithms for linear bandits being used to
+solve the constrained multi-armed bandit problem. The key di￿er-
+ence between C￿￿￿￿￿￿￿￿￿￿￿L1￿OFUL and OFUL is that instead of
+using a scaled L2-ball in each iteration, we use a a scaled L1-ball,
+which makes C￿￿￿￿￿￿￿￿￿￿￿L1￿OFUL e￿cient; without this adapta-
+tion the equivalent step in our setting required solving an NP-hard
+and nonconvex optimization problem.3 C￿￿￿￿￿￿￿￿￿￿￿L1￿OFUL
+2This is also what allows us to get fast and e￿cient algorithms like C￿￿￿￿￿￿￿￿￿￿￿  ￿
+G￿￿￿￿￿ for the constrained multi-armed bandit setting.
+3This is similar in spirit to how C￿￿￿￿￿￿￿￿￿￿B￿￿￿2 can be adapted to C￿￿￿￿￿￿￿￿￿￿
+B￿￿￿1 in [14].
+incurs Õ
+⇣
+k
+ 
+⇣
+k
+2 + log2T
+⌘⌘
+regret (see Theorem 3). This gives a
+worse dependence on k but a better dependence on   as compared
+with to C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ (see Table 1), and hence could
+be bene￿cial in some settings. However, the runtime is consider-
+ably slower than C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿. Instead of maintaining a
+least-squares estimate of the optimal reward vector, C￿￿￿￿￿￿￿￿￿￿￿
+ ￿G￿￿￿￿￿ maintains an empirical mean estimate of it denoted by
+µ̄t , which is computationally cheaper per iteration. It also solves
+only one linear program instead of 2k linear programs at every
+iteration. Both of these factors together cause a signi￿cant decrease
+in running time compared to C￿￿￿￿￿￿￿￿￿￿￿L1￿OFUL. Thus, while
+C￿￿￿￿￿￿￿￿￿￿￿L1￿OFUL theoretically achieves lower regret than
+C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ in terms of   , it is not as computationally
+e￿cient, and performs worse in practice.
+4.3.2 More E￿icient LP Solvers for Special Group Structures. For
+the special case where group weights are binary, i.e.,
+wa (Gi ) 2 {0, 1} 8a 2 [k], i 2 [ ],
+and the constraint set have some special structure, we can solve
+the LP e￿ciently:
+Single Partition. If the groups in the constraint set form a
+partition, one can solve the linear program inO (k ) time via a simple
+greedy algorithm. Since each part is separate, we can simply put
+the minimum probability mass as required by the constraints on
+the best arm of each group, and then put the maximum possible
+probability mass on arms in descending order of arm utility. This
+gives a probability vector that satis￿es the constraints and is optimal
+with respect to the reward.
+Laminar Constraints. Let the groupsG1, . . . ,G  ✓ [k] be such
+that: Gi \G j , ; implies Gi ✓ G j or G j ✓ Gi . The groups form a
+tree-like data structure, where the children are the largest groups
+that are subset of the parents. In this case, the LP can be solved
+e￿ciently by a greedy algorithm, and we can solve the LP step in
+O ( k ) time exactly. For the sake of brevity and clarity, we defer the
+full explanation to the appendix.
+5 EMPIRICAL RESULTS
+In this section we compare the performance of C￿￿￿￿￿￿￿￿￿￿￿ ￿
+G￿￿￿￿￿ to the unconstrained algorithm, the hypothetical optimal
+constrained algorithm (which we could implement if we knew the
+rewards of the arms a-priori), a smoothed version of the uncon-
+strained algorithm that satis￿es the constraints, and a naive baseline
+that satis￿es the constraints but does not aim to optimize the re-
+ward.4 We brie￿y outline the experiments and results here, with
+details in the following subsections.
+We conduct counterfactual experiments on three datasets (see
+Table 2). We consider a curated PoliticalNews where the constraints
+aim to reduce the political polarization of the presented search re-
+sults. As mentioned above, we can similarly apply these techniques
+to the diversi￿cation of content in areas beyond political polariza-
+tion. Towards this, we simulate our algorithm on another dataset of
+news articles [41] and strive to diversify across topics (e.g., business,
+4In our simulations, the regret for C￿￿￿￿￿￿￿￿￿￿￿L1￿OFUL was similar or slightly
+worse than C￿￿￿￿￿￿￿￿￿￿￿  ￿G￿￿￿￿￿. As C￿￿￿￿￿￿￿￿￿￿￿  ￿G￿￿￿￿￿ is also much more
+e￿cient we use it as the main comparator, and leave open the question as to if or when
+C￿￿￿￿￿￿￿￿￿￿￿L1￿OFUL performs better as suggested by the theoretical results.
+entertainment, and world news), and the MovieLens dataset [22]
+where we strive to diversify recommendations across genres. In
+all cases, we￿ nd that C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ consistently out-
+performs the smoothed version of the unconstrained algorithm
+as well as the naive baseline, accumulating much higher reward,
+while closely approximating the hypothetical optimal. This bene￿t
+of C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ is most evident when the constraints
+are the tightest; e.g., C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ accumulates twice
+as much reward as the smoothed version of the unconstrained
+algorithm on the YOW dataset (see Figure 2).
+We then compare the polarization and diversi￿cation for the
+constrained and unconstrained algorithms. We aim to reduce po-
+larization by recommending news articles with both, liberal and
+conservative biases. Similarly, we aim to increase diversity by rec-
+ommending articles and movies not just from the best group in
+terms of rewards, but from other groups as well. We observe that
+algorithms in the unconstrained setting quickly converge to the best
+group in terms of rewards, whereas algorithms in the constrained
+setting always display a certain minimum percentage of content not
+from the best group, hence improving diversi￿cation and avoiding
+polarization.
+5.1 Experimental Setup
+5.1.1 Algorithm and Benchmarks. In each counterfactual simula-
+tion we report the normalized cumulative reward for each of the
+following algorithms and benchmarks:
+U￿￿￿￿￿￿￿￿￿￿￿￿￿O￿￿￿￿￿￿ is the hypothetical optimal algorithm
+when there is no constraint and the expected rewards of all arms
+a 2 [k] are known. It simply chooses the best arm a
+? at each step t .
+U￿￿￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ is the unconstrained  ￿G￿￿￿￿￿ algo-
+rithm, where C is the set of all probability distributions over [k].
+C￿￿￿￿￿￿￿￿￿￿￿O￿￿￿￿￿￿ is the hypothetical optimal probability
+distribution, subject to the polarization constraints, that we could
+have used if we had known the reward vector µ? for the arms
+a-priori.
+C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ is our implementation of Algorithm 1
+with the given polarization constraints as input.5
+C￿￿￿￿￿￿￿￿￿￿￿R￿￿ is a smoothed version of U￿￿￿￿￿￿￿￿￿￿￿￿￿ ￿
+G￿￿￿￿￿ that satis￿es the constraints. At each time step, given the
+probability distribution pt speci￿ed by the unconstrained  ￿G￿￿￿￿￿
+algorithm, C￿￿￿￿￿￿￿￿￿￿￿R￿￿ takes the largest   2 [0, 1] such that
+selecting an arm with probability   · pt does not violate the con-
+straints. With the remaining probability (1     ) it follows the same
+procedure as in C￿￿￿￿￿￿￿￿￿￿￿N￿￿￿￿ to select an arm at random
+subject to the constraints.
+C￿￿￿￿￿￿￿￿￿￿￿N￿￿￿￿. As a baseline, we consider a simple algo-
+rithm that satis￿es the constraints as follows: for each group i and
+arm a, with probability `i
+wa (Gi )
+it selects an arm at random fromGi ,
+then, with any remaining probability, it selects an arm uniformly
+at random from the entire collection [k] while respecting the upper
+bound constraints ui .
+Note that if we know the true rewards of the arms, this optimal
+distribution is easy to compute via a simple greedy algorithm; it
+simply places themost probabilitymass that satis￿es the constraints
+5We set  t = min(1, 10/t ). Tuning  t could give even better results.
+on the best arm, the most probability mass remaining on the second-
+best arm subject to the constraints, and so on and so forth until the
+entire probability mass is exhausted. This strategy can be found by
+solving one LP.
+5.1.2 Implementation Details. Instead of solving an LP from scratch
+at each iteration (in step 4 of Algorithm 1), we warm start the LP
+by using the solution of the LP from the previous iteration as the
+starting point for our solver. We modi￿ed an implementation of
+an LP solver [40] which uses the interior points method. “Warm-
+starting” the LP solver in this way speeds up the LP computation
+considerably in practice and allows e￿cient implementation of the
+algorithm even when there are many groups that do not form a
+partition and hence many nontrivial constraints. For certain special
+cases, provably fast algorithms for solving the LP also exist (see
+Section 4.3.2), however we did not employ these techniques in the
+simulations.
+Note thatC￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿,C￿￿￿￿￿￿￿￿￿￿￿R￿￿ andU￿￿￿
+￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ implementations all use Algorithm 1 as a sub-
+routine; however C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ and C￿￿￿￿￿￿￿￿￿￿￿R￿￿
+take the constraints as input, withC￿￿￿￿￿￿￿￿￿￿￿R￿￿ satisfying the
+polarization constraints via smoothing the probability distribution,
+and U￿￿￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ need not satisfy the constraints at
+all.
+5.1.3 Description of Datasets and Group Weights.
+PoliticalNews.We curate this dataset by using a large scale web-
+crawler [2] to collect online news articles over a span of 30 days
+(23rd July – 21st August, 2018), along with the number of Facebook
+likes that each article received as of 22nd August, 2018. We look
+at the political leaning of each article’s publisher as determined
+by AllSides [1], which provides labels left, left-leaning, neutral,
+right-leaning or right for a wide set of publishers. We discard any
+articles that remain unlabelled or have fewer than 10 likes. This
+results in a dataset consisting of an average of 1356 articles each
+day, of which 15% are right, 7% are right-leaning, 31% are neutral,
+34% are left-leaning and 13% are left. On average, the most-liked
+right article has 42, 293 likes, the most-liked right-leaning article
+has 144, 624 likes, the most-liked neutral article has 48, 647 likes, the
+most-liked left-leaning article has 117, 267 likes and the most-liked
+left article has 107, 497 likes. For each day, we encode each article
+as an arm with Bernoulli reward with mean proportional to the
+number of likes on Facebook (normalized to lie in the range [0, 1]).
+We place a group weight of 0, 0.25, 0.5, 0.75 and 1 on right, right-
+leaning, neutral, left-leaning and left articles respectively for the
+liberal group (w (L)). Similarly, we place a group weight of 1, 0.75,
+0.5, 0.25 and 0 on right, right-leaning, neutral, left-leaning and left
+articles respectively for the conservative group (w (C)).
+MovieLens. We consider the MovieLens dataset [22], which
+consists of 100, 000 ratings from 943 users across 1, 682 movies;
+each user rated at least 20 movies on a scale of 1   5. Each movie is
+also a￿liated with one or more of 19 genres (e.g., sci-￿, romance,
+thriller). As some genres have signi￿cant overlap (e.g., thriller and
+horror), while others have di￿erent meanings at their intersections
+(e.g., romance vs rom-com vs comedy), we￿ rst cluster the movies
+into di￿erent meta-categories based on their genres using a black-
+box k-means clustering algorithm with k = 25 [30].6 We use the
+cluster centres as representative arms, and associate all movies in
+that cluster to that arm. For a given user, the reward associated with
+an arm is given by a Gaussian where the mean is the average rating
+the user gave to movies associated with the arm, and standard
+deviation   = 0.1.
+For a genre i (i 2 [19]) and movie category a, the group weight
+wa (Gi ) is set to be the ith coordinate of the cluster centre of movie
+category a found by the k-means clustering.
+YOW.We consider the YOW dataset [41] which contains data
+from a collection of 24 paid users who read 5921 unique articles
+over a 4 week time period. The dataset contains the time at which
+each user read an article, a [0-5] rating for each article read by each
+user, and (optional) user-generated categories of articles viewed.
+We use this data to construct reward distributions for each user on
+a set of arms that one can expect to see from the real world.
+We create a simple ontology to categorize the 10010 user-generated
+labels into a total of   = 7 groups of content: Science, Entertain-
+ment, Business, World, Politics, Sports, and USA. On average there
+are k = 81 unique articles in a day. We take this to be the number of
+arms in this experiment. Similar to the MovieLens experiments, we
+cluster the articles into 81 arms based on the news categories they
+belong to, using k-means clustering (k = 81). We use the cluster
+centres as representative arms, and associate all articles in that
+cluster to that arm. For a given user, the reward associated with
+that arm is given by a Gaussian where the mean is the average rat-
+ing the user gave to articles associated with the arm, and standard
+deviation   = 0.1.
+For a news category i (i 2 [7]) and article a, the group weight
+wa (Gi ) is set to be the ith coordinate of the cluster centre found
+by k means clustering.
+5.2 E￿ect of Reducing Polarization on the
+Reward
+We vary the tightness of upper bound constraints on the probability
+mass of displaying arms of a given group, and report the normalized
+cumulative reward.
+5.2.1 PoliticalNews. For this dataset, there are only two groups:
+either left or right. However, a news article may have weight on
+both groups, and it is these weights that determine how right- or
+left-leaning an article is, and hence how much they contribute
+towards polarization in a given direction. We simulated each of
+the 30 days separately, resulting in n = 30 datapoints. We report
+the normalized cumulative reward after T = 10, 000 iterations,
+averaged over experiments from all 30 days. As there are only two
+groups, setting a lower bound constraint `1 =   is equivalent to
+setting an upper bound constraint u2 = 1     . Hence, it su￿ces
+to see the e￿ect as we vary the upper bounds. We vary u1 = u2 =
+u from 0.5 to 1; i.e., from a fully constrained one in which each
+group has exactly 50% weighted probability of being selected to
+a completely unconstrained setting. We observe in Figure 2a that,
+even for very large values of u (i.e., when the constraints are loose),
+the C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ algorithm signi￿cantly outperforms
+6We determine k = 25 using the graph of silhouette values [33] vs. k .
+(a) PoliticalNews dataset. (b) MovieLens dataset. (c) YOW dataset.
+Figure 2: E￿ect of Polarization Constraints (u) on Reward. The normalized cumulative reward attained as a function of the
+strength of the upper-bound constraints is reported for the three datasets in￿ gures (a), (b) and (c). In all cases, our algorithm
+C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ does not allow polarization, and performs near-optimally with respect to the reward. The lower the
+value of u, the stronger are the constraints.
+(a) PoliticalNews. (b) MovieLens. (c) YOW.
+Figure 3: Visualizing Polarization and Diversi￿cation. The weighted probability mass on the best group is reported against
+the number of iterations. While the unconstrained algorithm converges quickly to placing all of its probability mass on the
+optimal group, the constrained algorithm – by de￿nition – maintains some weight on the non-optimal groups. This is what
+ensures diversi￿cation across content and avoids polarization.
+C￿￿￿￿￿￿￿￿￿￿￿R￿￿ with respect to regret, and is only worse than
+the unconstrained (and hence polarized) algorithm by an additive
+factor of approximately 1 u
+5 (i.e., less than 10%).
+5.2.2 MovieLens. For this dataset, a group corresponds to a genre.
+Note that a movie can belong to multiple genres with varying
+weights which may not add up to one. We report the normalized
+cumulative reward averaged across all 943 users after T = 1000
+iterations. Error bars depict the standard error of the mean. We
+observe in Figure 2b that C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ signi￿cantly
+outperforms the C￿￿￿￿￿￿￿￿￿￿￿N￿￿￿￿ and C￿￿￿￿￿￿￿￿￿￿￿R￿￿ al-
+gorithms across constraints. Additionally, as there are fewer arms
+in the MovieLens dataset as compared to the PoliticalNews dataset,
+the learning cost is lower and hence the C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿
+performs essentially as well as the (unattainable) C￿￿￿￿￿￿￿￿￿￿￿
+O￿￿￿￿￿￿ algorithm.
+5.2.3 YOW. For this dataset, a group corresponds to an article
+category. Note that an article can belong to multiple categories
+(e.g., science and business) simultaneously, with varying weights
+across each category. We report the normalized cumulative re-
+ward averaged across all 21 users after T = 10, 000 iterations.
+Error bars depict the standard error of the mean. As before, we
+observe in Figure 2c that C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ signi￿cantly
+outperforms the C￿￿￿￿￿￿￿￿￿￿￿N￿￿￿￿ and C￿￿￿￿￿￿￿￿￿￿￿R￿￿ al-
+gorithms across constraints, and performs almost as well as the
+(unattainable) C￿￿￿￿￿￿￿￿￿￿￿O￿￿￿￿￿￿ algorithm.
+5.3 Polarization Over Time
+In order to see how polarization can be avoided and diversi￿cation
+can be enforced using our framework, for each dataset we plot
+the normalized cumulative weighted probability mass on the best
+group for each datapoint against the number of iterations, with the
+u = 0.75. Initially, the unconstrained and constrained algorithms
+have the same weighted probability mass for the best group, be-
+cause the algorithms are simply exploring the arms. However, the
+di￿erence between the algorithms becomes very apparent once the
+algorithm begin to learn. Due to a larger number of arms in the
+PoliticalNews dataset, this process takes longer as compared to the
+other two datasets. U￿￿￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ quickly polarizes
+almost-entirely to display content only from the best group. This
+depicts the necessity for such constraints. However, C￿￿￿￿￿￿￿￿￿￿￿
+ ￿G￿￿￿￿￿maintains at least 1 u of its weighted probability mass on
+content not belonging to the best group, increasing diversi￿cation
+and avoiding polarization.
+6 CONCLUSION
+In this paper we initiate a formal study of combating polarization in
+personalization algorithms that learn user behavior. We present a
+general framework that allows one to prevent polarization by ensur-
+ing that a balanced set of items are displayed to each user. We show
+how one can modify a simple bandit algorithm in order to perform
+well with respect to regret subject to satisfying the polarization
+constraints, improving the regret bound over the state-of-the-art.
+Empirically, we observe that theC￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ algorithm
+performs well; it not only converges quickly to the theoretical opti-
+mum, but this optimum, even for the tightest constraints on the arm
+values selected (u = 0.2 for MovieLens, u = 0.5 for PoliticalNews),
+is within a factor of 2 of the unconstrained rewards. Furthermore,
+C￿￿￿￿￿￿￿￿￿￿￿ ￿G￿￿￿￿￿ is fast and we expect it to scale well in
+web-level applications.
+With regard to future work, a limitation of our algorithms is the
+fact that they assume we are given the group labels and weights for
+each piece of content. These labels would either need to be inferred
+from the data, which could bring with it additional bias associated
+with this learning algorithm, or would need to be self-reported,
+which can lead to adversarial manipulation. Additionally, it would
+be important to extend this work to a dynamic setting in which the
+type of content changes over time, e.g., using restless bandit tech-
+niques. From an experimental standpoint, testing this algorithm in
+the￿ eld, in particular to measure user satisfaction given diversi￿ed
+news feeds, would be of signi￿cant interest. Such an experiment
+would give deeper insight into the bene￿ts and tradeo￿s between
+personalization and the diversi￿cation of content, which could then
+be leveraged to determine which kind of constraints can prevent
+polarization not just of the items in the feed, but of the beliefs and
+opinions of those viewing them.
+REFERENCES
+[1] -. 0. AllSides Media Bias Ratings. https://www.allsides.com/media-bias/
+media-bias-ratings.
+[2] -. 0. Webhose News API. https://webhose.io/data-feeds/news-api/.
+[3] Yasin Abbasi-Yadkori, Dávid Pál, and Csaba Szepesvári. 2011. Improved Algo-
+rithms for Linear Stochastic Bandits. In Advances In Neural Information Processing
+Systems.
+[4] Gediminas Adomavicius, Jesse Bockstedt, Curley Shawn, and Jingjing Zhang.
+2014. De-biasing user preference ratings in recommender systems. In Joint
+Workshop on Interfaces and Human Decision Making for Recommender Systems,
+Co-located with ACM Conference on Recommender Systems.
+[5] Gediminas Adomavicius and YoungOk Kwon. 2012. Improving aggregate rec-
+ommendation diversity using ranking-based techniques. IEEE Transactions on
+Knowledge and Data Engineering 24, 5 (2012), 896–911.
+[6] Shipra Agrawal and Nikhil Devanur. 2016. Linear Contextual Bandits with
+Knapsacks. In Advances In Neural Information Processing Systems. 3450–3458.
+[7] Shipra Agrawal and Navin Goyal. 2012. Analysis of thompson sampling for the
+multi-armed bandit problem. In Conference on Learning Theory. 39–1.
+[8] Rubayyi Alghamdi and Khalid Alfalqi. 2015. A survey of topic modeling in text
+mining. Int. J. Adv. Comput. Sci. Appl.(IJACSA) 6, 1 (2015).
+[9] Peter Auer, Nicolo Cesa-Bianchi, and Paul Fischer. 2002. Finite-time analysis of
+the multiarmed bandit problem. Machine learning 47, 2-3 (2002), 235–256.
+[10] Drake Baer. 2016. The ‘Filter Bubble’ Explains Why Trump Won and You Didn’t
+See It Coming. NY Mag.
+[11] Engin Bozdag and Jeroen van den Hoven. 2015. Breaking the￿ lter bubble:
+democracy and design. Ethics and Information Technology 17, 4 (01 Dec 2015),
+249–265.
+[12] L. E. Celis, L. Huang, V. Keswani, and N. K. Vishnoi. 2018. Classi￿cation with
+Fairness Constraints: AMeta-Algorithmwith Provable Guarantees. ArXiv e-prints
+(June 2018). arXiv:1806.06055
+[13] Michael Conover, Jacob Ratkiewicz, Matthew R Francisco, Bruno Gonçalves,
+Filippo Menczer, and Alessandro Flammini. 2011. Political polarization on twitter.
+ICWSM 133 (2011), 89–96.
+[14] Varsha Dani, Thomas P Hayes, and Sham M Kakade. 2008. Stochastic Linear
+Optimization under Bandit Feedback. In Proceedings of the Annual Conference on
+Learning Theory (COLT).
+[15] Amit Datta, Michael Carl Tschantz, and Anupam Datta. 2015. Automated exper-
+iments on ad privacy settings. Proceedings on Privacy Enhancing Technologies
+2015, 1 (2015), 92–112.
+[16] Wenkui Ding, Tao Qin, Xu-Dong Zhang, and Tie-Yan Liu. 2013. Multi-Armed
+Bandit with Budget Constraint and Variable Costs.. In AAAI.
+[17] Robert Epstein and Ronald E Robertson. 2015. The search engine manipulation
+e￿ect (SEME) and its possible impact on the outcomes of elections. Proceedings
+of the National Academy of Sciences 112, 33 (2015), E4512–E4521.
+[18] Ayman Farahat andMichael C Bailey. 2012. How e￿ective is targeted advertising?.
+In Proceedings of the 21st international conference on World Wide Web. ACM.
+[19] Thomas Fox-Brewster. 2017. Creepy Or Cool? Twitter Is Tracking Where You’ve
+Been, What You Like And Is Telling Advertisers. Forbes Magazine.
+[20] Venkata Rama Kiran Garimella and Ingmar Weber. 2017. A Long-Term Analysis
+of Polarization on Twitter. In ICWSM.
+[21] Avi Goldfarb and Catherine Tucker. 2011. Online display advertising: Targeting
+and obtrusiveness. Marketing Science (2011).
+[22] F. Maxwell Harper and Joseph A. Konstan. 2015. TheMovieLens Datasets: History
+and Context. ACM Trans. Interact. Intell. Syst. 5, 4, Article 19 (Dec. 2015), 19 pages.
+https://doi.org/10.1145/2827872
+[23] Sounman Hong and Sun Hyoung Kim. 2016. Political polarization on twitter:
+Implications for the use of social media in digital governments. Government
+Information Quarterly 33, 4 (2016), 777–782.
+[24] Matthew Joseph, Michael Kearns, Jamie H Morgenstern, and Aaron Roth. 2016.
+Fairness in learning: Classic and contextual bandits. In Advances in Neural Infor-
+mation Processing Systems. 325–333.
+[25] Lihong Li, Wei Chu, John Langford, and Robert E Schapire. 2010. A contextual-
+bandit approach to personalized news article recommendation. In Proceedings of
+the 19th international conference on World wide web. ACM, 661–670.
+[26] Shuai Li, Alexandros Karatzoglou, and Claudio Gentile. 2016. Collaborative
+￿ltering bandits. In Proceedings of the 39th International ACM SIGIR conference on
+Research and Development in Information Retrieval. ACM, 539–548.
+[27] Jiahui Liu, Peter Dolan, and Elin Rønby Pedersen. 2010. Personalized news
+recommendation based on click behavior. In Proceedings of the 15th international
+conference on Intelligent user interfaces. ACM.
+[28] Sandeep Pandey and Christopher Olston. 2006. Handling Advertisements of
+Unknown Quality in Search Advertising. In Advances in Neural Information
+Processing Systems.
+[29] Eli Pariser. 2011. The￿ lter bubble: What the Internet is hiding from you. Penguin
+UK.
+[30] F. Pedregosa, G. Varoquaux, A. Gramfort, V. Michel, B. Thirion, O. Grisel, M.
+Blondel, P. Prettenhofer, R. Weiss, V. Dubourg, J. Vanderplas, A. Passos, D. Cour-
+napeau, M. Brucher, M. Perrot, and E. Duchesnay. 2011. Scikit-learn: Machine
+Learning in Python. Journal of Machine Learning Research 12 (2011), 2825–2830.
+[31] Filipe N. Ribeiro, Lucas Henrique, Fabricio Benevenuto, Abhijnan Chakraborty,
+Juhi Kulshrestha, Mahmoudreza Babaei, and Krishna P. Gummadi. 2018. Media
+Bias Monitor: Quantifying Biases of Social Media News Outlets at Scale. In
+Proceedings of the 12th International AAAI Conference on Web and Social Media
+(ICWSM).
+[32] Ronald E. Robertson, David Lazer, and Christo Wilson. 2018. Auditing the
+Personalization and Composition of Politically-Related Search Engine Results
+Pages. In Proceedings of the 2018 World Wide Web Conference.
+[33] Peter J. Rousseeuw. 1987. Silhouettes: A graphical aid to the interpretation and
+validation of cluster analysis. J. Comput. Appl. Math. (1987).
+[34] Pranav Sakulkar and Bhaskar Krishnamachari. 2016. Stochastic contextual ban-
+dits with known reward functions. arXiv preprint arXiv:1605.00176 (2016).
+[35] Till Speicher, Muhammad Ali, Giridhari Venkatadri, Filipe Nunes Ribeiro, George
+Arvanitakis, Fabrício Benevenuto, Krishna P. Gummadi, Patrick Loiseau, and
+Alan Mislove. 2018. Potential for Discrimination in Online Targeted Advertising.
+In Proceedings of the 1st Conference on Fairness, Accountability and Transparency.
+PMLR.
+[36] Karthik Sridharan. 2002. A gentle introduction to concentration inequalities.
+(2002).
+[37] Chong Wang and David M Blei. 2011. Collaborative topic modeling for recom-
+mending scienti￿c articles. In Proceedings of the 17th ACM SIGKDD international
+conference on Knowledge discovery and data mining. ACM, 448–456.
+[38] Jacek Wasilewski and Neil Hurley. 2016. Incorporating Diversity in a Learning
+to Rank Recommender System.. In FLAIRS Conference. 572–578.
+[39] Ingmar Weber, Venkata R Kiran Garimella, and Alaa Batayneh. 2013. Secular vs.
+islamist polarization in egypt on twitter. In Proceedings of the 2013 IEEE/ACM
+International Conference on Advances in Social Networks Analysis and Mining.
+ACM.
+[40] Yiming Yan. 0. Mehrotra’s Predictor-Corrector Interior Point Method. https:
+//github.com/YimingYAN/mpc.
+[41] Yi Zhang. 2005. Bayesian Graphical Models For Adaptive Filtering. In PhD Thesis.

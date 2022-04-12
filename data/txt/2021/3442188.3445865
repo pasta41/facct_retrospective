@@ -1,0 +1,1392 @@
+Fairness Violations and Mitigation under Covariate Shift
+Harvineet Singh
+Center for Data Science
+New York University
+New York City, NY, USA
+hs3673@nyu.edu
+Rina Singh
+∗
+Tandon School of Engineering
+New York University
+New York City, NY, USA
+rina@fusemachines.com
+Vishwali Mhasawade
+Tandon School of Engineering
+New York University
+New York City, NY, USA
+vishwalim@nyu.edu
+Rumi Chunara
+Tandon School of Engineering;
+School of Global Public Health
+New York University
+New York City, NY, USA
+rumi.chunara@nyu.edu
+ABSTRACT
+We study the problem of learning fair prediction models for unseen
+test sets distributed differently from the train set. Stability against
+changes in data distribution is an important mandate for responsible
+deployment of models. The domain adaptation literature addresses
+this concern, albeit with the notion of stability limited to that of
+prediction accuracy. We identify sufficient conditions under which
+stable models, both in terms of prediction accuracy and fairness,
+can be learned. Using the causal graph describing the data and
+the anticipated shifts, we specify an approach based on feature
+selection that exploits conditional independencies in the data to
+estimate accuracy and fairness metrics for the test set. We show
+that for specific fairness definitions, the resulting model satisfies a
+form of worst-case optimality. In context of a healthcare task, we
+illustrate the advantages of the approach in making more equitable
+decisions.
+CCS CONCEPTS
+•Computingmethodologies→Learningunder covariate shift;
+Causal reasoning and diagnostics.
+KEYWORDS
+algorithmic fairness, domain adaptation, covariate shift, causal in-
+ference
+ACM Reference Format:
+Harvineet Singh, Rina Singh, Vishwali Mhasawade, and Rumi Chunara. 2021.
+Fairness Violations and Mitigation under Covariate Shift. In Conference on
+Fairness, Accountability, and Transparency (FAccT ’21), March 3–10, 2021,
+Virtual Event, Canada. ACM, New York, NY, USA, 11 pages. https://doi.org/
+10.1145/3442188.3445865
+∗
+Work done while at New York University. Current affiliation is Fusemachines Inc.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+© 2021 Association for Computing Machinery.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+https://doi.org/10.1145/3442188.3445865
+1 INTRODUCTION
+Deployment of machine learning algorithms to aid consequential
+decisions, such as in medicine, criminal justice, and employment,
+require revisiting the dominant paradigms of training and testing
+such algorithms. Particularly, the assumption that the data distri-
+bution in training and deployment will be the same is not always
+warranted. Examples of the impact of distribution shift can be found
+in medical imaging tasks [51, 68], where the algorithms trained on
+one chest radiography dataset performed poorly on other datasets.
+Similarly, Nestor et al. [41] find that models for critical care tasks
+degraded in performance over time resulting from changes in the
+instrumentation of the electronic health records. Given the safety-
+critical nature of the decisions, the decision-making process should
+account for these shifts in distributions to ensure high predictive
+accuracy of the algorithms.
+Manymethods exist to learn under distribution shifts [52], includ-
+ing recent work from a causal inference perspective [2, 46, 55, 62].
+Such methods have significant appeal since they allow learning
+accurate models for arbitrary shifts, including those in unseen fu-
+ture data. This is achieved by exploiting causally-relevant factors
+in data that are generalizable to unseen test sets, as opposed to
+fitting to the factors specific to the training sets. However, the focus
+of the methods has been on average case prediction performance
+alone. In certain circumstances, while high predictive accuracy
+is a necessary requirement, decisions made using the algorithms
+should also not lead to or perpetuate past disparities among groups
+in the data. Without any design changes, algorithmic solutions for
+mitigating distribution shifts that do not account for disparities in
+training data can result in disparate impact while predicting under
+distribution shifts. We discuss a concrete example later.
+At the same time, most work in algorithmic fairness addresses
+the setting with a single learning task (or domain) under the as-
+sumption that the data distribution does not change between train
+and test settings [1, 22]. Under this assumption, minimizing classifi-
+cation risk along with constraints on the fairness metric in training
+data is likely to generalize to identically distributed test data. Think-
+ing about shifts in fair machine learning is also important though,
+since deployment of a (fair) decision-making tool might affect what
+data is collected in future (e.g. selectively policing locations with
+3
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Singh, et al.
+high predicted risk [31]), or might incentivize individuals to strate-
+gically adapt their features for favourable outcomes [21, 30], thus,
+causing distribution shift. In addition, due to data-scarcity, such
+as in medical decision-making [66], the models may be applied to
+newer settings (such as hospitals) than the ones seen during train-
+ing. The issue of ensuring fairness when deployment environment
+differs from the training one has received little attention [57]. Due
+to the variety of train-test shifts that can occur, conceptualizing
+and addressing the problem has been challenging.
+Our contributions. We address the problem of learning fair
+models under mismatch in train-test distributions when either lim-
+ited or no data is available from the test distribution. We consider
+the setup of causal domain adaptation where possible shifts are
+expressed using causal graphs with the goal of learning models
+with stable performance under the specified shifts. Our main con-
+tribution is to formulate the fair learning problem in this setup
+and provide sufficient conditions that enable estimation of model
+accuracy and fairness metrics in the test domain. For a subset of
+covariate shifts and for several well-known group-fairness metrics,
+we show that the resulting solution is worst-case optimal. We op-
+erationalize the sufficient conditions in an algorithm based on a
+reduction to the standard fair learning problem. Finally, we present
+a case study on a medical decision-making task which demonstrates
+applicability of the approach.
+2 RELATEDWORK
+Domain adaptation and fair machine learning are both widely stud-
+ied problems. Thus, we primarily focus the discussion on literature
+at their intersection.
+Fairness. A number of fairness metrics have been proposed
+that make different normative statements on the machine learning
+models’ output (see [37] for a review). Depending on the application
+context, different metrics might be appropriate or mandatory by
+law [40]. Consequently, fairness methods have been developed to
+build/modify models that satisfy different fairness criteria. We focus
+on a class of methods that pose the problem as that of constrained
+optimization [1, 15].
+Domain adaptation. The seminal work of Ben-David et al. [3]
+relates the target domain error to the source domain error and
+the distance between the distributions. This inspired many domain
+adaptationmethods based on adversarial training of representations
+to align the distributions [18]. One drawback is that the methods re-
+quire some data from test distribution while training. When causal
+structure of the domains is known, recent work on causal domain
+adaptation [33, 55, 60, 62] identify predictors with stable accuracy
+under unseen changes in distribution. To accomplish this, the meth-
+ods exploit the principle of invariance of causal mechanisms [45,
+Sec. 1.3] that says – interventions (or shifts) in certain mechanisms
+in the graph keep the other mechanisms unchanged. The invari-
+ant mechanisms can be used to build stable predictors. Similar to
+[46, 62], we adopt a setting where a causal graph specifies antici-
+pated distribution shifts and no target domain data is given (but
+can be used if available). The goal is to construct predictors that
+are invariant to all anticipated shifts, without necessarily observ-
+ing the corresponding data. The setting is particularly well-suited
+for consequential decision-making where we want to proactively
+guard against shifts that may result in harm, before deploying the
+model and collecting target data. However, none of these methods
+consider the possibility of unfair outcomes after adaptation.
+Fairness and domain adaptation. On multiple benchmark
+datasets, Friedler et al. [17] found that fair machine learning meth-
+ods showed high variance in achieved accuracy and fairness on
+randomly split train-test sets. To mitigate this, Huang and Vishnoi
+[25] propose adding a regularization term to the constrained ERM
+problem that guarantees stability. However, the term stability is
+used for changes in the fairness metric as a training data sample is
+removed/added, as opposed to changes under different distributions.
+In [13], authors propose algorithms for generalisation of fairness
+constraints but to an i.i.d. test set. In [32], the authors propose
+learning feature representations, using adversarial training, which
+result in fair classifiers when trained on the representations. They
+do not address changes in distribution of the features (and their
+representations) across domains.
+In the same setup as ours under the assumption of covariate
+shift but with the availability of unlabelled target data, [12] give
+weighting-based estimators and [53] take a robust optimization
+approach. Other works that assume some labelled data from the
+target domain include [44, 57, 59]. For instance, [44] learns a repre-
+sentation from multiple domains with guarantees on generalization
+to the target domain, but requires labelled target data to fine-tune
+classifiers and a low-rank assumption that constrains dis-similarity
+between the domains. In [59], authors restrict to shifts in feature
+means and propose ways to flag a potentially unfair model under
+such shifts. Further, concurrent work [34] posits a set of test distri-
+butions defined as weighted combinations of the training data, and
+find a fair classifier minimizing the worst loss across such distri-
+butions. Instead, we rely on distributional assumptions expressed
+using a causal graph. Considering the causal structure of the prob-
+lem allows the modeller to express plausible distribution shifts more
+intuitively by denoting the mechanisms, instead of the statistical
+properties, that can change. It also guides the construction of esti-
+mators that are robust against shifts of arbitrary magnitude rather
+than only the shifts in the observed datasets.
+Our work is related in spirit to [6, 27] who consider building
+fair models from ‘biased’ training data. Here, we provide a com-
+plementary set of results on fairness under train-test distribution
+mismatch, avoiding assumptions on specific generative processes
+for the shift. Instead we use causal graphs to make weaker assump-
+tions on where the mismatch is. This allows us to give a general
+characterization of the addressable mismatch settings. Moreover,
+at a conceptual level, our focus is on addressing mismatch with
+multiple future test sets rather than a biased training set.
+3 PROBLEM SETUP
+Let us denote all the variables associated with the system being
+modelled as V := (X, 𝐴,𝑌 ), where 𝐴 is the sensitive attribute, X is
+a non-empty set of covariates other than 𝐴, and 𝑌 is an outcome of
+interest. We will consider a binary sensitive attribute,𝐴 ∈ {a, d} (i.e.
+advantaged and disadvantaged group), and the binary classification
+case, thus, 𝑌 ∈ {0, 1}. For simplicity of exposition, consider the
+case with only two domains – a source and a target – with joint
+probability distributions 𝑃source and 𝑃target, respectively. Crucially,
+4
+Fairness Violations and Mitigation under Covariate Shift FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+the two distributions may be different (e.g. data from two hospitals
+with different care practices). Bold letters are used for vectors,
+uppercase for random variables, and lowercase for instantiations.
+3.1 Fair classifier
+Consider that the classifier is built from the feature (sub)set S ⊆ {X, 𝐴}
+and outputs the binary prediction 𝑓 (S) ∈ {0, 1}.1 Wewill operate in
+the empirical risk minimization framework for learning classifiers
+and introduce additional fairness constraints in the objective to con-
+trol the inter-group disparity, a commonly-used approach [1, 15, 67].
+Each constraint is given by some function 𝐺 of the prediction, out-
+come, and features. Denote the constraint by 𝐺 (𝑓 (S), (𝑌, S)) ≤ 𝜖
+with (𝑌, S) ∼ 𝑃target (𝑌, S) and some hyperparameter 𝜖 ≥ 0 allow-
+ing for approximate fairness. If there are multiple constraints, we
+write the set of constraints succinctly as G(𝑓 , 𝑃target) ≤ 𝝐 . Note
+that the desired fairness constraint G is assumed to be the same
+in both the domains. The classification error i.e. probability of a
+misclassification is written as 𝑃 (𝑓 (S) ≠ 𝑌 ). Then, the fair domain
+adaptation (DA) problem amounts to finding a minimizer
+[Fair DA] 𝑓 ∗
+target
+:= argmin
+𝑓 ∈F(S)
+{𝑃target (𝑓 (S) ≠ 𝑌 ) : G(𝑓 , 𝑃target) ≤ 𝝐}
+(1)
+i.e. a function 𝑓 ∗
+target
+in the set of learnable functions F (S) of fea-
+tures S that minimizes classification error as well as satisfies fairness
+constraints.
+Fairness metrics.We will focus on group-fairness metrics de-
+fined based on some notion of parity across groups. These have
+received much attention in the fair machine learning literature
+[1, 15, 22] due to the relative ease of communicating their implica-
+tions to stakeholders and the ease of computing them from obser-
+vational data.
+Definition 3.1. (DP) [7] A classifier 𝑓 is said to satisfy demo-
+graphic parity for some distribution 𝑃 if 𝑃 (𝑓 (S) |𝐴) = 𝑃 (𝑓 (S)). Thus,
+the constraint 𝐺 is |𝑃 (𝑓 (S) |𝐴 = a) − 𝑃 (𝑓 (S) |𝐴 = d) | ≤ 𝜖 .
+Definition 3.2. (EO) [22] A classifier 𝑓 is said to satisfy equal-
+ized odds for some distribution 𝑃 if 𝑃 (𝑓 (S) |𝑌 = 𝑦,𝐴) = 𝑃 (𝑓 (S) |𝑌 =
+𝑦) for 𝑦 ∈ {0, 1}. Thus, the constraints G are |𝑃 (𝑓 (S) |𝑌 = 𝑦,𝐴 =
+a) − 𝑃 (𝑓 (S) |𝑌 = 𝑦,𝐴 = d) | ≤ 𝜖 for 𝑦 ∈ {0, 1}.
+We define two more metrics derived from EO. If we condition
+only on 𝑌 = 1, the resulting metric is known as true positive rate
+equality (TPR), or more commonly equality of opportunity [22].
+Similarly, for 𝑌 = 0, the metric is known as true negative rate
+equality (TNR).
+Solving (1) requires estimating the error 𝑃target (𝑓 (S) ≠ 𝑌 ) and
+the fairness constraint G(𝑓 , 𝑃target). Given enough samples from
+𝑃target, standard fair learning methods e.g. [1] return a solution. But,
+this is not possible in the Fair DA setting, as we do not have access
+to the complete target data. Thus, the central question we ask is:
+Underwhat assumptions canwe still find 𝑓 ∗
+target
+? For arbitrary
+distribution shifts, it is not possible to answer this question in
+affirmative. With background knowledge of how the distributions
+differ, past work provides methods to bound the target domain
+1
+Note that S can contain 𝐴 as we assume that disparate treatment is allowed in the
+problems of our interest.
+error. Crucially, such methods still do not guarantee target domain
+fairness and using fairness constraints from the source domain,
+naturally, does not solve (1). Through the following example, we
+illustrate that these design choices can significantly affect accuracy
+and fairness of the models. It also shows how the causal inference
+framework for domain adaptation allows for the specification of
+shifts and design of predictors.
+3.2 An illustrative example.
+Consider a simplified version of the flu diagnosis task from [36]. The
+associated data generating process is shown in Figure 1a. Flu status
+𝑌 of a person is to be predicted from three measurements {𝑇, 𝑅,𝐴}.
+The disease has two known causes 𝑅 and𝐴, say virus-exposure risk
+and age group (indicating adult or child) respectively. In addition,
+a noisy yet predictive symptom of flu is observed as 𝑇 , say body
+temperature, which is expressed differently depending on the age
+group. A categorical variable 𝐶 indicates different data collection
+sites (the domains) which differ on (i) how well the temperature
+is measured, e.g. self-reported vs. clinician-tested (𝐶 → 𝑇 ), and
+(ii) the proportion of demographics across sites (𝐶 → 𝐴). Suppose,
+a classifier 𝑌 is to be built using data from a single site (source
+domain) and used in multiple sites (target domains) to allocate
+scarce healthcare resources (testing kits, medical consultation) to
+individuals. The model designer would like to mitigate differential
+error rates across age groups and chooses to use EO as the fairness
+constraint while learning 𝑌 .
+We compare three ways of designing the model that account
+differently for the possibility of shift and unfairness. Figures 1b,
+1c show results from a simulation, discussed in detail in Section
+6.2. As we vary the magnitude of distribution shift between the
+sites, the Standard classifier, built by regressing𝑌 on {𝑇, 𝑅,𝐴} from
+source data degrades in accuracy (blue curve) on target data. By
+accounting for the shift, CausalDA, a domain adaptation approach
+[55] that only uses the features {𝑅,𝐴}, remains stable (orange curve).
+Surprisingly, domain adaptation leads to higher levels of fairness
+violations, as shown in Figure 1c. To mitigate this we would want
+to learn CausalDA with fairness constraints which is complicated,
+as discussed earlier, since we cannot evaluate the constraints for
+unseen target domains. However, following the method proposed
+in Section 5, learning CausalDA with fairness constraints on the
+source domain (red curve) retains both the desired properties –
+consistently high accuracy and low unfairness. Thus, the example
+illustrates the need to consider fairness constraints while adapting
+for the shifts.
+Next, we describe the joint causal graphs in more detail that
+allow us to represent the potential shifts, followed by our main
+results on learning fair and stable predictors under specific shifts.
+4 JOINT CAUSAL INFERENCE AND DOMAIN
+ADAPTATION
+Following recent work [33, 38, 55], we consider a joint causal graph
+which represents the data distribution for all domains. This allows
+us to reason about the invariant distributions under shifts, which
+is key to addressing the fair domain adaptation problem.
+Assume that all the source and the target domains are charac-
+terized by a set of variables V, which are observed under different
+5
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Singh, et al.
+𝐴
+𝐶 𝑇
+𝑌
+𝑅
+(a) Example causal graph annotated to show
+anticipated shifts in the distributions 𝑃 (𝐴)
+and/or 𝑃 (𝑇 |𝐴,𝑌 ) .
+0 5 10 15
+Magnitude of Shift
+0.5
+0.6
+0.7
+0.8
+0.9
+Ac
+cu
+ra
+cy
+ o
+n 
+Ta
+rg
+et
+ D
+at
+a Standard
+CausalDA
+CausalDA+FairLearn
+(b) Accuracy vs. Shift.
+0 5 10 15
+Magnitude of Shift
+0.0
+0.2
+0.4
+0.6
+Fa
+irn
+es
+s V
+io
+l. 
+on
+ T
+ar
+ge
+t D
+at
+a Standard
+CausalDA
+CausalDA+FairLearn
+(c) Fairness Violation vs. Shift.
+Figure 1: Flu diagnosis example. (a) Data generating process for source and target domains represented as a causal graphwhere
+domains are indicated by the context variable 𝐶. Edges from 𝐶 represent shifts between the domains. {𝑇, 𝑅,𝐴} are features,
+with sensitive attribute𝐴, and outcome 𝑌 . (b,c) Classification accuracy and fairness violation with varyingmagnitude of shifts
+for synthetic data (Section 6.2) for the example. Fairness violation is computed as the maximum violation of equalized odds
+constraint across 𝑌 and 𝐴. Median values are plotted over 50 runs and error bars show first and third quartiles. Proposed
+approach (CausalDA+FairLearn) achieves both stable accuracy and fairness in the shifted target domains.
+contexts (e.g. experimental settings) particular to each domain. Joint
+Causal Inference [38, Sec. 3] framework provides a way of rep-
+resenting the data generating process for all domains as a single
+causal graph representing an underlying causal model. In addition
+to the system variables V, the framework introduces an additional
+set of exogenous variables, named context variables C , that rep-
+resent the modeler’s knowledge of how the domains differ from
+one another (given by the causal relations among the system and
+context variables).
+2
+We include the formal definition of JCI frame-
+work in Appendix D along with the necessary assumptions on
+faithfulness, and Markov property. For the example in Figure 1a,
+system variables are {𝑇, 𝑅,𝐴,𝑌 }. With a binary context variable
+𝐶 , 𝑃 (𝑇, 𝑅,𝐴,𝑌 | 𝐶 = 0) and 𝑃 (𝑇, 𝑅,𝐴,𝑌 | 𝐶 = 1) correspond to joint
+distributions for the two domains, source and target. More gener-
+ally, setting context variable to a particular value, say C = c, can
+be seen as an intervention that results in the data distribution for a
+domain 𝑃 (V | C = c).3
+A class of causal domain adaptation problems is to learn a pre-
+dictor that generalizes to different target data distributions which
+correspond to different settings of the context variables in the causal
+graph. In [33], authors propose learning a predictor using only a
+subset of the features that guarantee invariance of the outcome
+distribution conditional on the chosen feature subset. More specifi-
+cally, if V = (X, 𝐴,𝑌 ) and C are the context variables, the desired
+subset of features S ⊆ {X, 𝐴} satisfies 𝑌 ⊥ C | S, implying that
+the conditional distribution of outcome 𝑌 given the features S is
+invariant to the effect of domain changes. The set S is referred to as
+a separating set as it d-separates 𝑌 and C in the joint causal graph.
+This criterion generalizes the covariate shift criterion [63], which
+assumes independence between 𝑌 and𝐶 conditioned on all the fea-
+tures. Note that the separating set criterion excludes graphs where
+2
+In a related concept, selection diagrams also add auxiliary variables to a causal graph
+to represent the distributions that can change across different domains [46]. More
+discussion on the relationship between the two can be found in [38].
+3
+Under the assumptions of JCI framework, discussed in Appendix D, this is the same
+as 𝑃 (V𝑑𝑜 (C=c) ) where 𝑑𝑜 (C = c) denotes an intervention on𝐶 .
+C directly causes 𝑌 , known as label shift. The predictor using the
+separating set satisfies a desirable optimality property. As shown in
+[55], it has the lowest mean squared loss against any distribution
+having the same outcome distribution 𝑌 | S as in the source.
+However, using a separable set in itself does not guarantee fair-
+ness. For example, separating sets for Figure 1a are S ∈ {{𝐴}, {𝐴, 𝑅}}.
+But neither satisfies the condition required for EO, in general, i.e.
+𝑓 (S) ⊥ 𝐴 | 𝑌 . Thus, to ensure both invariance and fairness, we
+restrict our search space in Fair DA (1) to F (S), i.e. the set of
+predictors built using the separating set S. Next, we describe the
+assumptions that allow us to solve this problem. All proofs are
+included in Appendices A−C in the supplemental material.
+5 FAIR DOMAIN ADAPTATION
+Now, we return to our problem of finding fair classifiers for the
+target domain and describe how the joint causal graph helps in
+solving (1). In the context variable notation, we are interested in
+finding
+argmin
+𝑓 ∈F(S)
+{𝑃 (𝑓 (S) ≠ 𝑌 |𝐶 = 1) : G(𝑓 , 𝑃 (𝑌, S|𝐶 = 1)) ≤ 𝝐}
+where 𝐶 = 1 represents the target domain. We start by noting the
+need for further assumptions.
+Proposition 1. Fair DA problem (1) is not solvable in general
+without further assumptions.
+Proposition (1) follows by the impossibility results on domain
+adaptation [4]. Even when domain adaptation is possible, i.e. target
+domain error is identifiable (uniquely estimable in terms of source
+domain distribution), the fairness constraint is not guaranteed to be
+identifiable. We make this point by constructing an example with
+group-specific measurement error in features.
+Thus, the natural question is under what conditions on distribu-
+tions and assumptions on data availability can we identify the error
+𝑃 (𝑓 (S) ≠ 𝑌 |𝐶 = 1) and the fairness constraint G(𝑓 , 𝑃 (𝑌, S|𝐶 = 1)).
+We make the following two assumptions for the selected features
+S ⊆ {X, 𝐴} for the classifier.
+6
+Fairness Violations and Mitigation under Covariate Shift FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Assumption 1 (Invariance of classification error). Fea-
+tures S form a separating set, i.e. 𝐶 ⊥ 𝑌 | S.
+Assumption 2 (Invariance of fairness constraint). De-
+pending on the fairness metric, assume that
+• For demographic parity (DP), S satisfies 𝐶 ⊥ S | 𝐴,
+• For equalized odds (EO), S satisfies 𝐶 ⊥ S | 𝑌,𝐴,
+• For true positive rate equality (TPR), S satisfies 𝐶 ⊥ S | 𝑌 =
+1, 𝐴,
+• For true negative rate equality (TNR), S satisfies 𝐶 ⊥ S | 𝑌 =
+0, 𝐴.
+For example, the condition for DP asserts that the characteristics
+(in terms of features S) of the sensitive groups are invariant across
+domains. Similarly, the condition for EO says that feature distribu-
+tion for groups defined by the label and the sensitive attribute is
+invariant across domains. This ensures that we can evaluate (and
+hence balance) the corresponding fairness constraint irrespective
+of the domain.
+Next, we consider two scenarios to state the quality of the so-
+lution that can be found under the two assumptions – (i) when
+labelled source and unlabelled target domain data is available, alter-
+natively, (ii) when only the labelled source domain data is available.
+5.1 Fair domain adaptation with limited target
+domain data
+Proposition 2. Given Assumptions 1 and 2 hold, then using
+only labelled source and unlabelled target data, the Fair DA problem
+(1) can be solved exactly by a data re-weighting method.
+Proof sketch. This follows since the error is invariant, i.e.
+𝑃 (𝑓 (S) ≠ 𝑌 |S,𝐶 = 1) = 𝑃 (𝑓 (S) ≠ 𝑌 |S,𝐶 = 0), due to Assumption 1.
+This implies that
+E𝑌,S (𝑃 (𝑓 (S) ≠ 𝑌 |S,𝐶 = 1)) = E𝑌,S (𝑤 (S) × 𝑃 (𝑓 (S) ≠ 𝑌 |S,𝐶 = 0))
+where weights, 𝑤 (S) = 𝑃 (S|𝐶 = 1)/𝑃 (S|𝐶 = 0), are the ratio of
+feature densities. Under Assumption 2, the fairness constraint is
+invariant, i.e. G(𝑓 , 𝑃 (𝑌, S|𝐶 = 1)) = G(𝑓 , 𝑃 (𝑌, S|𝐶 = 0)). To solve
+(1), we find
+argmin
+𝑓 ∈F(S)
+{𝑤 (S)𝑃 (𝑓 (S) ≠ 𝑌 |𝐶 = 0) : G(𝑓 , 𝑃 (𝑌, S|𝐶 = 0)) ≤ 𝝐} .
+Both the error and the constraint are estimable as we have labelled
+source data sampled from 𝑃 (𝑌, S|𝐶 = 0). The remaining term is
+the density ratio𝑤 (S) used to re-weight the error. Since we have
+features from both source and target in this scenario,𝑤 (S) can be
+computed, for instance, using a probabilistic classifier for discrimi-
+nating between the domains [5]. □
+This solution strategy is akin to the importance-weighting ap-
+proach of addressing covariate shift [58, 63], with the distinction
+being the use of the separating feature set instead of all the features.
+5.2 Fair domain adaptation with no target
+domain data
+In the scenario when only the labelled source data is available, we
+cannot use Proposition (2) since we cannot estimate the weights.
+𝐴
+𝑅
+𝑌
+𝐿𝑇𝐶2
+𝐶1
+A
+Demography
+(sensitive attribute)
+Y Disease status
+R Risk factors
+L Lab tests
+T Treatment
+(a)
+𝐴 𝑆
+𝐿
+𝑌
+𝑅
+𝐶
+A Gender (sensitive attribute)
+L Age
+Y Credit risk level
+R
+Repayment duration,
+Credit amount
+S Savings, Housing
+(b)
+Figure 2: Examples of addressable causal graphs. (a) Disease
+risk scoring under population shift and treatment policy
+shift [60] (b) Credit scoring under population shift [10]. Fol-
+lowing Assumptions 1 and 2, including 𝐴 in the feature set
+blocks the effect of population shift (e.g. the paths in ma-
+genta) and excluding 𝐿 from the feature set blocks the effect
+of treatment policy shift (e.g. the path in green).
+Instead, we use the source data with the selected features,
+˜𝑓 ∗ ∈ argmin
+𝑓 ∈F(S)
+{𝑃 (𝑓 (S) ≠ 𝑌 |𝐶 = 0) : G(𝑓 , 𝑃 (𝑌, S|𝐶 = 0)) ≤ 𝝐} ,
+with S satisfying Assumptions 1 and 2
+(2)
+Next, we show that this solution minimizes the worst-case error
+under fairness constraints among target distributions satisfying the
+two assumptions with respect to the feature subset S. Such a prop-
+erty might be desirable for models aiding consequential decision-
+making as it guarantees good performance under the worst possible
+target distribution. In other words, the solution to (2) will perform
+well for any target distribution we may encounter, as long as the
+distribution adheres to the stated assumptions.
+Denote the set of continuous functions which satisfy the fairness
+constraints G with respect to the distribution 𝑃 by
+F (G, 𝑃) := {𝑓 ∈ C0 : G(𝑓 , 𝑃) ≤ 𝝐},
+where C0 denotes the set of all continuous functions. Let P denote
+the distributions over (X, 𝐴,𝑌 ) that satisfy Assumptions 1 and 2
+for some features S. Then, the set F (G, 𝑃) is the same for any
+distribution 𝑃 ∈ P.
+Lemma 1. F (𝐺, 𝑃) = F (𝐺,𝑄), ∀ 𝑃,𝑄 ∈ P
+By Assumption 2, if G(𝑓 ,𝑄) holds then G(𝑓 , 𝑃) also holds. Thus,
+the two sets are the same. Therefore, we can denote the set of fair
+functions by F (G,P).
+For the next result, we will restrict to three fairness definitions
+(DP, TPR, or TNR) and assume that the conditional outcome, i.e. the
+random variable 𝑃 (𝑌 = 1|X, 𝐴,𝐶 = 1), has strictly positive density
+on [0, 1]. This technical condition allows us to characterize the
+optimal predictors in F (G,P), following Corbett-Davies et al. [11].
+Theorem 1 (Worst-case optimality). Consider the set of dis-
+tributions P satisfying Assumptions 1 and 2 which are absolutely
+7
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Singh, et al.
+Algorithm 1 Fair domain adaptation via reduction to standard fair
+learning
+Input Joint causal graph G, source dataDsource, fairness metric
+Output Classifier 𝑓 ∗
+target
+(S) or No_solution
+Initialize 𝑅
+val
+← {}.
+for S ⊆ {X, 𝐴} do
+Solve min𝑓 ∈F(S)𝑃source (𝑓 (S) ≠ 𝑌 ) and compute error 𝑅
+val(S)
+on validation set
+𝑅
+val
+← {𝑅
+val
+, 𝑅
+val(S) }
+end for
+Sort 𝑅
+val
+in increasing order
+Traverse 𝑅
+val
+and select S satisfying Assumptions 1 and 2, say
+S∗, by checking for d-separation in graph G
+if S∗ exists then
+Solve Fair DA problem (2) with features S∗ and return output
+else
+return No_solution
+end if
+continuous with respect to the same product measure, and a set of
+fair functions F (G,P) satisfying either DP, TPR, or TNR. Assume
+that the conditional outcome has strictly positive density. Then, the
+proposed classifier ˜𝑓 ∗ satisfies
+˜𝑓 ∗ ∈ argmin
+𝑓 ∈F(G,P)
+sup
+𝑃 ∈P
+𝑃 (𝑓 (X, 𝐴) ≠ 𝑌 ) (3)
+That is, the proposed approach achieves minimum worst-case
+error amongst the fair predictors with respect to the distributions
+satisfying the two assumptions. We note that the assumption of
+absolute continuity in Theorem 1 is made to avoid cases where
+source and target distributions have disjoint support, which would
+make generalization challenging if some parts of the feature space
+are not observed at all in the source domain.
+5.3 Practicality of assumptions
+Assumptions 1 and 2 together describe the types of shifts that our ap-
+proach can address. Graphically, these are characterized as (a) shifts
+with causal paths to 𝑌 which all include 𝐴 (i.e. 𝐶 · · · →𝐴→ · · ·𝑌
+with all arrows toward 𝑌 ), and (b) shifts with non-causal paths
+to 𝑌 (i.e. 𝐶 · · · →𝑀← · · ·𝑌 for some feature 𝑀 ∈ S). This means
+that any shift causing change in the distribution of the sensitive
+attribute as well as any shift in variables with a non-causal path
+to 𝑌 can be addressed. Figure 2 gives an example of both the cases
+(described in more detail in Appendix F). Shifts in distribution of
+sensitive attribute are common when there is sample selection bias
+e.g. patient demographics being different between rural and urban
+hospitals. In Section 6.4, we demonstrate a general class of shifts in
+medical diagnosis tasks where both the assumptions are satisfied.
+Finally, we note that the assumptions (barring those for DP) are
+untestable without access to labelled target data. The reason for
+untestability is the same as that for no unmeasured confounding –
+we do not observe the (counterfactual) target data, and hence cannot
+test for conditional independence. Thus, background knowledge of
+plausible shifts are critical.
+5.4 Proposed algorithm
+The approach described in (2) suggests a simple algorithm based
+on feature selection followed by solving the standard fair learn-
+ing problem. We assume that the following are given – a causal
+graph for the system of interest G and data from a source domain
+Dsource = {(X𝑖 , 𝐴𝑖 , 𝑌𝑖 )}𝑛𝑖=1. The steps, outlined in Algorithm 1, are
+as follows. (a) Iterate over all feature subsets to rank them in in-
+creasing order of their empirical error on the source domain. (b)
+Starting from the feature set with the least error, check for As-
+sumptions 1 and 2 using 𝑑-separation [45] in G. (c) Solve the fair
+learning problem with Dsource limited to model class F (S). This
+can be achieved by a fair learning algorithm, such as [1], chosen
+based on the model class and the fairness definition. If there is no S
+satisfying the assumptions, we do not return a solution.
+The time complexity is dominated by the search over feature
+subsets in (a) which is exponential in number of features. To reduce
+the combinatorial search, we can run a feature selection procedure,
+e.g. the lasso in case of linear models [23, Chapter 3], to prune
+non-predictive features. Another heuristic is to start with the set of
+causal parents of Y (which satisfy Assumption 1) and prune it to
+get a subset satisfying Assumption 2.
+5.5 Extension to Counterfactual Fairness
+Another set of fairness definitions based on the causal effect of the
+sensitive attribute on the prediction have been proposed [28, 29, 39].
+We consider one version of these counterfactual fairness definitions.
+Definition 5.1. (Ctf) [29] A classifier 𝑌 = 𝑓 (X, 𝐴) is said to
+be counterfactually fair if the counterfactual distribution of 𝑌 con-
+ditioned on all observed values is the same under 𝑑𝑜 (𝐴 = a) and
+𝑑𝑜 (𝐴 = d), i.e. 𝑃 (𝑌𝑑𝑜 (𝐴=a) = 𝑦 |X = x, 𝐴 = 𝑖) = 𝑃 (𝑌𝑑𝑜 (𝐴=d) = 𝑦 |X =
+x, 𝐴 = 𝑖), for 𝑦 ∈ {0, 1} and 𝑖 ∈ {a, d}.
+One method to build a classifier 𝑓 (S) satisfying Ctf is to only
+use feature set S ∈ {X, 𝐴} that does not contain any descendant of
+𝐴 in the causal graph [29, Lemma 1].
+Thus, the counterpart of Assumption 2 for solving Fair DA under
+Ctf is that the selected feature set contains the non-descendants of
+𝐴. Combined with Assumption 1, we select non-descendants of 𝐴
+which form a separating set in order to solve Fair DA. Since, Ctf
+only requires change in feature subset and does not include any
+fairness constraints in the fair learning problem, we can show the
+worst-case optimality result as well (described in Appendix E).
+However, we note that there are multiple ways of defining coun-
+terfactual fairness. For instance, [39] require that causal effects of
+𝐴 on 𝑌 through particular paths should be zero or small. Further
+work should explore approaches to solve Fair DA under broader
+definitions of counterfactual fairness.
+6 EXPERIMENTS
+The experiment settings explained next are designed to evaluate per-
+formance (accuracy and fairness) of the proposed classifier, trained
+using a source dataset, on unseen target datasets. The constrained
+learning problem in (2) is solved using the algorithm by [1], re-
+ferred henceforth as FairLearn, which converts the problem into a
+sequence of weighted cost-sensitive classification problems. Predic-
+tive performance is measured using accuracy (percentage correct),
+8
+Fairness Violations and Mitigation under Covariate Shift FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+𝐴 ∼ Bernoulli (𝜎 (𝛾 · _1 ·𝐶 + 𝑢1))
+𝑅 ∼ N(0, 1) + _2 · 𝐴 + 𝑢2
+𝑌 ∼ Bernoulli (𝜎 (_3 · 𝐴 + _4 · 𝑅 + 𝑢3))
+𝑇 = _5 · 𝑌 + _6 · 𝑅 + _7 · 𝐴 + N(0, 𝛾 · _8 ·𝐶) + 𝑢4
+𝑢1, 𝑢2, 𝑢3 ∼ N(0, 0.82), 𝑢4 ∼ N(0, 1.0)
+(_1, _2, _3, _4) = (0.2,−0.1,−0.8, 0.8)
+(_5, _6, _7, _8) = (0.8, 0.1,−0.8, 0.2)
+𝛾 ∈ [0, 15]
+𝜎 (𝑥) = 1/(1 + exp(−𝑥))
+(a) Data generating process.
+0.6 0.8 1.0
+Accuracy on Target Data
+0.0
+0.2
+0.4
+0.6
+Fa
+irn
+es
+s V
+io
+l. 
+on
+ T
+ar
+ge
+t D
+at
+a Standard
+CausalDA
+OTDA
+Standard+FairLearn
+CausalDA+FairLearn
+(b) High shift magnitude, 𝛾 = 15.
+0.6 0.8 1.0
+Accuracy on Target Data
+0.0
+0.2
+0.4
+0.6
+Fa
+irn
+es
+s V
+io
+l. 
+on
+ T
+ar
+ge
+t D
+at
+a Standard
+CausalDA
+OTDA
+Standard+FairLearn
+CausalDA+FairLearn
+(c) Low shift magnitude, 𝛾 = 1.67.
+Figure 3: (a) Data for the domains with shift governed by 𝛾 , highlighted in red. (b,c) Accuracy and fairness metrics on synthetic
+data example with different magnitude of shifts. Median values are reported over 50 runs and error bars show first and third
+quartiles. Proposed approach CausalDA+FairLearn is both accurate and fair under large shifts.
+area under ROC and precision-recall curves (AUPRC). For the exper-
+iments presented here, we use EO as the desired fairness constraint.
+To evaluate (un)fairness, we report themaximumviolation of the EO
+constraint, i.e. max𝑌 ∈{0,1},𝐴∈{a,d}
+𝑃 (𝑓 (S) | 𝑌,𝐴) − 𝑃 (𝑓 (S) | 𝑌 ).
+6.1 Baselines.
+We consider five baselines which account for either distribution
+shift, unfairness, both, or none of these.
+• Standard is the optimal un-constrained classifier with all
+available features, i.e. 𝑓 (V \ 𝑌 ).
+• CausalDA is the classifier with the separating set, i.e. 𝑓 (S)
+s.t. 𝐶 ⊥ 𝑌 | S.
+• OTDA is an optimal transport-based method for unsupervised
+domain adaptation [14].
+• Standard+FairLearn is 𝑓 (V \ 𝑌 ) trained with FairLearn.
+• Finally, CausalDA+FairLearn is the proposed method i.e.
+𝑓 (S) trained with FairLearn where S satisfies Assumptions
+1 and 2.
+Results on another method, anchor regression [56], are included in
+Appendix H. Since this method requires data from multiple sources,
+we evaluate it against the above methods in a separate experiment
+setting. Hyperparameters used for the methods are reported in
+Appendix I. Code for reproducing results on synthetic data is at
+https://github.com/ChunaraLab/fair_domain_adaptation.
+6.2 Synthetic data example
+Setup. For the flu example in Figure 1a, we generate data from a
+structural equation model described in Figure 3a with linear rela-
+tionships and logit link function for binary variables. To generate
+target domains, we perform soft interventions [35] to shift distribu-
+tions of 𝐴 and 𝑇 . The shift magnitude is governed by a multiplier
+𝛾 in the linear equations. In total, 50 pairs of source and target
+datasets are simulated with 𝑁 = 2000 samples in each dataset. The
+proportion of disadvantaged group in source is kept at roughly
+0.5. In target domains with an extreme value for 𝛾 = 15, the ratio
+shifts to roughly 0.94. Class ratio is varied from 0.5 to 0.36 with
+increase in 𝛾 . From Figure 1a, we observe that S={𝐴, 𝑅} satisfies
+the two assumptions. Adding𝑇 (a collider) to Smakes the predictor
+dependent on𝐶 and, thus, unstable. We use logistic regression mod-
+els in all experiments. In Figure 3b, the goal is to find a classifier
+performing well on both accuracy and fairness, i.e. one close to the
+right-hand bottom corner.
+Results. For a high magnitude of shift, Figure 3b, domain adap-
+tation (CausalDA) leads to considerably higher accuracy than using
+all features (Standard), but results in high unfairness. Learning
+with fairness constraints (CausalDA+FairLearn) which results in
+low unfairness with a minimal loss in accuracy even when the do-
+mains differ significantly. As seen in Figure 3c, for low magnitudes
+of shift, CausalDA+FairLearn still has low unfairness but results
+in a pessimistic accuracy estimate as it accounts for larger shifts
+than are seen in the target domain. Thus, in practice, the choice of
+method will depend on the expected magnitude of shift.
+6.3 Synthetic data example: additional results
+Varying magnitude of shift. To check robustness of different
+models to distribution shift, we generate target datasets with dif-
+ferent values of 𝛾 in the linear structural equations in Section 6.1.
+Figure 5 (a,b,c), included at the end, shows two predictive perfor-
+mance metrics – Accuracy (percentage correct), AUROC – and one
+fairness metric – maximum fairness violation – for different mag-
+nitudes of shift. We observe the same trends as reported in Section
+6.1, i.e. CausalDA (orange curve) achieves stable predictive perfor-
+mance but leads to high unfairness, whereas CausalDA+FairLearn
+(red curve) achieves both stable predictive performance and low
+unfairness.
+Results with demographic parity. Figure 5 (d,e,f) report re-
+sults on the synthetic example with demographic parity (DP) as
+the fairness constraint instead of EO. In case of DP, the fairness
+violation is quantified as |𝑃 (𝑓 (S) | 𝐴 = 𝑎) − 𝑃 (𝑓 (S) | 𝐴 = 𝑑)
+
+. We
+observe similar trends as compared to the plots for EO.
+9
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Singh, et al.
+𝐶1
+𝐷
+𝑌
+𝑋
+𝑀
+𝐶2
+(a) Graph for AKI diagnosis.
+D
+Demography
+(age, sex (A), race)
+Y AKI diagnosis
+M Comorbidities
+X
+Lab tests & Vitals
+(including BUN)
+𝐶1,𝐶2 Context variables
+(b) Variable descriptions
+0.55 0.60 0.65 0.70
+AUPRC on Target Data
+0.00
+0.02
+0.04
+0.06
+0.08
+0.10
+Fa
+irn
+es
+s V
+io
+l. 
+on
+ T
+ar
+ge
+t D
+at
+a
+Standard
+CausalDA
+Standard+FairLearn
+CausalDA+FairLearn
+(c) AUPRC. Class ratio is 0.21
+Figure 4: (a) Postulated causal graph for AKI. Bi-directed edge denotes unmeasured confounding between disease outcome and
+lab test values due to unobserved common causes. (b) Legend for variables in the graph. (c) Accuracy and fairness metrics for
+AKI data. Median values are reported over 50 runs and error bars show first and third quartiles. Proposed approach improves
+fairness with small loss in accuracy, even on shifted target data.
+6.4 Case study: diagnosing Acute Kidney Injury
+Acute Kidney Injury (AKI) is a condition characterized by an acute
+decline in renal function, affecting 7-18% of hospitalized patients
+and more than 50% of patients in the intensive care unit (ICU) [8].
+The condition can develop over a few hours to days and early predic-
+tion can greatly reduce the fatalities associated with the condition.
+Hence, building models for predicting AKI risk from clinical data is
+an active area of research. Such models can be used to risk-stratify
+patients to screen them for close monitoring or to perform further
+diagnostics to guide course of treatment [24]. Importantly, AKI in-
+cidence has well-documented disparities across groups defined by
+race and sex [19, 20]. Thus, introduction of risk prediction tools for
+guiding clinical care has a potential to perpetuate such disparities,
+or alternatively, to address them through a more deliberate design
+of the prediction tools. A recent study [64] showed good predictive
+performance for AKI based on patient data provided by the U.S.
+Department of Veteran Affairs. However, the female population
+was severely underrepresented in the data, which raises concern
+over differential error rates when deployed in a different popula-
+tion. Therefore, to analyze the fairness across sensitive groups, we
+conduct experiments on MIMIC III, a publicly-available critical care
+dataset [26]. We extract variable types, mentioned in caption of Fig-
+ure 3, for around 24𝐾 patients. Pre-processing steps are described in
+Appendix I. We use a simplified causal graph for the AKI diagnosis
+task, Figure 4a, based on the one used by [60] for a sepsis diagnosis
+task. The group sex=female is taken as the sensitive attribute to
+assess fairness of the predictions. In this case study, the AKI risk
+score is not intended to prescribe treatment, but to flag a patient for
+extra care resources e.g. by alerting clinical staff. Thus, the potential
+harm that we want to avoid is groups having unequal opportunity
+to such care resulting from group differences in prediction errors.
+Setup. Patient encounters are randomly split (2:1) into source
+and target data. We artificially introduce two types of shifts – (a)
+change in female proportion, and (b) change in measurement pol-
+icy, where a lab test is prescribed less often – some of the factors
+affecting model performance across clinical settings [54]. We ran-
+domly downsample female population by rejecting each row in the
+source data from that group with probability 50%. This shifts the
+proportion of females from 40% to 25%. Also, we randomly choose
+50% encounters in the target data and add missing values for the
+Blood Urea Nitrogen (BUN) test, a biomarker of AKI [16]. Results
+with other missingness proportions are included in Appendix I.
+From Figure 4a, we note that S={D,M,X\BUN} satisfies the two
+assumptions. We report AUPRC in Figure 4c, instead of accuracy, as
+it is less sensitive to class imbalance (class ratio is 0.21). All results
+are reported for classifiers trained with gradient boosting trees.
+We drop OTDA from comparison due to its low accuracy and high
+running time for this dataset.
+Results. We find that classifiers with separating feature set
+perform significantly better in AUPRC compared to those with
+all features (exact numbers are reported in Appendix I). Further,
+CausalDA+FairLearn improves fairness in target domain, reduc-
+ing fairness violation by 47% with 0.8% decrease in AUPRC. Thus,
+the experiments provide preliminary evidence that our method
+can learn stable classifiers while being fair for a class of shifts in
+diagnosis tasks denoted by Figure 4a. Note that the setup has some
+limitations, namely, adding missing values to perturb target data
+conflates the effectiveness of the procedure for handling missing
+data (mean value imputation in our case) with the procedure for
+domain adaptation. We plan to validate the approach on datasets
+across multiple hospitals or time points to address these limitations.
+7 LIMITATIONS AND DISCUSSION
+Knowledge of causal graph. Our approach requires the causal
+graph for the system being studied to check whether the two as-
+sumptions are satisfied for any given subset. While this is a require-
+ment made by multiple domain adaptation methods [60, 62], this
+can be relaxed when data from multiple domains are available. In
+such settings, causal discovery methods [47] can be used to posit
+a graph and validate with domain experts. Such a procedure is
+demonstrated in [61]. An important direction for future work in-
+cludes identifying the desired feature subsets with causal discovery
+algorithms. We recommend that the causal graph be postulated
+conservatively, i.e. only adding conditional independencies that
+are well-substantiated by domain knowledge. In this case, if the
+separating features are not found, our method will output that a fair
+10
+Fairness Violations and Mitigation under Covariate Shift FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+predictor is not possible instead of incorrectly returning a model
+that will not be fair.
+Addressable shifts. In Section 5.3, we described shifts that our
+approach can address and presented examples. However, these are
+only a part of the possible shifts that a modeller may worry about.
+For example, shifts in direct causes of the outcome are excluded
+due to Assumption 2. Such shifts can result in arbitrary changes to
+the outcome within each group, making it impossible to balance
+group-specific statistics in the fairness constraint (see Appendix
+A for an example). These are difficult to address without making
+strict assumptions on magnitude of the shift or assuming access to
+target data. Thus, for some joint causal graphs, Algorithm 1 might
+not yield any feature set. In such cases, an alternative is to return
+the set with the least source domain risk but such a set has no
+generalization guarantee.
+Algorithmic fairness in healthcare to promote health eq-
+uity. Disparities in health outcomes and healthcare access across
+different groups (e.g. based on race and gender) arise from multiple
+reasons such as socio-economic inequities (e.g. due to structural
+racism) [50] and clinician bias [43]. Such disparities can result in
+differential model performance across groups as Obermeyer et al.
+[42] finds in context of a model for identifying patients who need
+extra care resources. Left unaddressed, allocating resources using
+‘biased’ models may worsen health disparities. As a consequence, a
+growing body of work aims to develop algorithms embodying fair-
+ness principles specific to healthcare [9]. This includes constraining
+prediction errors across groups for the tasks of predicting risk of
+cardiovascular events [48] or predicting healthcare costs [69]. How-
+ever, such group-level fairness constraints, including the ones we
+consider, may not match ethical desiderata in all possible health-
+care settings. Some alternative constraints have been defined, for
+example, using counterfactuals [49] or preference between group
+or aggregate-level models [65]. We plan to investigate fair domain
+adaptation under broader notions of fairness. We have motivated
+the approach on healthcare tasks due to the importance of ensur-
+ing reliable model performance under distribution shifts in this
+domain. We note that the approach is more broadly applicable to
+other domains involving high-stakes decisions.
+8 CONCLUSION AND FUTUREWORK
+In absence of data from new environments in which a machine
+learning model will be deployed, giving performance guarantees
+regarding predictive performance and fairness is challenging. We
+find that methods to address distribution shift, while controlling for
+decay in accuracy, can result in fairness violations. As a counter-
+measure, we show that it is possible to obtain accurate and fair
+predictors for widely-studied fairness definitions and under a large
+class of shifts particularly prevalent in healthcare tasks. Future
+work includes studying fair domain adaptation under parametric
+assumptions on shifts, adaptation for counterfactual definitions of
+fairness, and finite sample properties of the estimators. We hope
+that the problem setup presented here will enable further work at
+the intersection of fairness and causal inference.
+ACKNOWLEDGMENTS
+We acknowledge funding from the NSF grant number 1845487.
+HS would like to thank Sreyas Mohan, Kunal Relia, Margarita Bo-
+yarskaya and Nabeel Abdur Rehman for helpful discussions.
+REFERENCES
+[1] Alekh Agarwal, Alina Beygelzimer, Miroslav Dudik, John Langford, and Hanna
+Wallach. 2018. A Reductions Approach to Fair Classification. In International
+Conference on Machine Learning. 60–69.
+[2] Martin Arjovsky, Léon Bottou, Ishaan Gulrajani, and David Lopez-Paz. 2019.
+Invariant risk minimization. arXiv preprint arXiv:1907.02893 (2019).
+[3] Shai Ben-David, John Blitzer, Koby Crammer, Alex Kulesza, Fernando Pereira, and
+Jennifer Wortman Vaughan. 2010. A theory of learning from different domains.
+Machine learning 79, 1-2 (2010), 151–175.
+[4] Shai Ben-David, Tyler Lu, Teresa Luu, and Dávid Pál. 2010. Impossibility theorems
+for domain adaptation. In International Conference on Artificial Intelligence and
+Statistics. 129–136.
+[5] Steffen Bickel, Michael Brückner, and Tobias Scheffer. 2007. Discriminative
+learning for differing training and test distributions. In Proceedings of the 24th
+international conference on Machine learning. 81–88.
+[6] Avrim Blum and Kevin Stangl. 2020. Recovering from Biased Data: Can Fairness
+Constraints Improve Accuracy?. In 1st Symposium on Foundations of Responsible
+Computing (FORC 2020). Schloss Dagstuhl-Leibniz-Zentrum für Informatik.
+[7] Toon Calders, Faisal Kamiran, and Mykola Pechenizkiy. 2009. Building classifiers
+with independency constraints. In 2009 IEEE International Conference on Data
+Mining Workshops. IEEE, 13–18.
+[8] Lakhmir S Chawla, Rinaldo Bellomo, Azra Bihorac, Stuart L Goldstein, Edward D
+Siew, Sean M Bagshaw, David Bittleman, Dinna Cruz, Zoltan Endre, Robert L
+Fitzgerald, et al. 2017. Acute kidney disease and renal recovery: consensus report
+of the Acute Disease Quality Initiative (ADQI) 16 Workgroup. Nature Reviews
+Nephrology 13, 4 (2017), 241.
+[9] Irene Y. Chen, Emma Pierson, Sherri Rose, Shalmali Joshi, Kadija Ferryman, and
+Marzyeh Ghassemi. 2021. Ethical Machine Learning in Health Care. To appear in
+Annual Review of Biomedical Data Science (2021). arXiv:2009.10576
+[10] Silvia Chiappa. 2019. Path-specific counterfactual fairness. In Proceedings of the
+AAAI Conference on Artificial Intelligence, Vol. 33. 7801–7808.
+[11] Sam Corbett-Davies, Emma Pierson, Avi Feller, Sharad Goel, and Aziz Huq. 2017.
+Algorithmic decision making and the cost of fairness. In Proceedings of the 23rd
+ACM SIGKDD International Conference on Knowledge Discovery and Data Mining.
+797–806.
+[12] Amanda Coston, Karthikeyan Natesan Ramamurthy, Dennis Wei, Kush R Varsh-
+ney, Skyler Speakman, Zairah Mustahsan, and Supriyo Chakraborty. 2019. Fair
+transfer learning with missing protected attributes. In Proceedings of the 2019
+AAAI/ACM Conference on AI, Ethics, and Society. 91–98.
+[13] Andrew Cotter, Maya Gupta, Heinrich Jiang, Nathan Srebro, Karthik Sridha-
+ran, Serena Wang, Blake Woodworth, and Seungil You. 2019. Training Well-
+Generalizing Classifiers for Fairness Metrics and Other Data-Dependent Con-
+straints. In International Conference on Machine Learning. 1397–1405.
+[14] Nicolas Courty, Rémi Flamary, Devis Tuia, and Alain Rakotomamonjy. 2016.
+Optimal transport for domain adaptation. IEEE transactions on pattern analysis
+and machine intelligence 39, 9 (2016), 1853–1865.
+[15] Michele Donini, Luca Oneto, Shai Ben-David, John S Shawe-Taylor, and Massim-
+iliano Pontil. 2018. Empirical risk minimization under fairness constraints. In
+Advances in Neural Information Processing Systems. 2791–2801.
+[16] Charles L Edelstein. 2008. Biomarkers of Acute Kidney Injury. Advances in
+Chronic Kidney Disease 3, 15 (2008), 222–234.
+[17] Sorelle A Friedler, Carlos Scheidegger, Suresh Venkatasubramanian, Sonam
+Choudhary, Evan P Hamilton, and Derek Roth. 2019. A comparative study
+of fairness-enhancing interventions in machine learning. In Proceedings of the
+Conference on Fairness, Accountability, and Transparency. 329–338.
+[18] Yaroslav Ganin, Evgeniya Ustinova, Hana Ajakan, Pascal Germain, Hugo
+Larochelle, François Laviolette, Mario Marchand, and Victor Lempitsky. 2016.
+Domain-adversarial training of neural networks. The Journal of Machine Learning
+Research 17, 1 (2016), 2096–2030.
+[19] Morgan E Grams, Kunihiro Matsushita, Yingying Sang, Michelle M Estrella,
+Meredith C Foster, Adrienne Tin, WH Linda Kao, and Josef Coresh. 2014. Ex-
+plaining the racial difference in AKI incidence. Journal of the American Society of
+Nephrology 25, 8 (2014), 1834–1841.
+[20] Morgan E Grams, Yingying Sang, Shoshana H Ballew, Ron T Gansevoort, Heejin
+Kimm, Csaba P Kovesdy, David Naimark, Cecilia Oien, David H Smith, Josef
+Coresh, et al. 2015. A meta-analysis of the association of estimated GFR, albu-
+minuria, age, race, and sex with acute kidney injury. American Journal of Kidney
+Diseases 66, 4 (2015), 591–601.
+[21] Moritz Hardt, NimrodMegiddo, Christos Papadimitriou, andMaryWootters. 2016.
+Strategic classification. In Proceedings of the 2016 ACM conference on innovations
+11
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Singh, et al.
+0 5 10 15
+Magnitude of Shift
+0.5
+0.6
+0.7
+0.8
+0.9
+Ac
+cu
+ra
+cy
+ o
+n 
+Ta
+rg
+et
+ D
+at
+a Standard
+CausalDA
+OTDA
+Standard+FairLearn
+CausalDA+FairLearn
+(a) Accuracy vs Shift.
+0 5 10 15
+Magnitude of Shift
+0.5
+0.6
+0.7
+0.8
+0.9
+1.0
+AU
+RO
+C 
+on
+ T
+ar
+ge
+t D
+at
+a
+Standard
+CausalDA
+OTDA
+Standard+FairLearn
+CausalDA+FairLearn
+(b) AUROC vs Shift.
+0 5 10 15
+Magnitude of Shift
+0.0
+0.2
+0.4
+0.6
+Fa
+irn
+es
+s V
+io
+l. 
+on
+ T
+ar
+ge
+t D
+at
+a Standard
+CausalDA
+OTDA
+Standard+FairLearn
+CausalDA+FairLearn
+(c) Fairness Violation vs Shift.
+0 5 10 15
+Magnitude of Shift
+0.5
+0.6
+0.7
+0.8
+0.9
+Ac
+cu
+ra
+cy
+ o
+n 
+Ta
+rg
+et
+ D
+at
+a Standard
+CausalDA
+OTDA
+Standard+FairLearn
+CausalDA+FairLearn
+(d) Accuracy vs Shift.
+0 5 10 15
+Magnitude of Shift
+0.5
+0.6
+0.7
+0.8
+0.9
+1.0
+AU
+RO
+C 
+on
+ T
+ar
+ge
+t D
+at
+a
+Standard
+CausalDA
+OTDA
+Standard+FairLearn
+CausalDA+FairLearn
+(e) AUROC vs Shift.
+0 5 10 15
+Magnitude of Shift
+0.0
+0.2
+0.4
+0.6
+Fa
+irn
+es
+s V
+io
+l. 
+on
+ T
+ar
+ge
+t D
+at
+a Standard
+CausalDA
+OTDA
+Standard+FairLearn
+CausalDA+FairLearn
+(f) Fairness Violation vs Shift.
+Figure 5: Accuracy, AUROC, and Fairness violation with varying magnitude of shifts for synthetic data. (a,b,c) With equalized
+odds (EO) as the fairness constraint. (d,e,f)With demographic parity (DP) as the fairness constraint.Median values are reported
+over 50 runs and error bars showfirst and third quartiles. Performance of the proposed approach is stable across different shifts
+and for the two fairness metrics.
+in theoretical computer science. 111–122.
+[22] Moritz Hardt, Eric Price, Nati Srebro, et al. 2016. Equality of opportunity in
+supervised learning. In Advances in neural information processing systems. 3315–
+3323.
+[23] Trevor Hastie, Robert Tibshirani, Jerome Friedman, and James Franklin. 2005.
+The elements of statistical learning: data mining, inference and prediction. The
+Mathematical Intelligencer 27, 2 (2005), 83–85.
+[24] Luke E Hodgson, Nicholas Selby, Tao-Min Huang, and Lui G Forni. 2019. The
+role of risk prediction models in prevention and management of AKI. In Seminars
+in nephrology, Vol. 39. Elsevier, 421–430.
+[25] Lingxiao Huang and Nisheeth Vishnoi. 2019. Stable and Fair Classification. In
+International Conference on Machine Learning. 2879–2890.
+[26] Alistair EW Johnson, Tom J Pollard, Lu Shen, H Lehman Li-wei, Mengling Feng,
+Mohammad Ghassemi, Benjamin Moody, Peter Szolovits, Leo Anthony Celi, and
+Roger GMark. 2016. MIMIC-III, a freely accessible critical care database. Scientific
+data 3 (2016), 160035.
+[27] Nathan Kallus and Angela Zhou. 2018. Residual Unfairness in Fair Machine
+Learning from Prejudiced Data. In Proceedings of the 35th International Conference
+on Machine Learning.
+[28] Niki Kilbertus, Mateo Rojas Carulla, Giambattista Parascandolo, Moritz Hardt,
+Dominik Janzing, and Bernhard Schölkopf. 2017. Avoiding discrimination through
+causal reasoning. In Advances in Neural Information Processing Systems. 656–666.
+[29] Matt J Kusner, Joshua Loftus, Chris Russell, and Ricardo Silva. 2017. Counterfac-
+tual fairness. In Advances in Neural Information Processing Systems. 4066–4076.
+[30] Lydia T Liu, Sarah Dean, Esther Rolf, Max Simchowitz, and Moritz Hardt. 2019.
+Delayed impact of fair machine learning. In Proceedings of the 28th International
+Joint Conference on Artificial Intelligence. AAAI Press, 6196–6200.
+[31] Kristian Lum and William Isaac. 2016. To predict and serve? Significance 13, 5
+(2016), 14–19.
+[32] David Madras, Elliot Creager, Toniann Pitassi, and Richard Zemel. 2018. Learning
+Adversarially Fair and Transferable Representations. In International Conference
+on Machine Learning. 3381–3390.
+[33] Sara Magliacane, Thijs van Ommen, Tom Claassen, Stephan Bongers, Philip
+Versteeg, and Joris M Mooij. 2018. Domain adaptation by using causal inference
+to predict invariant conditional distributions. In Advances in Neural Information
+Processing Systems. 10846–10856.
+[34] Debmalya Mandal, Samuel Deng, Suman Jana, and Daniel Hsu. 2020. Ensuring
+fairness beyond the training data. Advances in neural information processing
+systems (2020).
+[35] Florian Markowetz, Steffen Grossmann, and Rainer Spang. 2005. Probabilistic
+soft interventions in conditional Gaussian networks. In Tenth International Work-
+shop on Artificial Intelligence and Statistics. Society for Artificial Intelligence and
+Statistics, 214–221.
+[36] Vishwali Mhasawade, Nabeel Abdur Rehman, and Rumi Chunara. 2020.
+Population-aware hierarchical bayesian domain adaptation via multi-component
+invariant learning. In Proceedings of the ACM Conference on Health, Inference, and
+Learning. 182–192.
+[37] Shira Mitchell, Eric Potash, Solon Barocas, Alexander D’Amour, and Kristian
+Lum. 2018. Prediction-based decisions and fairness: A catalogue of choices,
+assumptions, and definitions. arXiv preprint arXiv:1811.07867 (2018).
+[38] Joris M. Mooij, Sara Magliacane, and Tom Claassen. 2020. Joint Causal Inference
+from Multiple Contexts. Journal of Machine Learning Research 21, 99 (2020),
+1–108. http://jmlr.org/papers/v21/17-123.html
+[39] Razieh Nabi and Ilya Shpitser. 2018. Fair inference on outcomes. In Thirty-Second
+AAAI Conference on Artificial Intelligence.
+[40] Arvind Narayanan. 2018. Translation tutorial: 21 fairness definitions and their
+politics. In Proc. Conf. Fairness Accountability Transp., New York, USA, Vol. 1170.
+[41] Bret Nestor,MatthewMcDermott,Willie Boag, Gabriela Berner, TristanNaumann,
+Michael C Hughes, Anna Goldenberg, and Marzyeh Ghassemi. 2019. Feature
+robustness in non-stationary health records: caveats to deployable model perfor-
+mance in common clinical machine learning tasks. arXiv preprint arXiv:1908.00690
+(2019).
+[42] Ziad Obermeyer, Brian Powers, Christine Vogeli, and Sendhil Mullainathan. 2019.
+Dissecting racial bias in an algorithm used to manage the health of populations.
+Science 366, 6464 (2019), 447–453.
+[43] Institute of Medicine. 2003. Unequal Treatment: Confronting Racial and Ethnic
+Disparities in Health Care. The National Academies Press, Washington, DC.
+https://doi.org/10.17226/12875
+[44] Luca Oneto, Michele Donini, Andreas Maurer, and Massimiliano Pontil. 2019.
+Learning fair and transferable representations. arXiv preprint arXiv:1906.10673
+12
+Fairness Violations and Mitigation under Covariate Shift FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+(2019).
+[45] Judea Pearl. 2009. Causality. Cambridge university press.
+[46] Judea Pearl and Elias Bareinboim. 2011. Transportability of causal and statisti-
+cal relations: A formal approach. In Twenty-Fifth AAAI Conference on Artificial
+Intelligence.
+[47] Jonas Peters, Peter Bühlmann, and Nicolai Meinshausen. 2016. Causal inference
+by using invariant prediction: identification and confidence intervals. Journal
+of the Royal Statistical Society: Series B (Statistical Methodology) 78, 5 (2016),
+947–1012.
+[48] Stephen Pfohl, Ben Marafino, Adrien Coulet, Fatima Rodriguez, Latha Palaniap-
+pan, and NigamH. Shah. 2019. Creating Fair Models of Atherosclerotic Cardiovas-
+cular Disease Risk. In Proceedings of the 2019 AAAI/ACM Conference on AI, Ethics,
+and Society (Honolulu, HI, USA) (AIES ’19). Association for ComputingMachinery,
+New York, NY, USA, 271–278. https://doi.org/10.1145/3306618.3314278
+[49] Stephen R Pfohl, Tony Duan, Daisy Yi Ding, and Nigam H Shah. 2019. Coun-
+terfactual Reasoning for Fair Clinical Risk Prediction. In Machine Learning for
+Healthcare Conference. 325–358.
+[50] Jo C Phelan and Bruce G Link. 2015. Is racism a fundamental cause of inequalities
+in health? Annual Review of Sociology 41 (2015), 311–330.
+[51] Eduardo HP Pooch, Pedro L Ballester, and Rodrigo C Barros. 2019. Can we trust
+deep learning models diagnosis? The impact of domain shift in chest radiograph
+classification. arXiv preprint arXiv:1909.01940 (2019).
+[52] Joaquin Quionero-Candela, Masashi Sugiyama, Anton Schwaighofer, and Neil D
+Lawrence. 2009. Dataset shift in machine learning. The MIT Press.
+[53] Ashkan Rezaei, Anqi Liu, Omid Memarrast, and Brian Ziebart. 2020. Robust
+Fairness under Covariate Shift. arXiv preprint arXiv:2010.05166 (2020).
+[54] Richard D Riley, Joie Ensor, Kym IE Snell, Thomas PA Debray, Doug G Altman,
+Karel GM Moons, and Gary S Collins. 2016. External validation of clinical
+prediction models using big datasets from e-health records or IPD meta-analysis:
+opportunities and challenges. bmj 353 (2016), i3140.
+[55] Mateo Rojas-Carulla, Bernhard Schölkopf, Richard Turner, and Jonas Peters. 2018.
+Invariant models for causal transfer learning. The Journal of Machine Learning
+Research 19, 1 (2018), 1309–1342.
+[56] Dominik Rothenhäusler, Nicolai Meinshausen, Peter Bühlmann, and Jonas Peters.
+2018. Anchor regression: heterogeneous data meets causality. arXiv preprint
+arXiv:1801.06229 (2018).
+[57] Candice Schumann, Xuezhi Wang, Alex Beutel, Jilin Chen, Hai Qian, and Ed H
+Chi. 2019. Transfer of Machine Learning Fairness across Domains. arXiv preprint
+arXiv:1906.09688 (2019).
+[58] Hidetoshi Shimodaira. 2000. Improving predictive inference under covariate
+shift by weighting the log-likelihood function. Journal of statistical planning and
+inference 90, 2 (2000), 227–244.
+[59] Dylan Slack, Sorelle A Friedler, and Emile Givental. 2020. Fairness warnings
+and fair-MAML: learning fairly with minimal data. In Proceedings of the 2020
+Conference on Fairness, Accountability, and Transparency. 200–209.
+[60] Adarsh Subbaswamy and Suchi Saria. 2018. Counterfactual Normalization: Proac-
+tively Addressing Dataset Shift Using Causal Mechanisms.. In UAI. 947–957.
+[61] Adarsh Subbaswamy and Suchi Saria. 2020. I-SPEC: An End-to-End Framework
+for Learning Transportable, Shift-Stable Models. arXiv preprint arXiv:2002.08948
+(2020).
+[62] Adarsh Subbaswamy, Peter Schulam, and Suchi Saria. 2019. Preventing failures
+due to dataset shift: Learning predictive models that transport. In The 22nd
+International Conference on Artificial Intelligence and Statistics. 3118–3127.
+[63] Masashi Sugiyama, Shinichi Nakajima, Hisashi Kashima, Paul V Buenau, and
+Motoaki Kawanabe. 2008. Direct importance estimation with model selection and
+its application to covariate shift adaptation. In Advances in neural information
+processing systems. 1433–1440.
+[64] Nenad Tomašev, Xavier Glorot, Jack W Rae, Michal Zielinski, Harry Askham,
+Andre Saraiva, Anne Mottram, Clemens Meyer, Suman Ravuri, Ivan Protsyuk,
+et al. 2019. A clinically applicable approach to continuous prediction of future
+acute kidney injury. Nature 572, 7767 (2019), 116.
+[65] Berk Ustun, Yang Liu, and David Parkes. 2019. Fairness without Harm: Decou-
+pled Classifiers with Preference Guarantees. In Proceedings of the 36th Interna-
+tional Conference on Machine Learning (Proceedings of Machine Learning Research,
+Vol. 97), Kamalika Chaudhuri and Ruslan Salakhutdinov (Eds.). PMLR, Long Beach,
+California, USA, 6373–6382. http://proceedings.mlr.press/v97/ustun19a.html
+[66] Jenna Wiens, John Guttag, and Eric Horvitz. 2014. A study in transfer learning:
+leveraging data from multiple hospitals to enhance hospital-specific predictions.
+Journal of the American Medical Informatics Association 21, 4 (2014), 699–706.
+[67] Muhammad Bilal Zafar, Isabel Valera, Manuel Gomez-Rodriguez, and Krishna P
+Gummadi. 2019. Fairness Constraints: A Flexible Approach for Fair Classification.
+Journal of Machine Learning Research 20, 75 (2019), 1–42.
+[68] John R Zech, Marcus A Badgeley, Manway Liu, Anthony B Costa, Joseph J Titano,
+and Eric Karl Oermann. 2018. Variable generalization performance of a deep
+learning model to detect pneumonia in chest radiographs: A cross-sectional study.
+PLoS medicine 15, 11 (2018), e1002683.
+[69] Anna Zink and Sherri Rose. 2020. Fair regression for health care spending.
+Biometrics 76, 3 (2020), 973–982.
+13

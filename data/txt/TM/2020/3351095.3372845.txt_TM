@@ -1,0 +1,211 @@
+
+We present FlipTest, a black-box technique for uncovering discrimi-
+nation in classifiers. FlipTest is motivated by the intuitive question:
+had an individual been of a different protected status, would the model
+have treated them differently? Rather than relying on causal infor-
+mation to answer this question, FlipTest leverages optimal transport
+to match individuals in different protected groups, creating sim-
+ilar pairs of in-distribution samples. We show how to use these
+instances to detect discrimination by constructing a flipset: the
+set of individuals whose classifier output changes post-translation,
+which corresponds to the set of people who may be harmed because
+of their group membership. To shed light on why the model treats a
+given subgroup differently, FlipTest produces a transparency report:
+a ranking of features that are most associated with the model’s be-
+havior on the flipset. Evaluating the approach on three case studies,
+we show that this provides a computationally inexpensive way to
+identify subgroups that may be harmed by model discrimination,
+including in cases where the model satisfies group fairness criteria.
+CCS CONCEPTS
+• Computing methodologies→Machine learning; •Human-
+centered computing;
+KEYWORDS
+fairness, machine learning, optimal transport, disparate impact
+ACM Reference Format:
+Emily Black, Samuel Yeom, and Matt Fredrikson. 2020. FlipTest: Fairness
+Testing via Optimal Transport. In Conference on Fairness, Accountability,
+and Transparency (FAT* ’20), January 27–30, 2020, Barcelona, Spain. ACM,
+New York, NY, USA, 11 pages. https://doi.org/10.1145/3351095.3372845
+1 INTRODUCTION
+With the recent introduction of machine learning in sensitive ap-
+plications like predictive policing [17] and child welfare [40], the
+question of whether these algorithms can lead to unfair outcomes
+has gained widespread attention. These concerns are not merely
+hypothetical. Racial bias in the COMPAS recidivism prediction
+model [4] and gender bias in Amazon’s hiring model [11] suggest
+that discriminatory models can have wide-reaching harmful effects.
+∗
+The first two authors contributed equally to this research.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full
+citation on the first page. Copyrights for components of this work owned by others
+than the author(s) must be honored. Abstracting with credit is permitted. To copy
+otherwise, or republish, to post on servers or to redistribute to lists, requires prior
+specific permission and/or a fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 978-1-4503-6936-7/20/02. . . $15.00
+https://doi.org/10.1145/3351095.3372845
+A growing set of strategies have emerged for testing and detec-
+tion of such discriminatory behaviors. A common approach that ap-
+plies to group fairness criteria such as demographic parity [18] and
+equalized odds [22] is to measure aggregate statistics of the model’s
+behavior on a targeted population. For example, this approach was
+taken with the COMPAS system for recidivism prediction by mea-
+suring false positive and negative rates across Caucasian and minor-
+ity populations [17], and is supported by IBM’s AIF360 toolkit for
+assessing model fairness [7]. However, there are several potential
+issues with this approach [9, 27, 44], among which is that models
+can potentially “pass” such audits while still behaving unfairly to-
+wards individuals, or even targeted subgroups [31]. Additionally,
+while aggregate statistics can reveal broad patterns of potential dis-
+crimination, they do not reveal additional information that sheds
+light on the underlying discriminatory mechanism at play, which is
+crucial when assessing whether the behavior is truly problematic.
+Recent work [2, 19] instead searches for discrimination at the
+individual level, testing whether changes in the protected demo-
+graphic status of an individual can cause changes in model outcome.
+However, to change the protected demographic status of an individ-
+ual, these methods simply flip the value of the protected attribute
+(e.g., race or gender). While this can ensure that the model does not
+directly use the protected attribute to discriminate, it still allows
+the model to disproportionately harm a protected group by using
+features that are correlated with the protected attribute.
+The framework of counterfactual fairness by Kusner et al. [29]
+takes these correlations into account by assuming a causal gener-
+ative model for the relevant data. This approach has the advantage
+that instances of discrimination against individuals or small sub-
+groups cannot “fly under the radar”, and the causal generative
+model may lead to a more nuanced and granular understanding
+of how the model discriminates. However, the reliance on detailed
+causal information creates practical issues that may limit its appli-
+cability as well. Namely, it may not be feasible to assume access to a
+generative causal model in many applications, and if an inaccurate
+model is used, then the conclusions may be misleading. Moreover,
+the legal frameworks governing discrimination in many countries
+(e.g., disparate impact in the US [37] and indirect discrimination in
+the UK [32]) do not require a causal relationship with the protected
+status, so tests based on counterfactual fairness may fail to identify
+instances of legally actionable discrimination.
+In this paper we present FlipTest, a black-box, efficient, and inter-
+pretable fairness testing approach that is motivated by the following
+intuitive question: had an individual been of a different protected
+status, would the model have treated them differently? In contrast
+to aggregate testing methods, FlipTest reasons about the model’s
+behavior on individuals and subgroups to look for evidence of dis-
+crimination, and can thus uncover forms of discrimination to which
+group fairness measures are blind. However, unlike counterfactual
+fairness, FlipTest does not rely on causal information, and instead
+FAT* ’20, January 27–30, 2020, Barcelona, Spain Emily Black, Samuel Yeom, and Matt Fredrikson
+uses an optimal transport mapping [41] to answer the question
+above. Consequently, the goal of our test is not to demonstrate a
+causal link between the protected attribute and the model’s output,
+but to showcase salient patterns in a model’s behavior that may be
+indicative of discrimination. Importantly, this means that FlipTest
+is sensitive to both statistical and causal discrimination, and does
+not require strong causal assumptions about the data-generating
+process. Further, we show that the information computed in this
+process can provide insight into not just whether a model discrim-
+inates, but how it does and who is likely to be affected.
+Problem setting.We consider a setting where a machine learning
+system is being audited for discriminatory behaviors, either by
+well-intentioned stakeholders who may have been involved in the
+model’s construction, or by concerned practitioners outside of the
+development process. Ideally, the auditors include a domain expert
+who is familiar with the application and the subject population who
+will come into contact with the algorithm. We assume that these
+individuals and those responsible for training the model are not
+intentionally trying to evade a finding of discrimination.
+Optimal transport. FlipTest uses an optimal transport map [41] to
+construct instances that may reveal whether a model’s behavior is
+sensitive to changes in protected status. An optimal transport map
+transforms one probability distribution into another, while minimiz-
+ing a given cost defined over their respective supports. For example,
+we might use an optimal transport map from the distribution of
+men to women in order to obtain a (female, male) pair of inputs
+with which to query the model. If the model’s output differs for
+these two people, then it may be evidence that the model discrim-
+inates on the basis of gender. Using optimal transport to compare
+protected group outcomes is advantageous because it translates
+exactly from one distribution to another, generating inputs that
+are in the distribution of its image. When the image of an optimal
+map corresponds to a distribution that the model was trained on,
+the results will reflect characteristic model behavior that can be
+expected when the model is deployed. This is not necessarily true
+for other methods of generating alternate inputs on which to com-
+pare model outcomes, e.g. input influence measures [12]. Further,
+the mapping does not rely on causal information, and can reveal
+associative forms of discrimination that causal tests cannot while
+requiring fewer assumptions about that data.
+A key challenge with this approach lies in constructing the map-
+ping, which can be computationally demanding with large, high-
+dimensional datasets. In recent years there have been notable ad-
+vances in methods for efficiently approximating optimal transport
+maps [34], and FlipTest’s efficacy can benefit from ongoing work on
+this problem. In this paper, we present an approximation method
+based on generative adversarial networks (GANs) [20] (Section 3.1),
+and validate it by showing that it is feasible to construct good, stable
+approximations of known precise mappings (Section 5.1).
+Finding evidence of discrimination. Beyond examining model
+behavior on individual pairs, we show how the information pro-
+vided by the optimal transport map can be systematically evaluated
+for evidence of discrimination. In particular, we assume that the clas-
+sifier in question produces binary outputs, one of which is seen as
+a favorable outcome and the other as unfavorable. We consider two
+sets of individuals under the optimal map: those whose prediction
+changes from favorable to unfavorable, and vice versa. We call these
+flipsets, and look to the relative size of each flipset for signs of poten-
+tial discrimination; for example, we show how flipsets relate to well-
+known fairness criteria like demographic parity and equalized odds
+(Section 4). In addition, large flipsets can indicate subgroup-level
+discrimination that is not well described by these group fairness
+criteria (Section 5.3). By comparing the distribution of the flipsets
+to the distribution of the overall population, it is often possible to
+identify specific subgroups that the model discriminates against.
+To gain insight into how the model discriminates, we construct a
+transparency report that summarizes the most salient statistical dif-
+ferences in the features between the flipset individuals and their im-
+ages under the optimal transport mapping (Section 4.2). Intuitively,
+the transparency report can serve as an overview of what features
+the model may be using to discriminate between populations.
+However, it is not guaranteed that a person in the flipset is the
+victim of discrimination. For example, an inter-group disparity in
+the model’s output may be permitted if there is a sufficient justifi-
+cation such as a “business necessity” [6, §II.B]. Therefore, we treat
+the flipset analysis and transparency report as a starting point for
+further investigation about the potential unfairness of the model,
+which can be followed up with more expensive and conclusive
+analyses that look at whitebox model information [12, 13].
+Experiments.We empirically evaluate FlipTest on four different
+datasets (Section 5), demonstrating the testing workflow that we
+envision for it: Chicago Strategic Subject List [10], an illustrative
+dataset from Lipton et al. [31], the law school success dataset used
+to illustrate counterfactual fairness [29], and a synthetic dataset
+we construct to demonstrate differences from prior work. Our re-
+suls show that FlipTest provides clear, interpretable evidence of
+discrimination in a range of settings, along with concrete diag-
+nostic information that is useful when reasoning about the model
+behaviors that are responsible for the discrimination.
+We compare FlipTest against two prior approaches: counterfac-
+tual fairness [29] and FairTest [38]. For counterfactual fairness, we
+examine the dataset used by the authors to evaluate the approach,
+and compare FlipTest’s optimal transport-based results against
+those obtained by making comparable interventions on the gener-
+ative causal model given by Kusner et al. [29, Section 5]. We find
+that the two lead to similar conclusions about the model’s tendency
+to discriminate, despite the fact that FlipTest makes substantially
+fewer assumptions about the data. For FairTest, an approach based
+on statistical hypothesis testing of subgroup discrimination, we
+show that FlipTest can complement FairTest by detecting instances
+that FairTest misses.
+Summary. To summarize, our main contributions are: (1) FlipTest,
+a black-box, efficient testing approach for detecting discrimination
+in classifiers; (2) the novel use of optimal transport for fairness
+testing; and (3) the application of FlipTest to two case studies in-
+volving predictive policing (Section 5.2) and hiring (Section 5.3), as
+well as comparisons to prior fairness testing methods (Sections 5.4,
+5.5), which demonstrate that our approach can identify concrete
+examples of unfair model behavior in cases where prior testing
+methods do not.
+FlipTest: Fairness Testing via Optimal Transport FAT* ’20, January 27–30, 2020, Barcelona, Spain

@@ -1,0 +1,1616 @@
+A case study of algorithm-assisted decision making in child maltreatment hotline screening decisions
+Proceedings of Machine Learning Research 81:1–15, 2018 Conference on Fairness, Accountability, and Transparency
+Alexandra Chouldechova achould@cmu.edu
+Heinz College
+Carnegie Mellon University
+Pittsburgh, PA, 15213, USA
+Emily Putnam-Hornstein ehornste@usc.edu
+Suzanne Dworak-Peck School of Social Work
+University of Southern California
+Los Angeles, CA, 90089, USA
+Diana Benavides-Prado diana.benavides.prado@aut.ac.nz
+Oleksandr Fialko oleksandr.fialko@aut.ac.nz
+Rhema Vaithianathan rhema.vaithianathan@aut.ac.nz
+Centre for Social Data Analytics
+Auckland University of Technology
+Auckland, New Zealand
+Editors: Sorelle A. Friedler and Christo Wilson
+ABSTRACT
+Every year there are more than 3.6 mil-
+lion referrals made to child protection agen-
+cies across the US. The practice of screen-
+ing calls is left to each jurisdiction to fol-
+low local practices and policies, potentially
+leading to large variation in the way in
+which referrals are treated across the coun-
+try. Whilst increasing access to linked ad-
+ministrative data is available, it is difficult
+for welfare workers to make systematic use
+of historical information about all the chil-
+dren and adults on a single referral call.
+Risk prediction models that use routinely
+collected administrative data can help call
+workers to better identify cases that are
+likely to result in adverse outcomes. How-
+ever, the use of predictive analytics in the
+area of child welfare is contentious. There
+is a possibility that some communities—
+such as those in poverty or from particu-
+lar racial and ethnic groups—will be dis-
+advantaged by the reliance on government
+administrative data. On the other hand,
+these analytics tools can augment or re-
+place human judgments, which themselves
+are biased and imperfect. In this paper we
+describe our work on developing, validat-
+ing, fairness auditing, and deploying a risk
+prediction model in Allegheny County, PA,
+USA. We discuss the results of our analy-
+sis to-date, and also highlight key problems
+and data bias issues that present challenges
+for model evaluation and deployment.
+1 INTRODUCTION
+Every year there are more than 3.6 million refer-
+rals made to child protection agencies across the
+US. It is estimated that 37% of US children are
+investigated for child abuse and neglect by age
+18 years (Kim et al., 2017). These statistics indi-
+cate that far from being a rare occurrence, many
+more children are being pulled into the child wel-
+fare agencies than previously thought. Currently,
+screening these referral calls is left to each ju-
+risdiction to follow local practices and policies.
+These practices usually involve caseworkers gath-
+ering details about the adults and children associ-
+ated with the alleged victim. Often, the decision
+on whether to investigate or not is made without
+ever visiting the family or speaking with them.
+Whilst electronic case management systems
+and linked administrative data are increasingly
+available, it is difficult for child welfare workers
+to make systematic use of historical information
+about all the children and adults on a single refer-
+c© 2018 A. Chouldechova, E. Putnam-Hornstein, D. Benavides-Prado, O. Fialko & R. Vaithianathan.
+Algorithms in child welfare case study
+ral call. Fully interrogating a case history for all
+the people named on a call could take hours. The
+increasing pressure on ensuring that investigative
+resources are focused on the highest risk children
+means that there is some potential for predictive
+analytics to assist call screeners to more quickly
+and accurately assess each referral.
+Predictive Risk Modelling (PRM) uses rou-
+tinely collected administrative data to predict the
+likelihood of future adverse outcomes. By strate-
+gically targeting services to the riskiest cases, it
+is hoped that many of the adverse events can
+be prevented. Additionally, unnecessary inves-
+tigations which are burdensome for families and
+costly for the system could be avoided. PRM has
+been used previously in health and hospital set-
+tings (Panattoni et al., 2011; Billings et al., 2012)
+and has been suggested as a potentially useful
+tool that could be translated into child protec-
+tion settings (Vaithianathan et al., 2013).
+However, the use of predictive analytics in the
+area of child welfare is contentious. There is
+the possibility that some communities—such as
+those in poverty or from particular racial or eth-
+nic groups—will be disadvantaged by the reliance
+on government administrative data because they
+will typically have more data kept about them
+simply by dint of being poor and on welfare. Such
+families could then be flagged as high risk and
+be more frequently investigated. If the algorithm
+uses past investigations to produce a high risk
+score for a family, then this will exacerbate the
+original bias.
+On the other hand, these analytics tools can
+augment or replace human judgments, which
+themselves are potentially biased. There is a pos-
+sibility that caseworkers are basing their screen-
+ing decisions in part on personal experiences or
+current caseloads. Caseworker decisions may
+also be be affected by cognitive biases—for ex-
+ample over-weighting recent cases, unrelated to
+the current case, where a child has been fatally
+harmed. When making decisions under time
+pressure, caseworkers might be guilty of statisti-
+cal discrimination, where they use easily observed
+features (e.g. living in a neighborhood with high
+crime rates) as proxies for unobservable but more
+pertinent attributes (e.g. drug-use). Bias in hu-
+man decision-making is often difficult to assess,
+and the existing research does not provide a con-
+sensus view of racial bias in the child welfare sys-
+tem (Fluke et al., 2011).
+A subject where there is greater consensus con-
+cerns the relative accuracy of so-called “clinical”
+versus “actuarial” judgment.1 Some of the ear-
+liest research comparing human predictions to
+those of statistical models goes back to the pi-
+oneering work of Meehl (1954). Decades of re-
+search and several large scale meta-analyses have
+largely upheld the original conclusions: When it
+comes to prediction tasks, statistical models are
+generally significantly more accurate than human
+experts (Dawes et al., 1989; Grove et al., 2000;
+Kleinberg et al., 2017).
+Our goal in Allegheny County is to improve
+both the accuracy and equity of screening deci-
+sions by taking a fairness-aware approach to in-
+corporating prediction models into the decision-
+making pipeline. The present paper reports on
+the lessons that we have learned so far, our ap-
+proaches to predictive bias assessment, and sev-
+eral outstanding challenges. To be sure, at cer-
+tain points we offer more questions than an-
+swers. Our hope is that this report contributes to
+the rich ongoing conversation concerning the use
+of algorithms in supporting critical decisions in
+government—and the importance of considering
+fairness and discrimination in data-driven deci-
+sion making. While the work presented here is
+firmly grounded in the child maltreatment hot-
+line context, much of the discussion and our gen-
+eral analytic approach are broadly applicable to
+other domains where predictive risk modeling
+may be used. Readers are also encouraged to
+refer to the recent work of Shroff (2017) for an-
+other perspective on predictive analytics in the
+child welfare domain. This related work pro-
+vides an excellent report on various considera-
+tions that are important for model development,
+as well as strategies for effectively engaging with
+agency leadership.
+1.1. Organization of this paper
+We begin in the next section with some back-
+ground on the model development. As part of
+this discussion we describe both the tool that
+is currently deployed in Allegheny County and
+the competing models that are being developed
+1. The term “actuarial” has fallen out of fashion, and has
+in many cases been replaced with “machine learning”.
+as part of an ongoing redesign process. Then in
+Section 3 we investigate the predictive bias prop-
+erties of the current tool and a Random forest
+model that has emerged in the redesign as one
+of the best performing competing models. Our
+predictive bias assessment is motivated both by
+considerations of human bias and recent work on
+fairness criteria that has emerged in the algorith-
+mic fairness literature. Section 4 discusses some
+of the challenges in incorporating algorithms into
+human decision making processes and reflects on
+the predictive bias analysis in the context of how
+the model is actually being used. We discuss
+some of the concerns that have arisen as part
+of the redesign, and propose an “oracle test” as
+a tool for clarifying whether particular concerns
+pertain to the statistical properties of a model
+or are targeted at other potential deficiencies.
+We also briefly describe an independent ethical
+review of the modeling work that was commis-
+sioned by the County. Section 5 concludes with a
+reflection on several of the key outstanding tech-
+nical challenges affecting the evaluation and im-
+plementation of the model.
+2 THE ALLEGHENY MODELS
+Allegheny County is a medium size county in
+Pennsylvania, USA, centered on the city of Pitts-
+burgh. In 2014, Allegheny County’s Department
+of Human Services issued a Request for Proposals
+focused on the development and implementation
+of tools that would enhance use of the County’s
+integrated data system. Specifically, the County
+sought proposals that would: (1) improve the
+ability to make efficient and consistent data-
+driven service decisions based on County records,
+(2) ensure public sector resources were being eq-
+uitably directed to the County’s most vulnera-
+ble clients, and (3) promote improvements in the
+overall health, safety and well-being of County
+residents. A consortium of researchers from four
+universities were awarded the contract in the Fall
+of 2014 and commenced work in close concert
+with the Allegheny County team.
+In mid-2015, it was decided that the most
+promising, ethical, and readily implemented use
+of PRM within the Allegheny County child pro-
+tection context was one in which a model would
+be deployed at the time a referral call was was re-
+ceived by the County. The objective was to help
+call workers determine whether a maltreatment
+referral is of sufficient concern to warrant an in-
+person investigation (referred to as “screening-in
+the call”). Calls that are thought to be innocu-
+ous and are not further investigated are said to
+be “screened-out”. In this section we describe
+the development and implementation of the Al-
+legheny Family Screening Tool (AFST).
+2.1. Then and now
+Allegheny County’s Department of Human Ser-
+vices is fairly unique in the United States: it has
+an integrated client service record and data man-
+agement system. This means that the County’s
+child protection hotline staff are in principle al-
+ready able to access and use historical and cross-
+sector administrative data (e.g., child protective
+services, mental health services, drug and alco-
+hol services, homeless services) related to indi-
+viduals associated with a report of child abuse or
+neglect. Although this information is critical to
+assessing child risk and safety concerns, it is chal-
+lenging for County staff to efficiently access, re-
+view, and make meaning of all available records.
+Beyond the time required to scrutinize data for
+every individual associated with a given referral
+(e.g., child victim, siblings, biological parents, al-
+leged perpetrator, other adults living at the ad-
+dress where the incident occurred), the County
+has no means of ensuring that available informa-
+tion is consistently used or weighted by staff when
+making hot-line screening decisions. As such, for
+example, recent paternal criminal justice involve-
+ment that surfaces in the context of one child’s re-
+ferral may be a deciding factor in one case, while
+for another child with a similar referral that same
+information may be completely ignored.
+Prior to the implementation of the call screen-
+ing tool, for the period from April 1, 2010
+through May 4, 2016, the majority of CPS re-
+ports (52%) were screened out. Of those children
+who were screened out, 53% were re-referred for a
+new allegation within 2 years. Of those who were
+initially screened-in, 13% were placed outside of
+the home within 2 years.
+Retrospective analysis of cases that resulted
+in critical incidents has revealed many instances
+of multiple calls having been repeatedly screened
+out. While each screen-out decision was individ-
+ually defensible, looking at the full case history
+paints the picture that child protective services
+should have gotten involved. The primary aim of
+introducing a prediction model is to supplement
+the often limited information received during the
+call with a risk assessment that takes into ac-
+count a broader set of information available in
+the integrated data system.
+The implementation of the AFST presents call
+screening staff with a score from 1 to 20 that re-
+flects the likelihood that the child will be placed
+(removed from home) within 2 years conditional
+on being screened in (further investigated). Out
+of home placement was chosen as the target for
+two primary reasons. First, it is a directly ob-
+servable event that serves as a good proxy for se-
+vere child maltreatment. Second, placement de-
+cisions are not made by the call screening staff.
+By predicting an outcome that cannot be directly
+determined by the staff, we reduce the risk of get-
+ting trapped in a feedback loop wherein workers
+effect the outcome predicted by the model (e.g.,
+substantiate cases that the model tells them they
+likely should).
+The original implementation also included a
+score reflecting the likelihood of re-referral con-
+ditional on the case being screened out. This
+model never gained traction in practice largely
+due to lack of buy-in from County leadership.
+There are many reasons for why a case might be
+re-referred, and many of them do not merit pro-
+tective services involvement. A County review of
+how cases were scored by the re-referral model in-
+dicated that re-referral risk was a poor measure
+of whether a referral merits further investigation.
+Even if re-referral risk were deemed to be a
+reasonable measure, there would be cause to
+doubt the predictive validity of the model. Ef-
+fective December 31, 2014, the state of Penn-
+sylvania amended the Child Protective Services
+Law (CPSL) to broaden the category of man-
+dated reporters. This significantly changed re-
+porting patterns across the state, resulting in an
+increase in the number of referrals. Since the ini-
+tial training data predated the policy change, the
+re-referral would not be able to take this surge in
+referrals into account.
+There is of course good reason to suspect
+that the predictive performance of the placement
+model will also be negatively affected by the
+mandatory reporting amendment. On the other
+hand, one might also expect that the placement
+model would not be as severely compromised as
+the re-referral model. That is, while more re-
+ferrals are coming in, there may be considerable
+consistency in the patterns of risk factors asso-
+ciated with placement risk. We will be better
+positioned to reevaluate the performance of the
+model as more post-amendment data becomes
+available for retrospective analysis.
+These considerations are relevant to under-
+standing how the AFST was deployed, and how
+it is intended to be used in the call screening
+context. While in some settings machine learn-
+ing systems have been used to replace decisions
+that were previously made by humans, this is not
+the case for the Allegheny Family Screening Tool.
+It was never intended or suggested that the al-
+gorithm would replace human decision-making.
+Rather, that the model should help to inform,
+train and improve the decisions made by the staff.
+As we have previously noted, the AFST and
+the call worker are relying on very different in-
+formation in assessing referrals. Whereas the call
+workers’ screening decisions are based in large
+part on the content of the allegation, the AFST
+does not use information about the allegation per
+se. The AFST instead relies entirely on admin-
+istrative data available on the individuals associ-
+ated to the referral. So while the AFST is able to
+pick up on cases that have high long arc risk, it
+may just as easily miss acute incidents described
+in the allegation that necessitate immediate in-
+vestigation. Until such a time that an AI system
+is developed that can properly assess all of the
+risks relevant to screening decisions, full automa-
+tion of the call screening process remains out of
+the question. In the meantime, the AFST con-
+tinues to be tested as a form of decision support,
+as well as a way to help leadership get better
+insight into call screening decisions which histor-
+ically have been relatively opaque.
+2.2. Modeling methodology
+2.2.1. Data
+The full data set consists of all n = 76, 964 re-
+ferral records collected by Allegheny County be-
+tween April 2010 and July 2014. A distinct re-
+ferral record is generated for each child associ-
+ated to an allegation. These records correspond
+to 36, 840 distinct referrals, involving 47, 305 dis-
+tinct children. In total the data set contains over
+Child and Family 
+History
+Demographics
+Previous 
+referrals
+Previous 
+protective 
+services received
+Findings 
+during previous 
+investigations
+Program 
+involvement
+Previous 
+placements
+Behavioural 
+health records
+- Child Victim
+- Other Children
+- Parent
+- Perpetrator
+Data
+Validation 
+- Performance 
+metrics 
+(AUC, TPR, 
+FPR)
+- Expert 
+validation/ 
+current 
+process
+Modelling
+- 46,503 records of screened-
+in referrals spanning April 
+2010 to July 2014, with 
+around 800 predictors
+- 32,086 training records, 
+14,417 test records, based on 
+independent children
+- Logistic regression model
+- Random Forest model (Breiman, 2001): 
+- 500 trees
+- split based on entropy
+- XGBoost model (Chen and Guestrin, 2016): 
+- 1,000 trees
+- 0.01 learning rate
+- 0.9 subsample ratio of training instances
+- SVM model (Vapnik, 1998): 
+- Radial-basis function kernel, with 
+gamma = 1 / number of features
+- Class weights: 0.8 placement, 0.2 no 
+placement
+- Probability estimation using a sigmoid 
+function (Platt, 1999)
+predicted 
+probabilities 
+for test set 
+Figure 1: An overview of the modeling process.
+800 variables providing demographics, past wel-
+fare interaction, public welfare, county prison, ju-
+venile probation, and behavioral health informa-
+tion on all persons associated with each refer-
+ral. 19, 869 of the observed referrals, involving
+31, 438 distinct children were screened in for in-
+vestigation. This corresponds to 46, 503 referral
+records. All of the model training and evalua-
+tion presented in this report is conducted on the
+subset of screened-in cases. Since our models are
+trained and tested on the screened-in population,
+we encounter a version of the selective labels prob-
+lem (Kleinberg et al., 2017) in trying to gener-
+alize our evaluation results to the entire set of
+referrals. We discuss this further in Section 5.
+2.2.2. Current model
+The initial model—the one that has been de-
+ployed in Allegheny County since August 2016—
+is based on a logistic regression fit to a selected
+subset of 71 features. Instead of presenting call
+workers with raw probability estimates or coarse
+classifications, it was decided that a derived score
+from 1 to 20 would be more suitable.2 The de-
+rived score corresponds to the ventiles (5% per-
+centiles) of the estimated probability distribu-
+tion. In the initial implementation, cases whose
+risk is assessed in the most risky 15% of the
+calls (scores of 18 or higher) were flagged for call
+2. This was not a principled decision, and is being re-
+considered in the model redesign.
+screeners as “mandatory screen-ins”.3 The top
+panel of Figure 2 shows the ventile and quantile
+cutoffs along with red dashed lines representing
+the mandatory screen-in cutpoints for the logis-
+tic regression model. Owing to how the scores are
+constructed, two cases that both receive a score
+of 19 may have a greater absolute risk difference
+than two cases that receive scores of 6 and 10,
+respectively.
+2.2.3. Issues with model validation
+As we only recently discovered, two mistakes
+were made in evaluating the predictive perfor-
+mance of the original version of the AFST—the
+version that went into deployment in 2016. These
+errors meant that reported estimates of the pre-
+dictive performance of the AFST models (e.g.,
+AUCs) were over-optimistic. To be clear, uncov-
+ering these issues earlier would not have affected
+how or whether the AFST was deployed. Cor-
+recting the validation scheme has produced more
+realistic estimates of model performance under
+ideal conditions, but does not change the models
+themselves. We describe the issues briefly here,
+and outline a corrected validation scheme in the
+section that follows.
+The first problem comes from the way in which
+the train-test split was initially performed. The
+split was obtained by randomly holding out 30%
+of the referral records for model validation, re-
+3. Despite what the name suggests, “mandatory” screen-
+ins can be overridden by hotline supervisors. We dis-
+cuss overrides in Section 5.
+taining the remaining 70% of records for model
+training. This has two potential issues: (1) the
+same children appeared both in the training and
+test set (but for different referrals); and (2) refer-
+rals involving multiple children had their records
+split between the training and test set (so that,
+say, siblings on the same referral could have been
+allocated between the train and test sets). Is-
+sue (2) is the primary cause of over-optimism in
+estimating predictive performance. This is be-
+cause placement outcomes, although not univer-
+sally the same for all children associated to a re-
+ferral, are nonetheless highly correlated.
+Secondly, the 71 features used in the final
+placement model were selected by looking at re-
+gression coefficient t-statistics4 using the full set
+of data. The train-test split was performed only
+after the set of features had been selected, so even
+if the split itself were valid, the model evalua-
+tion would not have accounted for the variable
+selection step. This further contributed to over-
+optimism in the prediction performance of the
+original AFST model.
+The validation results presented in the remain-
+der of this paper use a corrected train-test split,
+and do not suffer from these issues. For com-
+parison purposes throughout, we use a copycat
+model of the AFST (“AFST copy”) obtained by
+carrying out the variable selection procedure us-
+ing only the data in the train split.
+Method AUC TPR FPR
+Logistic (all vars) 0.70 0.49 0.21
+AFST copy 0.74 0.54 0.20
+SVM 0.77 0.57 0.20
+Random Forest 0.77 0.58 0.20
+XGBoost 0.80 0.61 0.19
+Table 1: Performance results for methods under
+analysis. TPR and FPR correspond
+to the 25% highest risk cutoff (ventile
+scores of 16 and higher).
+2.2.4. Model rebuild.
+In April 2017 the research team began a rebuild
+of the AFST with the aim of improving model
+4. For more details, see p.13 of
+https://tinyurl.com/y8n5m9kg
+accuracy by using the full set of available fea-
+tures and applying more flexible machine learn-
+ing models. Figure 1 provides a summary of the
+data, model options and validation metrics used
+during the rebuild.
+As part of this rebuild, we also revised the
+train-test splitting approach. Sample splitting
+was performed to ensure that there were no over-
+lapping children or referrals across the training
+and test data. 32, 086 of the referral records
+were used in training the models, and 14, 417 re-
+ferral records were held out for validation pur-
+poses. More details on this splitting approach
+along with validation results from holding out the
+most recent year of data as a test set are provided
+in the Supplement.
+The machine learning methods we considered
+included support vector machines (Vapnik, 1998)
+with probability prediction (Platt et al., 1999),
+random forests (Breiman, 2001) and XGBoost
+(Chen and Guestrin, 2016). We used available
+implementations of these methods in R, Python
+and LibSVM (Chang and Lin, 2011). These com-
+peting models produced considerable gains over
+the logistic regression model. Table 1 shows sev-
+eral test set classification metrics for the different
+methods.
+In the redesign it was also decided that the
+mandatory screen-in threshold will be lowered to
+capture the top 25% highest cases (cases scor-
+ing 16 or higher). This lower threshold corre-
+sponds to a TPR (Recall/Sensitivity) of 58% for
+the random forest model and 61% for the XG-
+Boost model. That is, of the test set cases that
+were observed to result in placement within 2
+years of the call, around 3 in 5 are flagged as
+mandatory screen ins by the two best perform-
+ing models.
+3. Predictive bias
+Predictive bias is a major concern when deploy-
+ing predictive modeling in the child welfare con-
+text. In this section we reflect on our analysis
+to-date of the racial bias5 properties of the Al-
+legheny County models. To set the stage for our
+discussion we begin with an overview of how hu-
+5. We performed similar analyses looking instead at
+poverty status and sex. There was no strong indi-
+cation of predictive bias with respect to these other
+variables.
+man bias is thought to contribute to observed
+disproportionalities in the child welfare system.
+This provides a context for thinking about how
+models can be helpful in mitigating human bias.
+We then evaluate the predictive bias of the AFST
+copy model and the Random forest model being
+considered in the redesign. While this work is
+presented in the child welfare context, our anal-
+ysis translates to many other risk prediction set-
+tings.
+2.5
+5.0
+7.5
+0.00 0.25 0.50 0.75 1.00
+Probability of placement (logistic regression)
+de
+ns
+ity
+Figure 2: Estimated probabilities from the lo-
+gistic regression model. Vertical grey
+lines indicate ventile cutoffs. Coloured
+segments correspond to quartiles of the
+risk distribution. Dashed red line indi-
+cates the mandatory screen-in thresh-
+old in the initial deployment of the
+model.
+3.1. Setting the stage: Human bias.
+To frame a discussion of model bias, it is impor-
+tant to first understand how disparate outcomes
+might arise in the existing process. Racial dis-
+proportionality and disparity are widely acknowl-
+edged problems in the child welfare system. A
+2016 report from the Child Welfare Information
+Gateway describes four major factors that sig-
+nificantly contribute to explaining the observed
+racial differences: (1) disproportionate and dis-
+parate need among families of color; (2) geo-
+graphic context; (3) child welfare system factors
+affecting the ability to provide resources for fam-
+ilies of colour; and (4) implicit or explicit racial
+bias and discrimination by child welfare profes-
+sionals. Statistical modeling can help to better
+understand and quantify factors (1) and (2), but
+it cannot do anything to counteract them. As we
+have argued in the previous sections, by provid-
+ing task-relevant information to help case workers
+better prioritize cases, we can hope to move the
+needle on (3) through a more strategic allocation
+of resources. In this section we describe how the
+racial bias factor is also one that we can directly
+address.
+Recent studies have found that Black chil-
+dren are more likely than White children to be
+screened in, even in cases where Black children
+had lower risk levels than White children (Det-
+tlaff et al., 2011). These disproportionalities
+are typically attributed to two plausible causes:
+(1) caseworkers may be applying different risk
+thresholds depending on the child’s race (“apply-
+ing different cutoffs”); and (2) caseworkers may
+be overestimating the risk for Black children rel-
+ative to White children (“miscalibration”).
+By introducing accurate and carefully deployed
+risk assessment tools into the decision-making
+pipeline, we can get finer control over both of
+these sources of bias. The first source of bias is
+the most straightforward to mitigate once one has
+a numeric risk score. One need only ensure that
+the same risk threshold is being systematically
+applied in each case. While such a strategy may
+result in disparate impact if risk profiles differ
+across groups, it is at the very least enforceable.
+The arguably greater concern is that the under-
+lying model may be miscalibrated, and may thus
+overestimate risk for some groups relative to oth-
+ers. We explore the calibration properties of the
+Allegheny models in the next section.
+Before continuing to the next section, we pause
+to briefly touch on a third source of bias, which
+is known as “statistical discrimination”. Statis-
+tical discrimination arises when caseworkers use
+the few observable factors most easily available
+to them—such as zip code, race and gender—
+to make inferences about relevant but unobserv-
+able factors such as risk of sexual abuse, expo-
+sure to gun violence or access to resources. On
+the one hand, PRM can be seen as a formalized
+version of precisely this sort of bias. The mod-
+els we construct are grounded in correlations, not
+causation, and many of the predictive variables
+may simply be proxies for underlying causal fac-
+tors. On the other hand the models are con-
+structed from hundreds of different case-level fea-
+tures and the derived risk scores turn out to be
+highly predictive. The only way to avoid “statis-
+tical discrimination” is to require that predictive
+risk models only use the provably causal features
+of a case. However, this would decrease model
+accuracy and degrade process outcomes.
+0.0
+0.1
+0.2
+0.3
+Black White Unknown Other Mixed Hispanic Asian
+Race/ethnicity
+P
+la
+ce
+m
+en
+t r
+at
+e
+Figure 3: Placement rates by Race/Ethnicity of
+the victim. X-axis values are sorted in
+descending order of count. Error bars
+reflect 95% confidence intervals.
+3.2. Calibration
+The notion that a fair instrument is one that
+has equal predictive accuracy across groups has
+a long history in the Standards for Educational
+and Psychological Testing (Association et al.,
+1999). In this literature instruments are tested
+for what is known as differential prediction, oth-
+erwise known as predictive bias (Skeem and
+Lowenkamp, 2016). For the purpose of the
+present discussion we adopt instead the term cal-
+ibration, adapted from Kleinberg et al. (2016),
+as it more clearly reflects the type of predic-
+tive accuracy with which equality is being re-
+quired. More formally: We say that a risk as-
+sessment model is well-calibrated with respect to
+race if for each score s, the proportion of cases
+scoring s that are observed to have the adverse
+event (here, placement) is the same for every
+race/ethnicity group. Formally, given a group
+variable G ∈ {g1, . . . , gk}, a score S and an out-
+come Y , calibration refers to the condition:
+P(Y = 1 | S = s,G = gj) = P(Y = 1 | S = s) ∀j
+Another way of formulating this criterion is as a
+conditional independence statement: We require
+the outcome (placement) to be statistically inde-
+pendent of race conditional on the score.
+We now present our empirical findings. The
+results in this section are obtained using a vali-
+dation sample of 14,417 screened-in referrals that
+were not used in training the placement pre-
+diction models. Figure 4 displays the observed
+placement rates for the AFST copy and Random
+forest models. These plots focus only on children
+whose race is recorded as Black or White. In the
+case of the AFST copy model, we find evidence of
+poor calibration around the top 2 score ventiles,
+and in the lower ventiles 1-5. Screened-in refer-
+rals that score a 20 on the AFST ventile scale are
+observed to result in placement in 50% of cases
+involving Black children and only 30% of cases
+involving White children. That is, at the highest
+ventile, the model appears to overestimate risk
+for White children compared to Black children.
+Put differently, a White child who scores 20 on
+the AFST has comparable placement risk to a
+Black child who scores 18. Looking at the Ran-
+dom forest results, we again find evidence miscal-
+ibration in the upper score levels. Differences ob-
+served at the lower ventiles are much smaller for
+the Random forest than the AFST copy model.
+We are presently delving deeper to try to un-
+derstand the reason for the miscalibration. De-
+pending on what the investigation reveals, we
+may take steps to correct the scores by applying
+within-group recalibration techniques.
+Since the models are intended to serve as
+decision-support tools and do not themselves pro-
+duce decisions, it is important to ensure that the
+scores reflect meaningful—furthermore, equally
+meaningful—information about placement risk.
+Calibration is thus often the primary or only
+predictive fairness criterion considered. How-
+ever, it is important to note that one can ma-
+nipulate scores in ways that preserve calibration
+but greatly increase the disparity in outcomes
+(Corbett-Davies et al., 2017). Miscalibration is
+certainly a concern, but it is not the only one
+that is relevant.
+3.3. Accuracy Equity and Error Rates
+This issue was most publicly brought to light by
+a team at ProPublica in their investigation into
+the COMPAS recidivism prediction instrument
+(Angwin et al., 2016). In this report the authors
+found that the false positive rate of the instru-
+ment was considerably higher (and the false nega-
+AFST copy Random Forest
+0 5 10 15 20 0 5 10 15 20
+0.0
+0.2
+0.4
+0.6
+Ventile risk score
+O
+bs
+er
+ve
+d 
+pl
+ac
+em
+en
+t r
+at
+e
+race
+Black
+White
+Figure 4: Observed placement rates by AFST model (left) and Random forest model (right) risk
+score ventile broken down by victim’s race. Error bars correspond to 95% confidence
+intervals.
+tive rate was considerably lower) for Black defen-
+dants than for White defendants. Whether error
+rate imbalance is an indication of predictive bias
+remains a widely contested issue, and is beyond
+the scope of this paper. Instead, we focus on pre-
+senting and contextualizing an assessment of the
+Allegheny County models across several fairness
+metrics that emerged in the debate surrounding
+the ProPublica article.
+We begin with a look at the “accuracy equity”
+properties of the Allegheny models. The term ac-
+curacy equity was used in Dieterich et al. (2016)
+to refer to equality of AUC across groups. Fig-
+ure 5 shows the ROC curves for both the AFST
+copy model and the Random forest model strat-
+ified by race/ethnicity group. Looking at the
+left panel, we find that there are some differ-
+ences in the logistic regression ROC curves (and
+the implied AUCs) across groups. Similar vari-
+ation appears in the random forest ROC curves,
+though the most significant difference—that be-
+tween the “Unknown” category and the rest—
+is not one that directly corresponds to a salient
+race/ethnicity group.
+Figure 5 also displays points corresponding to
+the value of (FPR, 1 - FNR) at the 25% high-
+est risk cutoff used for determining “mandatory
+screen-ins”. We see that even though the ROC
+curves lie quite close to one another for most
+groups, the chosen threshold corresponds to dif-
+ferent points on the ROC curves for different
+groups. This is most clearly pronounced in the
+case of the AFST copy model. While the ROC
+curves for the 4 non-Unknown groups lie close
+together, at the chosen risk cutoff the FPR and
+FNR rates differ considerably. False positive
+rates are significantly higher for the Mixed race
+subgroup. This FPR imbalance could lead to
+a perception that Mixed-race families are over-
+investigated relative to White families. This is a
+complicated matter in part because risk of place-
+ment in foster care is not the only relevant con-
+sideration when deciding whether to screen-in a
+case. Thus a screen-in that is a false positive from
+the viewpoint of placement may not be an unjus-
+tified investigation once other considerations are
+taken into account.
+Furthermore, As recent work of Kleinberg et al.
+(2016), Chouldechova (2017) and Berk et al.
+(2017) has shown, some level of imbalance on
+other predictive accuracy criteria is unavoidable
+when a model satisfying calibration-type prop-
+erties is applied to a population where preva-
+lence differs across groups. Figure 3 shows
+the observed placement rates broken down by
+race/ethnicity category. The rate differences may
+not appear large in an absolute sense, but even
+small differences in placement rates can lead to
+significant trade-offs across different fairness met-
+rics. While we do not explicitly consider the costs
+of different trade-offs in the current work, it is
+worth bearing in mind that any observed differ-
+ences in the error metrics that we present in this
+section would come at a cost to rectify. Which
+trade-offs are worth making is the subject of on-
+going discussion, but falls beyond the scope of
+the present paper.
+4. Fairness, Processes, and Ethics
+As we have seen, the latest rebuild of the Al-
+legheny prediction tool has improved the accu-
+racy and, at least by some metrics, the pre-
+dictive fairness of the model in comparison to
+the model used in the initial deployment. This
+improvement largely resulted from transitioning
+away from logistic regression to ensemble meth-
+ods such as random forests and boosted decision
+trees. Yet these accuracy gains come at a cost.
+While logistic regression models are traditionally
+viewed as being interpretable—in the sense that
+one can write down a clear formula for the es-
+timated model—ensemble methods make predic-
+tions in an opaque manner. Due to interpretabil-
+ity concerns, decision-makers may be reluctant to
+adopt a more complex model despite evidence of
+improved prediction accuracy. In this section we
+comment further on the merit of improved accu-
+racy, and offer a thought experiment that we refer
+to as the “oracle test” to help better frame this is-
+sue. Furthermore, since no expected benefit can
+be realized if the tool is not used as expected,
+we offer a look at how the tool has been used
+in practice. This brings us to a discussion of the
+limitations of our fairness analysis from a process
+perspective. We conclude the section with a dis-
+cussion of ethics, and the role that ethical review
+has played in model development.
+4.1. Oracle test
+To begin, it is worth noting that overall accu-
+racy metrics and comparisons made on the ba-
+sis thereof may fail to present a complete picture
+about the differences between competing models.
+This issue was recently explored in Chouldechova
+and G’Sell (2017), who showed that model dis-
+agreement may be highly pronounced on partic-
+ular salient subgroups, and hence the decision to
+adopt one model rather than another may come
+down to what those subgroups look like and how
+they are affected.
+Even in cases where one model outperforms
+all other competitors and is thus the clearly pre-
+ferred choice by some metric, many other ques-
+tions may remain, especially those concerning the
+fairness of the chosen model. Some of these ques-
+tions may be answerable using some of the fair-
+ness metrics presented in the previous section,
+while others may point to different concerns. To
+better separate concerns about predictive fairness
+properties from concerns about other possible de-
+ficiencies of the model we find it helpful to ap-
+ply what we call the Oracle Test. This is a sim-
+ple thought experiment that proceeds as follows.
+Imagine that you are given access to an oracle,
+which for every individual informs you with per-
+fect accuracy whether the individual will have an
+event (e.g., will be placed in foster care). Do any
+of the concerns you previously had remain when
+handed this oracle? Often the answer is yes.
+Even if we had perfect prediction accuracy, many
+valid and reasonable concerns might remain. We
+discuss a few of these below.
+Target variable bias. The prediction target
+in the Allegheny models is the risk of placement
+in foster care for cases that are screened-in. One
+might be concerned that this outcome variable
+is simply a proxy for an unobserved or difficult
+to observe outcome of greater interest such as,
+say, severe maltreatment or neglect. Race-related
+differences in reporting rates, screen-in rates, and
+investigations may mean that the target variables
+are in closer alignment with the outcome of inter-
+est for some groups than for others. This is ar-
+guably an even bigger issue in criminal recidivism
+prediction—where one is interested in re-offense
+but instead predicts re-arrest—than in the child
+welfare context.
+Disconnect between the prediction tar-
+get and decision criteria. A related issue is
+that of omitted objectives or payoffs. Depend-
+ing on the range of functions performed and ser-
+vices offered by the given child welfare system,
+many of the considerations that enter in the de-
+cision process may go beyond the risk of place-
+ment. For instance, while the Allegheny models
+are well-suited to supporting decision-making at
+the referral screening phase, they are not used
+and may be inadequate for supporting decisions
+about how and whether cases should be accepted
+for services.
+Explainability. In addition to knowing what
+the outcome is going to be, one may also need
+to know why this is the case. Even the simplest
+prediction models can only speak to the question
+of why in a limited sense. A model that is de-
+●
+●
+●
+●
+●
+0.00
+0.25
+0.50
+0.75
+1.00
+0.00 0.25 0.50 0.75 1.00
+False positive rate (1 − Specificity)
+Tr
+ue
+ p
+os
+iti
+ve
+ r
+at
+e 
+(S
+en
+si
+tiv
+ity
+)
+group
+Black
+Mixed
+Other
+Unknown
+White
+ROC curves for each racial group: AFST copy
+●
+●
+●
+●
+●
+0.00
+0.25
+0.50
+0.75
+1.00
+0.00 0.25 0.50 0.75 1.00
+False positive rate (1 − Specificity)
+Tr
+ue
+ p
+os
+iti
+ve
+ ra
+te
+ (S
+en
+si
+tiv
+ity
+)
+group
+Black
+Mixed
+Other
+Unknown
+White
+ROC curves for each racial group: Random forest
+Figure 5: Race-specific ROC curves for the AFST copy (left) Random forest (right) models. Points
+overlaid on the curves correspond to the (FPR, 1 - FNR) values at the 25% highest risk
+cutoff delineating mandatory screen-ins (see Section 2).
+composable or simulatable in the sense of Lipton
+(2016) may nevertheless fail to offer a satisfac-
+tory answer to why more penetrating than that
+the particular values of input variables combined
+to produce a high-risk prediction. One may be
+able to understand the risk factors involved and
+how they combine in the model, but the models
+have no claim to being causal. The overall utility
+of such an understanding may be quite limited.
+Effects of interventions. Knowing that a
+case will result in placement if one does not inter-
+vene also leaves open the question of how, or even
+if, some form of preventative intervention could
+help divert the case from this anticipated adverse
+outcome. To answer the latter question one re-
+quires an understanding (a model) of what would
+happen under different counterfactual conditions.
+This is not something that standard supervised
+learning approaches provide. They model the
+data as it is, not as it might be.
+4.2. Fairness is a Process Property
+Our discussion so far has largely focused on the
+accuracy and predictive fairness properties of the
+scoring tool. However, the scoring tool is, as the
+name suggests, merely a decision-support tool
+that is presented to call screeners at a specific
+juncture in the decision-making pipeline. The
+business process associated with a screening de-
+cision and where the tool enters it is illustrated
+in Figure 7. In the Allegheny process, call screen-
+ers are free to ignore the score altogether or only
+use it in selective cases. If this happens, then
+the fairness and accuracy properties of the tool
+will not carry over into equitable and effective
+decision-making. Indeed data from the post-
+implementation period makes it clear that screen-
+ing decisions are presently not as strongly associ-
+ated with the AFST risk score as we might have
+anticipated. While some fear that human asses-
+sors may fall into a pattern of rubber-stamping
+the recommendations of the tool, this does not
+appear to be happening in Allegheny County.
+The left panel of Figure 6 shows a break-
+down of the screening decisions over the en-
+tire range of AFST ventile scores. This plot
+shows that screen-out rates are decreasing in
+the AFST score. Furthermore, we find evidence
+of a sharp decrease in screen-out rates at the
+screen-in threshold of 18 6. Even so, screen-out
+rates for this highest risk population remain non-
+negligible. A review of the data shows that su-
+pervisors are overriding nearly 1 in 4 mandatory
+screen-ins, and the rate at which overrides occur
+vary from one supervisor to the next. We also
+find that screen-in rates are consistently above
+25% across the entire range of ventile scores.
+Prior to seeing the AFST score, call workers
+are asked to enter in two scores reflecting their
+6. When a call scored 18 or above, the calls were labeled
+as ”mandatory screen-ins” and only supervisors were
+allowed to screen them out
+0.00
+0.25
+0.50
+0.75
+1.00
+0 5 10 15 20
+WFST ventile score
+Sc
+re
+en
+in
+ig
+ d
+ec
+is
+io
+n 
+br
+ea
+kd
+ow
+n
+Decision
+Unknown/Pending
+Already active
+Screen out
+Screen in
+AFST
+0.00
+0.25
+0.50
+0.75
+1.00
+1 2 3 4 6 9
+Call worker assessed Risk−Safety score
+S
+cr
+ee
+ni
+ni
+g 
+de
+ci
+si
+on
+ b
+re
+ak
+do
+w
+n
+Decision
+Unknown/Pending
+Already active
+Screen out
+Screen in
+Figure 6: Left: Breakdown of screening decisions by AFST ventile score. Ventile scores of 18-20
+indicate “mandatory overrides”. Right: Breakdown of screening decisions for call worker
+assessed risk-safety score. Data consists of 11157 referrals that have been screened since
+the AFST was first deployed.
+ 
+ 
+ 
+ 
+ 
+  
+31 
+Using the Model in Practice 
+The intent of the model is to inform and improve the decisions made by the child protection staff. As stated in the 
+background, it was never intended that the algorithm would replace human decision-making. To implement the model, 
+a supplemental step in the call screening process was added to generate re-referral and placement risk scores that the 
+call screener and call screening supervisor review when deciding if the referral should be investigated. Beyond this 
+point, the risk scores do not impact the referral progression process. 
+Figure 9: Referral Progression Process  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+Provide family 
+with information 
+for other services 
+or agencies they 
+may find helpful 
+New Child 
+Welfare Case 
+Opens 
+Investigation 
+Findings/Service 
+Decision 
+Provide family 
+with information 
+for other services 
+or agencies they 
+may find helpful 
+Call information received and processed 
+Assigned Call Screener collects additional 
+information from sources including, but not limited to, 
+the individual who reported the maltreatment and the 
+Client View application that displays individual-level 
+prior service involvement. 
+Call Screener assigns risk and safety ratings based on 
+information collected. 
+**NEW STEP** 
+Call screener runs the Allegheny Screening Tool 
+Consultation with the Call Screening Supervisor 
+ 
+ 
+In limited cases, a field screen is conducted 
+Call Screening Process 
+Child Welfare 
+Call Screening 
+Decision 
+  Walden
+Figure 7: Referral progression process. The de-
+cision point that relies on the AFST is
+highlighted.
+assessment of the risk and safety of the alleged
+victim(s). The risk score denotes whether the
+call worker believes the case to be Low (1), Mod-
+erate (2), or High risk (3). The safety score de-
+notes whether the call worker believes the alleged
+victims to be at No Safety Threat (1), Impend-
+ing danger (2) or Present danger (3). An overall
+risk-safety score is obtained by multiplying the
+risk and safety scores together. Figure 8 shows
+the risk-safety score breakdown across the range
+of AFST ventile scores, and the Right panel of
+Figure 6 shows a breakdown of the screening de-
+cisions across the range of risk-safety scores. The
+two panels in Figure 9 show a breakdown of the
+risk and safety scores by AFST score ventile. We
+find that there is a much stronger correspon-
+dence between screening decisions and the call
+worker assessed risk-safety score than with the
+AFST score. This suggests that call workers are
+largely continuing to rely on their own assess-
+ments rather than those of the AFST tool. Fur-
+thermore, there is no clear association between
+the risk and safety assessments provided by the
+call workers and the AFST ventile score.
+An analysis is underway to better understand
+what factors influence override decisions, and
+whether the overrides and weak reliance on the
+AFST tool is negatively affecting the overall qual-
+ity of the screening process. Given that decisions
+are being made with only weak adherence to the
+AFST tool, it is far from clear that the predictive
+fairness properties of the models would translate
+into equitable decision making. When it comes
+to data-driven decision making, it is important to
+0.00
+0.25
+0.50
+0.75
+1.00
+0 5 10 15 20
+WFST ventile score
+C
+al
+l w
+or
+ke
+r r
+is
+k 
+as
+se
+ss
+m
+en
+t b
+re
+ak
+do
+w
+n
+Risk_Safety_Score
+A
+Figure 8: Overall risk-safety scores as assessed
+by the call workers prior to viewing the
+AFST ventile score. The risk-safety
+score is a product of two scores on
+a scale of 1-3 that call workers are
+asked to provide. Higher scores in-
+dicate higher assessment of risk and
+lower assessments of safety.
+bear in mind that fairness is a process property,
+not just a model property.
+4.3. Ethical review
+Prior to the deployment of the AFST, the County
+commissioned an independent ethical review of
+the work to be conducted by Tim Dare and Eileen
+Gambrill7. The authors adopted a comparative
+lens, arguing that ethical questions about the
+PRM entail an analysis of the costs and benefits
+of the proposed approach relative to the exist-
+ing process or other reasonable alternatives. The
+review emphasized the potential risks for confir-
+mation bias and stigmatization, and this in turn
+shaped decisions about how and when the tool
+would be used. For instance, in order to avoid
+confirmatory bias, scores are not shared with
+workers who investigate cases. Furthermore, in
+training it was clearly indicated that the scores
+do not reflect anything about the certainty of the
+present allegations, and do not themselves pro-
+vide evidence of case substantiation. It was also
+determined that race could be included as a pre-
+dictor variable if it substantively improved the
+predictive performance of the model.
+Throughout the project, the research team
+and County leaders had a strong commitment to
+transparency. They met with community groups,
+7. See p. 46 of https://tinyurl.com/y8n5m9kg for the
+full report.
+stakeholders and families who were in the welfare
+system multiple times. This has lead to a strong
+community acceptance of the project.
+5. Discussion
+In this final section we reflect on several of the
+key outstanding technical challenges affecting the
+evaluation and implementation of the AFST.
+5.1. Selective labels
+As we discussed in Section 2, the current mod-
+els have been trained and evaluated on the sub-
+set of referrals that were observed to be screened
+in. However, the purpose of the AFST is not to
+convey risk once the screening decision has been
+made, but rather to help the call worker make
+that decision in the first place. A key challenge is
+that we do not get to observe placement outcomes
+for a large fraction of cases that are screened out.
+This makes it difficult to assess the accuracy of
+the models on the full set of referrals, not just
+those that were screened in. A version of this
+“selective labels” problem was studied by Klein-
+berg et al. (2017) in the bail decision context,
+but their problem setting and analytic approach
+does not directly translate to our setting. We are
+actively working on methodology to address this
+problem in the call screening context.
+There are two key challenges. First, unlike in
+the bail setting, where it may be reasonable to as-
+sume that cases are randomly assigned to judges
+who make decisions independently, the call work-
+ers and supervisors are physically co-located and
+their observed decisions are much more inter-
+twined. Second, screened-out referrals may be
+followed by another referral at a later point on
+time. Thus we do get to at least partially observe
+outcomes for a subset of screened-out cases. Pre-
+liminary analyses indicate that the models con-
+tinue to perform well on the screened-out cases
+that were re-referred shortly thereafter and then
+screened in. However, considerably more work is
+required to ensure that the model performs well
+on the entire set of referrals.
+5.2. Implementation challenges
+As discussed in Section 4, data logs from the first
+year of implementation indicate that supervisors
+0.00
+0.25
+0.50
+0.75
+1.00
+0 5 10 15 20
+WFST ventile score
+C
+al
+l w
+or
+ke
+r r
+is
+k 
+sc
+or
+e 
+br
+ea
+kd
+ow
+n
+Risk_Score
+High Risk (H)
+Moderate Risk (M)
+Low Risk (L)
+A
+0.00
+0.25
+0.50
+0.75
+1.00
+0 5 10 15 20
+WFST ventile score
+C
+al
+l w
+or
+ke
+r s
+af
+et
+y 
+sc
+or
+e 
+br
+ea
+kd
+ow
+n
+Safety_Score
+Present Danger
+Impending Danger
+No Safety Threat
+AF
+Figure 9: Call worker assessed Risk (left) and Safety (right) scores across the AFST score ventiles.
+are overriding 1 in every 4 mandatory screen-ins.
+Furthermore, these rates differ from one supervi-
+sor to the next. The data indicates that the tool
+is resulting in lower screen-in rates for lowest risk
+cases, but the override decisions for the highest
+risk cases have been difficult to explain.
+A challenge in the implementation of the AFST
+is that it coincided with the major reform in the
+child welfare laws in the State of Pennsylvania
+that we previously discussed. One effect of these
+changes is that they established a State wide hot-
+line. These State calls are handled slightly dif-
+ferently by the County staff and the algorithm’s
+deployment was not well integrated into this new
+business process. This could partially explain the
+levels of overrides. A new business processes is
+being planned as part of the re-build.
+Additionally, the challenge remains that how-
+ever carefully one deploys an algorithm, data el-
+ements and processes change over time in ways
+that impact the model’s performance in the field.
+Constant auditing of scores and predictor vari-
+ables is necessary, and monthly reports are given
+to leadership on a range of descriptive statistics
+and performance measures. It could be that per-
+formance of the algorithm in the field has deteri-
+orated leading to justifiable overrides.
+There is a persistent tension between the need
+to allow staff to override the algorithm, and the
+need for staff to trust the model risk assessments
+when the latter indicates high certainty in the
+likely outcome. On the one hand, research has
+shown that statistical models tend to outperform
+human decision makers. However, there are also
+cases when the call worker receives important ad-
+ditional information during the referral call to
+which the model does not have access. Finding
+the right balance will undoubtedly involve con-
+tinued conversations with the frontline staff on
+how to redesign the ASFT to best enable them to
+make the challenging decisions with which they
+are tasked.
+Acknowledgments
+We thank Erin Dalton at the Allegheny County
+Department of Human Services for her leadership
+and oversight over this project. Thanks to Wei
+Zhu for assistance with the overrides analysis.
+We also wish to thank the anonymous referees
+for their comments and suggestions for improv-
+ing the manuscript.
+References**
+
+Julia Angwin, Jeff Larson, Surya Mattu, and
+Lauren Kirchner. How we analyzed the
+compas recidivism algorithm. 2016. URL
+https://www.propublica.org/article/
+how-we-analyzed-the-compas-recidivism-algorithm.**
+
+American Educational Research Association,
+American Psychological Association, Na-
+tional Council on Measurement in Education,
+et al. Standards for educational and psycholog-
+ical testing. American Educational Research
+Association, 1999.**
+
+Richard Berk, Hoda Heidari, Shahin Jabbari,
+Michael Kearns, and Aaron Roth. Fairness
+in criminal justice risk assessments: The state
+of the art. arXiv preprint arXiv:1703.09207,
+2017.**
+
+John Billings, Ian Blunt, Adam Steventon, Theo
+Georghiou, Geraint Lewis, and Martin Bards-
+ley. Development of a predictive model to iden-
+tify inpatients at risk of re-admission within 30
+days of discharge (parr-30). BMJ open, 2(4):
+e001667, 2012.**
+
+Leo Breiman. Random forests. Machine learning,
+45(1):5–32, 2001.**
+
+Chih-Chung Chang and Chih-Jen Lin. Libsvm:
+a library for support vector machines. ACM
+transactions on intelligent systems and tech-
+nology (TIST), 2(3):27, 2011.**
+
+Tianqi Chen and Carlos Guestrin. Xgboost: A
+scalable tree boosting system. In Proceedings of
+the 22nd acm sigkdd international conference
+on knowledge discovery and data mining, pages
+785–794. ACM, 2016.**
+
+Alexandra Chouldechova. Fair prediction with
+disparate impact: A study of bias in recidivism
+prediction instruments. Big Data, 2017.**
+
+Alexandra Chouldechova and Max G’Sell. Fairer
+and more accurate, but for whom? arXiv
+preprint arXiv:1707.00046, 2017.**
+
+Sam Corbett-Davies, Emma Pierson, Avi Feller,
+Sharad Goel, and Aziz Huq. Algorithmic de-
+cision making and the cost of fairness. arXiv
+preprint arXiv:1701.08230, 2017.**
+
+Robyn M Dawes, David Faust, and Paul E Meehl.
+Clinical versus actuarial judgment. Science,
+243(4899):1668–1674, 1989.**
+
+Alan J Dettlaff, Stephanie L Rivaux, Donald J
+Baumann, John D Fluke, Joan R Rycraft, and
+Joyce James. Disentangling substantiation:
+The influence of race, income, and risk on the
+substantiation decision in child welfare. Chil-
+dren and Youth Services Review, 33(9):1630–
+1637, 2011.**
+
+William Dieterich, Christina Mendoza, and Tim
+Brennan. Compas risk scales: Demonstrating
+accuracy equity and predictive parity. 2016.
+John Fluke, Brenda Jones Harden, Molly Jenk-
+ins, and Ashleigh Reuhrdanz. Disparities and
+disproportionality in child welfare: Analysis of
+the research. 2011.**
+
+William M Grove, David H Zald, Boyd S Lebow,
+Beth E Snitz, and Chad Nelson. Clinical versus
+mechanical prediction: a meta-analysis. Psy-
+chological assessment, 12(1):19, 2000.**
+
+Hyunil Kim, Christopher Wildeman, Melissa
+Jonson-Reid, and Brett Drake. Lifetime
+prevalence of investigating child maltreatment
+among us children. American Journal of Pub-
+lic Health, 107(2):274 – 280, 2017. ISSN 0090-
+0036.**
+
+Jon Kleinberg, Sendhil Mullainathan, and Man-
+ish Raghavan. Inherent trade-offs in the fair
+determination of risk scores. arXiv preprint
+arXiv:1609.05807, 2016.**
+
+Jon Kleinberg, Himabindu Lakkaraju, Jure
+Leskovec, Jens Ludwig, and Sendhil Mul-
+lainathan. Human decisions and machine pre-
+dictions. Working Paper 23180, National Bu-
+reau of Economic Research, February 2017.**
+
+Zachary C Lipton. The mythos of model inter-
+pretability. arXiv preprint arXiv:1606.03490,
+2016.**
+
+Paul E Meehl. Clinical versus statistical predic-
+tion: A theoretical analysis and a review of the
+evidence. 1954.**
+
+Laura E Panattoni, Rhema Vaithianathan, Toni
+Ashton, and Geraint H Lewis. Predictive risk
+modelling in health: options for new zealand
+and australia. Australian Health Review, 35
+(1):45–51, 2011.**
+
+John Platt et al. Probabilistic outputs for sup-
+port vector machines and comparisons to reg-
+ularized likelihood methods. Advances in large
+margin classifiers, 10(3):61–74, 1999.**
+
+Ravi Shroff. Predictive analytics for city agencies:
+Lessons from children’s services. Big Data,
+2017.**
+
+Jennifer L Skeem and Christopher T Lowenkamp.
+Risk, race, and recidivism: predictive bias and
+disparate impact. Criminology, 54(4):680–712,
+2016.**
+
+Rhema Vaithianathan, Tim Maloney, Emily
+Putnam-Hornstein, and Nan Jiang. Children
+in the public benefit system at risk of maltreat-
+ment: Identification via predictive modeling.
+American journal of preventive medicine, 45
+(3):354–359, 2013.**
+
+Vladimir Vapnik. Statistical learning theory. Wi-
+ley, New York, 1998.

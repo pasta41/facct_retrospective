@@ -1,0 +1,188 @@
+
+Humans are the final decision makers in critical tasks that involve
+ethical and legal concerns, ranging from recidivism prediction, to
+medical diagnosis, to fighting against fake news. Although machine
+learning models can sometimes achieve impressive performance
+in these tasks, these tasks are not amenable to full automation. To
+realize the potential of machine learning for improving human de-
+cisions, it is important to understand how assistance from machine
+learning models affects human performance and human agency.
+In this paper, we use deception detection as a testbed and investi-
+gate how we can harness explanations and predictions of machine
+learning models to improve human performance while retaining
+human agency. We propose a spectrum between full human agency
+and full automation, and develop varying levels of machine as-
+sistance along the spectrum that gradually increase the influence
+of machine predictions. We find that without showing predicted
+labels, explanations alone slightly improve human performance
+in the end task. In comparison, human performance is greatly im-
+proved by showing predicted labels (>20% relative improvement)
+and can be further improved by explicitly suggesting strong ma-
+chine performance. Interestingly, when predicted labels are shown,
+explanations of machine predictions induce a similar level of accu-
+racy as an explicit statement of strong machine performance. Our
+results demonstrate a tradeoff between human performance and
+human agency and show that explanations of machine predictions
+can moderate this tradeoff.
+CCS CONCEPTS
+• Applied computing→ Law, social and behavioral sciences.
+KEYWORDS
+human agency, human performance, explanations, predictions
+ACM Reference Format:
+Vivian Lai and Chenhao Tan. 2019. On Human Predictions with Expla-
+nations and Predictions of Machine Learning Models: A Case Study on
+Deception Detection. In FAT* ’19: Conference on Fairness, Accountability, and
+Transparency, January 29–31, 2019, Atlanta, GA, USA. ACM, New York, NY,
+USA, 10 pages. https://doi.org/10.1145/3287560.3287590
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+https://doi.org/10.1145/3287560.3287590
+1 INTRODUCTION
+Machine learning has achieved impressive success in a wide variety
+of tasks. For instance, neural networks have surpassed human-
+level performance in ImageNet classification (95.06% vs. 94.9%) [29];
+Kleinberg et al. [36] demonstrate that in bail decisions, machine
+predictions of recidivism can reduce jail rates by 41.9% with no
+increase in crime rates, compared to human judges; Ott et al. [60]
+show that linear classifiers can achieve ∼90% accuracy in detecting
+deceptive reviews while humans perform no better than chance.
+As a result of these achievements, machine learning holds promise
+for addressing important societal challenges.
+However, it is important to recognize different roles that machine
+learning can play in different tasks in the context of human decision
+making. In tasks such as object recognition, human performance
+can be considered as the upper bound, and machine learning models
+are designed to emulate the human ability to recognize objects in an
+image. A high accuracy in such tasks presents great opportunities
+for large-scale automation and consequently improving our soci-
+ety’s efficiency. In contrast, efficiency is a lesser concern in tasks
+such as bail decisions. In fact, full automation is often not desired
+in these tasks due to ethical and legal concerns. These tasks are
+challenging for humans and for machines, but with vast amounts of
+data, machines can sometimes identify patterns that are unsalient,
+unknown, or counterintuitive to humans. If the patterns embedded
+in the machine learning models can be elucidated for humans, they
+can provide valuable support when humans make decisions.
+The goal of our work is to investigate best practices for integrat-
+ing machine learning into human decision making. We propose a
+spectrum between full human agency, where humans make deci-
+sions entirely on their own, and full automation, where machines
+make decisions without human intervention (see Figure 1 for an
+illustration). We then develop varying levels of machine assistance
+along the spectrum using explanations and predictions of machine
+learning models. We build on recent developments in interpretable
+machine learning that provide useful frameworks for generating
+explanations of machine predictions [34, 35, 45, 50, 64, 65]. Instead
+of using these explanations to help users debug machine learning
+models, we incorporate the explanations as assistance for humans
+to improve human performance while retaining human agency
+in the decision making process. Accordingly, we directly evaluate
+human performance in the end task through user studies.
+In this work, we focus on a constrained form of decision making
+where humans make individual predictions. Specifically, we ask
+humans to decide whether a hotel review is genuine or deceptive
+based on the text. This prediction problem allows us to focus on the
+integration of machine learning into human predictions. In compar-
+ison, prior work in decision theory and decision support systems
+focuses on modeling preferences and utilities as well as building
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA Vivian Lai and Chenhao Tan
+Figure 1: A spectrum between full human agency and full automation illustrating howmachine learning can be integrated in
+human decision making. The detailed explanation of each method is in Section 3.
+knowledge databases and representations to reason about complex
+decisions [5, 31, 33, 55, 67]. Moreover, since many policy decisions
+can be formulated as prediction problems [37], understanding hu-
+man predictions with assistance from machine learning models
+constitutes an important step towards empowering humans with
+machine learning in critical challenging tasks.
+Deception detection as a testbed. In this work, we use deception
+detection as our testbed for three reasons. First, deceptive infor-
+mation is prevalent on the Internet. For instance, Ott et al. [58]
+find that deceptive reviews are a growing problem on multiple plat-
+forms such as TripAdvisor and Yelp. Fake news has also received
+significant attention recently [43, 74] and might have influenced
+the outcome of the U.S. presidential election in 2016 [3]. Enhancing
+humans’ ability in detecting deception can potentially alleviate
+these issues.
+Second, deception detection is a challenging task for humans and
+has been extensively studied [1, 2, 22, 24, 60]. It is promising that
+machines show preliminary success in prior work. For example,
+machines are able to achieve an accuracy of ∼90% in distinguishing
+genuine reviews from deceptive ones, while human performance
+is no better than chance [60]. Machines can identify unsalient and
+counterintuitive signals, e.g., deceptive reviews are less specific
+about spatial configurations and tend to include less sensorial and
+concrete language. It is worth noting that we should take the high
+machine accuracy with a grain of salt in the general domain because
+deception detection is a complex problem.1 The task introduced by
+Ott et al. [60] nevertheless provides an ideal sandbox to understand
+human predictions with assistance from machine learning models.
+Third, full automation is not desired in critical tasks such as
+deception detection because of ethical and legal concerns. The
+government should not have the authority to automatically block
+information from individuals, e.g., in the context of “fake news”. Fur-
+thermore, full automation may not comply with legal requirements.
+For instance, in the case of recidivism prediction, the Wisconsin
+Supreme Court ruled that “judges be made aware of the limitations
+of risk assessment tools” and “a COMPAS risk assessment should
+not be used to determine the severity of a sentence or whether
+an offender is incarcerated” [47, 71]. Similarly, the trial judge is
+required to act as a gatekeeper regarding the evidence from a poly-
+graph (lie detector) [70]. Therefore, it is crucial to retain human
+agency and understand human predictions with assistance from
+machine learning models.
+1For instance, one can argue that it is impossible to fully address the issue of deception
+in online reviews only based on textual information as an adversarial user can copy
+another user’s review, which becomes a deceptive review but with exactly the same
+text as a genuine one.
+Organization and Highlights. We start by reviewing related
+work to provide the necessary background for our study (Section 2).
+Our focus in this work is on investigating human predictions with
+assistance from machine learning models in the context of decep-
+tive review detection. To explore the spectrum between full human
+agency and full automation in Figure 1, we develop varying lev-
+els of assistance from machine learning models (Section 3). For
+example, the following three levels of machine assistance gradu-
+ally increase the influence of machine predictions: 1) showing only
+explanations of machine predictions without revealing predicted
+labels; 2) showing predicted labels without revealing high machine
+accuracy; 3) showing predicted labels with an explicit statement of
+strong machine accuracy.
+In Section 4, we investigate human performance under different
+experimental setups along the spectrum. We show that explana-
+tions alone slightly improve human performance, while showing
+predicted labels achieves great improvement (∼21% relative im-
+provement in human accuracy). However, this improvement is still
+moderate compared to “full” priming with an explicit statement of
+machine accuracy (∼46% relative improvement in human accuracy).
+Our findings suggest that there exists a tradeoff between human
+performance and human agency. Interestingly, when predicted la-
+bels are shown, explanations of machine predictions can achieve a
+similar effect as an explicit statement of machine accuracy. We also
+find that humans tend to trust correct machine predictions more
+than incorrect ones, indicating that they can somewhat identify
+when machines are correct.
+We further examine the effect of statements of machine accuracy
+by varying the accuracy numbers (Section 5). Surprisingly, we find
+that our participants are not sensitive to statements of machine
+accuracy and are more likely to trust machine predictions with an
+accuracy statement than without, even if the accuracy statement
+suggests poor machine performance. These observations echo with
+prior work on numeracy and suggest that it is difficult for humans
+to interpret and act on numbers [6, 62, 63, 69]. We also find that
+frequency explanations (e.g., 5 out of 10 for explaining 50%) can
+help humans calibrate the accuracy numbers. Note that we do
+not recommend these presentations on the spectrum because they
+present untruthful information.
+We discuss the limitations of our work and provide concluding
+thoughts regarding future directions of investigating best practices
+for integrating artificial intelligence into human decision making
+in Section 6.
+On Human Predictions with Explanations and Predictions of Machine Learning Models FAT* ’19, January 29–31, 2019, Atlanta, GA, USA

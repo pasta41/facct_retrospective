@@ -1,0 +1,1306 @@
+Fairness, Equality, and Power in Algorithmic Decision-Making
+Maximilian Kasy
+University of Oxford
+Department of Economics
+Rediet Abebe
+University of California, Berkeley
+Department of Electrical Engineering & Computer
+Sciences
+ABSTRACT
+Much of the debate on the impact of algorithms is concerned with
+fairness, defined as the absence of discrimination for individuals
+with the same “merit." Drawing on the theory of justice, we argue
+that leading notions of fairness suffer from three key limitations:
+they legitimize inequalities justified by “merit;" they are narrowly
+bracketed, considering only differences of treatment within the
+algorithm; and they consider between-group and not within-group
+differences. We contrast this fairness-based perspective with two
+alternate perspectives: the first focuses on inequality and the causal
+impact of algorithms and the second on the distribution of power.
+We formalize these perspectives drawing on techniques from causal
+inference and empirical economics, and characterize when they give
+divergent evaluations. We present theoretical results and empirical
+examples which demonstrate this tension. We further use these
+insights to present a guide for algorithmic auditing and discuss
+the importance of inequality- and power-centered frameworks in
+algorithmic decision-making.
+CCS CONCEPTS
+•Computingmethodologies→Philosophical/theoretical foun-
+dations of artificial intelligence; • Social and professional
+topics → Computing / technology policy.
+KEYWORDS
+Algorithmic fairness, inequality, power, auditing, empirical eco-
+nomics
+ACM Reference Format:
+Maximilian Kasy and Rediet Abebe. 2021. Fairness, Equality, and Power in
+Algorithmic Decision-Making. In Conference on Fairness, Accountability, and
+Transparency (FAccT ’21), March 3–10, 2021, Virtual Event, Canada. ACM,
+New York, NY, USA, 11 pages.
+1 INTRODUCTION
+A rich line of work within computer science examines the differ-
+ential treatment by algorithms of historically disadvantaged and
+marginalized groups. Much of this work is concerned with fairness
+of algorithms, which is understood as the absence of discrimination.
+Many leading notions of fairness – such as predictive parity or
+balance – are based on some variant of the question: are members
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+© 2021 Association for Computing Machinery.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+of different groups who are of equal “merit" treated equally by the
+algorithm?"
+1
+Research in this space has ranged from translating
+these fairness notions to various domains to examining when and
+whether they are simultaneously achievable with other constraints.
+In the spirit of “reflective equilibrium” [55], in this work we dis-
+cuss implications of these fairness definitions that may be deemed
+normatively undesirable. Leading notions of fairness take the ob-
+jective of the algorithm’s owner or designer as a normative goal. In
+the context of hiring, for instance, if productivity is perfectly pre-
+dictable and an employer’s hiring algorithm is profit-maximizing
+without constraints, then their hiring decisions are fair, by defi-
+nition; only deviations from profit-maximization are considered
+discriminatory. Furthermore, we argue that these leading notions
+of fairness, such as predictive parity or balance, suffer from the
+following three limitations.
+(1) They legitimize and perpetuate inequalities justified by “merit"
+both within and between groups. The focus on “merit" – a
+measure promoting the decision-maker’s objective – rein-
+forces, rather than questions, the legitimacy of the status
+quo.
+(2) They are narrowly-bracketed. Fairness only requires equal
+treatment within the context of the algorithm at hand, and
+does not consider the impact of the algorithm on inequality
+in the wider population. Unequal treatment that compen-
+sates pre-existing inequalities might reduce overall inequal-
+ity.
+(3) They focus on categories (protected groups) and ignore
+within-group inequalities, e.g., as emphasized by intersec-
+tional critiques [14]. Equal treatment across groups can be
+consistent with great inequality within groups.
+Informed by insights from theories of justice and empirical eco-
+nomics, we discuss each of these limitations. We then compare
+this fairness-based perspective with two alternative perspectives.
+The first asks: what is the causal impact of the introduction of an
+algorithm on inequality, both within and between groups? In con-
+trast to fairness, this perspective is consequentialist. It depends
+on the distribution of outcomes affected by the algorithm rather
+than treatment, and it does so for the full population rather than
+only for individuals who are part of the algorithm. This perspective
+encompasses both frameworks based on social welfare functions
+and statistical measures of inequality. In Section 3, we provide a
+formal characterization of the impact of marginal policy changes
+on both fairness and inequality using influence functions, which
+allows us to elucidate the conflict between these two objectives.
+1
+Definitions that do not have this general form are notions of “disparate impact,” which
+do not refer to merit, and notions of “individual fairness,” which are based on merit
+but do not refer to group membership.
+576
+DOI: 10.1145/3442188.3445919
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Kasy and Abebe
+The second alternative perspective focuses on the distribution
+of power and asks: who gets to pick the objective function of an algo-
+rithm? The choice of objective functions is intimately connected
+with the political economy question of who has ownership and
+control rights over data and algorithms. To explore this question,
+we formalize one possible notion of power based on the idea of
+“inverse welfare weights.”.
+2
+Given actual decisions, what are the
+welfare weights that rationalize these decisions? We formalize this
+in Section 4, which builds on insights from Section 3 by solving the
+inverse of a social welfare maximization problem.
+The rest of this paper is structured as follows: our setup is in-
+troduced in Section 2. We formalize the perspective based on the
+causal impact of algorithms in Section 3 and that based on distribu-
+tion of power in Section 4. In doing so, we highlight limitations of
+a fairness-based perspective, which we expose further in Section 5
+through examples. In Section 6, we present an empirical applica-
+tion of these insights. In Section 7, we present a step-by-step guide
+for algorithmic auditing, estimating the causal impact of algorith-
+mic changes on measures of inequality or welfare. We close with
+a discussion on the importance of inequality- and power-based
+frameworks in algorithmic decision-making.
+1.1 Related Work
+Many now-classic bodies of work study discrimination and harms
+caused by machine learning systems on historically disadvantaged
+groups in settings ranging from ad delivery [61] to facial analysis
+[10] to search engine bias [53] and provision of public services
+[16]. Barocas and Selbst provide a framework for understanding the
+negative consequences of such automated decision-making systems
+[5]. For general overviews and discussions, see also [1, 7, 9, 20, 53,
+54]. With a growing set of findings of algorithmic discrimination
+in the backdrop, researchers across numerous fields have sought to
+formalize and define different notions of fairness as well as analyze
+their feasibility, incompatibility, and politics. We direct the reader
+to [12, 19, 22, 38, 45, 50, 60, 64] for an overview and extensive
+discussions around various definitions of fairness as well as their
+relationship with other algorithmically-defined desiderata.
+Our work draws on the economics literature on discrimination,
+causal inference, social choice, optimal taxation, and on inequality
+and distributional decompositions. Definitions of fairness corre-
+spond to notions of taste-based and statistical discrimination in
+economics [6], and the notion of fairness defined in Equation (5)
+correspond to “hit-rate” based tests for taste-based discrimination
+as in [39]. Causal inference and the potential outcomes framework
+is reviewed in [32], social choice theory and welfare economics in
+[56]. Distributional decompositions are discussed in [18]; we draw
+in particular on the RIF regression approach of [17]. Understanding
+aggregation in social welfare functions in terms of welfare weights
+is common in optimal tax theory [58]. For a sociological perspective
+on discrimination, we direct the reader to an overview in [59].
+Recent work has considered short-comings of fairness across a
+number of dimensions. For instance, there is a growing body ofwork
+examining the long-term impact of fairness-driven interventions
+2
+Note, influence functions and welfare weights are commonly used in economics
+and statistics, but are less common in computer science. We present a self-contained
+introduction in the appendix as they are key tools in our analyses.
+[15, 28, 29, 41, 68]. Similarly, there is also a surge of work focused on
+understanding and improving fairness across subgroups [24, 35, 36]
+as well as in settings where group membership may not be known
+[21, 23, 33, 66]. Other work examines perceived trade-offs between
+fairness and other desiderata, such as accuracy [67].
+The closest work to ours have sought to understand the intersec-
+tion of fairness with social welfare and inequality [25, 26, 30, 48, 49].
+Despite tackling a different set of questions than ours, there are
+several papers that consider welfare-based analyses of fairness no-
+tions. In a notable example, Hu and Chen present a welfare-based
+study of fair classification and study the relationship between fair-
+ness definitions and the long-standing notions of social welfare
+considered in this work [30]. By translating a loss minimization
+program into a social welfare maximization problem, they show
+that more strict fairness criteria can lead to worse outcomes for
+both advantaged and disadvantaged groups. Heidari et al. similarly
+consider fairness and welfare, proposing welfare-based measures
+that can be incorporated into a loss minimization program, and
+Heidari et al. connect fairness to notions of equality of opportunity
+[25, 26]. In a related discussion, Mullainathan considers algorithmic
+fairness questions within a social welfare framework, comparing
+policies by machine learning systems with those set by a social
+planner that cares both about efficiency and equity [49]. These lines
+of line of work argue for more holistic assessments of welfare and
+equity in examining the impact of algorithmic decision-making.
+2 SETUP AND NOTATION
+A decision-maker D , such as a firm, a court, or a school, makes
+repeated decisions on individuals 𝑖 , who may be job applicants,
+defendants, or students. For clarity, we omit the subscript 𝑖 when
+there is no ambiguity. For each individual 𝑖 , a binary decision𝑊
+– such as hiring, release from jail, college admission – is made.
+Individuals are characterized by some unobserved “merit”𝑀 ∈ R,
+such as marginal productivity, recidivism, or future educational
+success. In some settings, 𝑀 is binary, but we do not make this
+assumption unless otherwise noted. In this work, merit 𝑀 refers
+to the variable that the decision-maker cares about; for instance
+a worker’s productivity in the hiring context, or recidivism in the
+bail setting context. This is the variable that supervised learning
+methods typically aim to predict. By contrast, the outcome 𝑌 –
+which we introduce in Section 3 below – is the variable that the
+treated individuals care about; for instance income in the hiring
+context, or time spent in jail in the bail setting context.
+3
+The decision-maker’s objective is to maximize
+` = 𝐸 [𝑊 · (𝑀 − 𝑐)], (1)
+where the expectation averages over individuals 𝑖 , and 𝑐 is the
+unit cost of choosing𝑊 = 1.4 Upper-case letters denote random
+variables, lower-case letters values that these random variables
+might take. In the hiring context, ` corresponds to profits and 𝑐
+to the wage rate. In the college admissions context, ` corresponds
+3
+Our terminology here deviates from familiar usage in that we use “outcome” to
+refer to 𝑌 rather than𝑀 . Note here, there are two possible “outcomes" – one for the
+individual concerned and one for the decision-maker – and this usage is intended to
+avoid ambiguity between them.
+4
+Formally, we consider a probability space (I , 𝑃,A ) , where all expectations integrate
+over 𝑖 ∈ I with respect to the probability measure 𝑃 , and all random variables are
+functions on I that are measurable with respect to A .
+577
+Fairness, Equality, and Power in Algorithmic Decision-Making FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+to average student performance among admitted students, and 𝑐
+might be the Lagrange multiplier (shadow cost) of some capacity
+constraint.
+The decision-maker D does not observe 𝑀 , but has access to
+some covariates (features) 𝑋 . D can also form a predictive model
+for𝑀 given 𝑋 based on past data,
+𝑚(𝑥) = 𝐸 [𝑀 |𝑋 = 𝑥] . (2)
+In practice,𝑚 needs to be estimated using some supervised machine
+learning algorithm. We will abstract from this estimation issue here
+and assume that𝑚(·) is known to D .
+D can allocate𝑊 as a function of 𝑋 , and possibly some ran-
+domization device. We assume throughout that𝑊 is chosen in-
+dependently of all other variables conditional on 𝑋 , and thus is
+conditionally exogenous.
+5
+Denote𝑤 (𝑥) = 𝐸 [𝑊 |𝑋 = 𝑥] the condi-
+tional probability of𝑊 = 1. Given their available information, the
+optimal assignment policy for D satisfies,
+𝑤∗ (·) = argmax
+𝑤 ( ·) ∈W
+𝐸 [𝐸 [𝑊 · (𝑀 − 𝑐) |𝑋 ]]
+= argmax
+𝑤 ( ·) ∈W
+𝐸 [𝑤 (𝑋 ) · (𝑚(𝑋 ) − 𝑐)], (3)
+where W is a set of admissible assignment policies.
+6
+The second
+equality holds because of conditional exogeneity of𝑊 and the law
+of iterated expectations. If W is unrestricted, then up to arbitrary
+tie breaking for𝑚(𝑋 ) = 𝑐 ,
+𝑤∗ (𝑥) = 1(𝑚(𝑥) > 𝑐) . (4)
+We assume that individuals are additionally characterized by a
+binary variable𝐴, corresponding to protected groups such as gender
+or race. This variable 𝐴 may or may not be part of 𝑋 .
+Fairness Definitions. Numerous definitions of fairness have been
+proposed in the literature [31, 50]. We will focus on the follow-
+ing popular definition of fairness, corresponding to the notion of
+“predictive parity” or calibration,
+𝐸 [𝑀 |𝑊 = 1, 𝐴 = 𝑎] = 𝐸 [𝑀 |𝑊 = 1] ∀ 𝑎. (5)
+This equality is the basis of tests for preferential discrimination in
+empirical economics. (See for instance [39].) A similar requirement
+could be imposed for𝑊 = 0.
+Another related requirement is “balance for the positive (or neg-
+ative) class,” 𝐸 [𝑊 |𝑀 = 𝑚,𝐴] = 𝐸 [𝑊 |𝑀 = 𝑚], which indicates
+equality of false positive (respectively negative) rates.
+Predictive parity requires that expected merit, conditional on
+having received treatment 1 (or 0), is the same across the groups 𝐴.
+Balance requires that the probability of being treated, conditional
+on merit, is the same across the groups 𝐴. For the binary 𝑀 case,
+balance and predictive parity cannot hold at the same time, unless
+either prediction is perfect (𝑀 = 𝐸 [𝑀 |𝑋 ]), or base rates are equal
+(𝑀 ⊥ 𝐴|𝑊 ) [12, 22, 38] . In our subsequent discussion, we focus on
+“predictive parity” as the leading measure of fairness; we provide
+parallel results for balance in Appendix A.
+5
+This assumption holds by construction, if 𝑋 captures all individual-specific informa-
+tion available to D .
+6
+This type of decision problem, with a focus on estimation in finite samples, has been
+considered for instance in [37] and [3].
+For 𝐴 ∈ {0, 1}, the assignment rule 𝑤 (·) satisfies predictive
+parity if and only if 𝜋 = 0, where
+𝜋 = 𝐸 [𝑀 |𝑊 = 1, 𝐴 = 1] − 𝐸 [𝑀 |𝑊 = 1, 𝐴 = 0]
+= 𝐸
+[
+𝑀 ·
+(
+𝑊𝐴
+𝐸 [𝑊𝐴] −
+𝑊 (1−𝐴)
+𝐸 [𝑊 (1−𝐴) ]
+)]
+. (6)
+Fairness as a constraint. A leading approach in the recent literature
+is to consider fairness as a constraint to be imposed on the decision-
+maker’s policy space. That is,𝑤∗ (·) is defined as above, but W is
+specified to be of the form,
+W = {𝑤 (·) : 𝜋 = 0} (7)
+for predictive parity (and similarly for other notions of fairness). We
+characterize the solution to this optimization problem in Corollary
+1 below.
+We argued in the introduction that fairness takes the objective
+of the algorithm’s owner as a normative goal. This is formalized by
+the following observation.
+Observation 1. Suppose that (i)𝑚(𝑋 ) = 𝑀 (perfect predictabil-
+ity), (ii)𝑤∗ (𝑥) = 1(𝑚(𝑋 ) > 𝑐) (unconstrained maximization of D ’s
+objective `), and (iii) 𝑊,𝑀 ∈ {0, 1} (classification setting). Then
+𝑤∗ (𝑥) satisfies predictive parity, i.e., 𝜋 = 0.
+This observation is an immediate consequence of the definition
+of fairness as predictive parity and points to the limited critical
+potential of such a definition of fairness. It implies, for instance,
+that if 𝑀 is perfectly predictable given the available features and
+employers are profit-maximizing without constraints, then their
+hiring decisions will be fair by definition. The algorithm𝑤 (·) vio-
+lates fairness only if (i) D is not actually maximizing 𝜋 (taste-based
+discrimination), (ii) outcomes are mismeasured, leading to biased
+predictions𝑚(·), or (iii) predictability is imperfect, leading to statis-
+tical discrimination. Similar observations could be stated for other
+notions of fairness, such as “balance for the positive class” (cf. Obser-
+vation 2 in the appendix), and for other settings, such as regression,
+where𝑀,𝑊 ∈ R.
+Absent perfect predictability, there may be a tension between the
+maximization of ` and predictive parity (𝜋 = 0). This tension has
+been discussed in economics as a failure of predictive parity (called
+“hit rate test” in this literature, [39]) to perfectly reflect taste-based
+discrimination [6]. This failure is due to the difference between av-
+erage and marginal expected merit among the treated. Taste-based
+discrimination corresponds to differences between the merit of the
+marginally treated, while predictive parity corresponds to equality
+of average merit among the treated. profit-maximization is equiva-
+lent to the absence of taste-based discrimination, by definition.
+Observation 1 throws the three limitations of a fairness-based
+perspective into sharp relief: under this perspective, inequality both
+between and within groups is acceptable if it is justified by merit𝑀
+(D ’s objective), no matter where the inequality in𝑀 is coming from.
+Furthermore, given merit, fairness aims for equal treatment within
+the algorithm, rather than aiming for compensating pre-existing
+inequalities of welfare-relevant outcomes in the wider population.
+And, finally, predictive parity or balance do not consider inequality
+of treatments (or outcomes) within the protected groups, but rather
+only between them. Below, we provide examples where changes to
+578
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Kasy and Abebe
+an assignment algorithm𝑤 (·) decreases un-fairness, while at the
+same time also increasing inequality and decreasing welfare.
+3 INEQUALITY AND THE CAUSAL IMPACT
+OF ALGORITHMS
+Drawing on theories of justice, we turn to a perspective focused
+on social welfare and inequality as well as the causal impact of
+algorithms [34, 56, 58]. Suppose that we are interested in outcomes
+𝑌 that might be affected by the treatment𝑊 , where the outcomes
+𝑌 are determined by the potential outcome equation
+𝑌 =𝑊 · 𝑌1 + (1 −𝑊 ) · 𝑌0, (8)
+cf. [32]. Suppose, further, that treatment is assigned randomly con-
+ditional on 𝑋 with assignment probability 𝑤 (𝑋 ). Then, the joint
+density of 𝑋 and 𝑌 is given by
+7
+𝑝𝑌,𝑋 (𝑦, 𝑥) =
+[
+𝑝𝑌0 |𝑋 (𝑦, 𝑥)+
+𝑤 (𝑥) ·
+(
+𝑝𝑌1 |𝑋 (𝑦, 𝑥) − 𝑝𝑌0 |𝑋 (𝑦, 𝑥)
+)]
+· 𝑝𝑋 (𝑥) . (9)
+We are interested in the impact of𝑤 (·) on a general statistic a
+of the joint distribution of outcomes 𝑌 and features 𝑋
+a = a (𝑝𝑌,𝑋 ) . (10)
+a might be a measure of inequality (such as the variance of 𝑌 or the
+ratio between two quantiles of 𝑌 ), a measure of welfare (such as
+the expectation of 𝑌𝛾 , where 𝛾 parametrizes inequality aversion),
+or a measure of group-based inequality (such as the difference in
+the conditional expectation of 𝑌 given 𝐴 = 1 and 𝐴 = 0).
+The influence function and welfare weights. In order to characterize
+the impact of changes to the assignment policy𝑤 (𝑥) on the statistic
+a , it is useful to introduce the following local approximation to a .
+Assume that a is differentiable as a function of the density 𝑝𝑌,𝑋 .
+8
+Then, as discussed [63], as well as in [13], [17], and [34], we can
+locally approximate a by
+a (𝑝𝑌,𝑋 ) − a (𝑝∗𝑌,𝑋 ) = 𝐸 [𝐼𝐹 (𝑌,𝑋 )] + 𝑜
+(
+∥𝑝𝑌,𝑋 − 𝑝∗𝑌,𝑋 ∥
+)
+, (11)
+where 𝐼𝐹 (𝑌,𝑋 ) is the influence function of a (𝑝𝑌,𝑋 ) at 𝑝∗𝑌,𝑋 , evalu-
+ated at the realization 𝑌,𝑋 , and the expectation averages over the
+distribution 𝑝𝑌,𝑋 .
+For completeness, in Section B in the appendix, we provide an
+introduction and review, as well as a more formal definition of the
+influence function as dual representation of the Fréchet derivative
+of a .
+Suppose now that
+𝑤 (𝑥) = 𝑤∗ (𝑥) + 𝜖 · 𝑑𝑤 (𝑥), (12)
+where𝑤0
+is some baseline assignment rule, and𝑑𝑤 (𝑥) is a local per-
+turbation to𝑤 . Suppose that 𝑝 and 𝑝∗ are the outcome distributions
+corresponding to𝑤 and𝑤∗
+. By Equation (11)
+a (𝑝𝑌,𝑋 ) − a (𝑝∗𝑌,𝑋 ) ≈
+∫
+𝐼𝐹 (𝑦, 𝑥) (𝑝𝑌,𝑋 (𝑦, 𝑥) − 𝑝∗𝑌,𝑋 (𝑦, 𝑥))𝑑𝑦𝑑𝑥.
+7
+The density is assumed to exist with respect to some dominating measure. For simplic-
+ity of notation, our expressions are for the case where the dominating measure is the
+Lebesgue measure, but they immediately generalize to general dominating measures.
+8
+To be precise, we need Fréchet-differentability with respect to the 𝐿∞ norm on the
+space of densities of 𝑌,𝑋 with respect to some dominating measure.
+By Equations (9), it then follows that:
+𝜕
+𝜕𝜖
+a (𝑝𝑌,𝑋 ) =
+∫
+𝐼𝐹 (𝑦, 𝑥) ·
+(
+𝑝𝑌1 |𝑋 (𝑦, 𝑥) − 𝑝𝑌0 |𝑋 (𝑦, 𝑥)
+)
+· 𝑝𝑋 (𝑥)𝑑𝑥
+= 𝐸 [𝑑𝑤 (𝑋 ) · 𝑛(𝑋 )] , where
+𝑛(𝑥) = 𝐸
+[
+𝐼𝐹 (𝑌1, 𝑥) − 𝐼𝐹 (𝑌0, 𝑥) |𝑋 = 𝑥
+]
+. (13)
+Proposition 1 below proves this claim. Defining 𝜔 as the average
+slope of 𝐼𝐹 (𝑦, 𝑥) between 𝑌0
+and 𝑌1
+, we can rewrite 𝐼𝐹 (𝑌1, 𝑥) −
+𝐼𝐹 (𝑌0, 𝑥) = 𝜔 · (𝑌1−𝑌0). We can think of𝜔 as the “welfare weight”
+for each person, measuring how much the statistic a “cares” about
+increasing the outcome 𝑌 for that person. This is analogous to the
+welfare weights used in public economics and optimal tax theory, cf.
+[57, 58]. We present examples to give intuition of welfare weights
+and influence functions.
+Example 3.1. For the mean outcome a = 𝐸 [𝑌 ], we get 𝐼𝐹 =
+𝑌 − 𝐸 [𝑌 ] and 𝜔 = 1. For the variance of outcomes a = Var(𝑌 ),
+we get 𝐼𝐹 = (𝑌 − 𝐸 [𝑌 ])2 − Var(𝑌 ) and 𝜔 ≈ 2(𝑌 − 𝐸 [𝑌 ]). For
+the mean of some power of the outcome, a = 𝐸 [𝑌𝛾/𝛾], we get
+𝐼𝐹 = 𝑌𝛾 − 𝐸 [𝑌𝛾 ] and 𝜔 ≈ 𝑌𝛾−1. And lastly, for the between-group
+difference of average outcomes, a = 𝐸 [𝑌 |𝐴 = 1] − 𝐸 [𝑌 |𝐴 = 0], we
+have 𝐼𝐹 = 𝑌 ·
+(
+𝐴
+𝐸 [𝐴] −
+1−𝐴
+1−𝐸 [𝐴]
+)
+− a and 𝜔 = 𝐴
+𝐸 [𝐴] −
+1−𝐴
+1−𝐸 [𝐴] .
+Utilitarian welfare. Thus far, we have discussed welfare in terms of
+outcomes 𝑌 that are observable in principle. This contrasts with the
+typical approach in welfare economics [11, 44], where welfare is
+defined based on the unobserved utility of individuals. Unobserved
+utility can be operationalized in terms of equivalent variation, that
+is, willingness to pay: what is the amount of money 𝑍 that would
+leave an individual indifferent between receiving 𝑍 and no treat-
+ment (𝑊 = 0), or receiving𝑊 = 1 but no money. Based on this
+notion of equivalent variation, social welfare can then be defined as
+a = 𝐸 [(𝜔 · 𝑍 ) ·𝑊 ] . The welfare weights 𝜔 now measure the value
+assigned to a marginal unit of money for a given person. Welfare
+weights reflect distributional preferences.
+Tension between the decision-maker’s objective, fairness, and equality.
+In the following proposition, we characterize the effect of a mar-
+ginal change 𝑑𝑤 (·) of the policy 𝑤 (·) on the different objectives,
+the decision-maker’s objective `, the measure of fairness 𝜋 , and sta-
+tistics a that might measure inequality or social welfare. Conflicts
+between these three objectives can arise if 𝑙 (𝑥), 𝑝 (𝑋 ), and 𝑛(𝑥), as
+defined below, are not affine transformations of each other.
+Proposition 1 (Marginal policy changes). Consider a family
+of assignment policies
+𝑤 (𝑥) = 𝑤∗ (𝑥) + 𝜖 · 𝑑𝑤 (𝑥),
+and denote by 𝑑`, 𝑑𝜋 , and 𝑑a the derivatives of ` (D ’s objective), 𝜋
+(the measure of fairness), and a (inequality or social welfare) with
+respect to 𝜖 . Suppose that a is Fréchet-differentable with respect to
+the 𝐿∞ norm on the space of densities of 𝑌,𝑋 with respect to some
+dominating measure.
+Then
+𝑑` = 𝐸 [𝑑𝑤 (𝑋 ) · 𝑙 (𝑋 )],
+𝑑𝜋 = 𝐸 [𝑑𝑤 (𝑋 ) · 𝑝 (𝑋 )] ,
+𝑑a = 𝐸 [𝑑𝑤 (𝑋 ) · 𝑛(𝑋 )],
+579
+Fairness, Equality, and Power in Algorithmic Decision-Making FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+where
+𝑙 (𝑥) = 𝐸 [𝑀 |𝑋 = 𝑥] − 𝑐, (14)
+𝑝 (𝑥) = 𝐸
+[
+(𝑀 − 𝐸 [𝑀 |𝑊 = 1, 𝐴 = 1]) · 𝐴
+𝐸 [𝑊𝐴]
+− (𝑀 − 𝐸 [𝑀 |𝑊 = 1, 𝐴 = 0]) · (1 −𝐴)
+𝐸 [𝑊 (1 −𝐴)]
+𝑋 = 𝑥
+]
+,
+(15)
+𝑛(𝑥) = 𝐸
+[
+𝐼𝐹 (𝑌1, 𝑥) − 𝐼𝐹 (𝑌0, 𝑥) |𝑋 = 𝑥
+]
+. (16)
+Proof. The case of ` is immediate from the definition of `. The
+case of a follows from the definition of Fréchet differentiability (cf.
+Section 20.2 in [63]), Lemma 1 in [34], and the arguments in Section
+3 of this paper. This leaves the case of 𝜋 . Let us consider the first
+component of 𝜋 ,
+𝐸 [𝑀 |𝑊 = 1, 𝐴 = 1] = 𝐸
+[
+𝑊𝑀𝐴
+𝐸 [𝑊𝐴]
+]
+,
+and thus
+𝑑𝐸 [𝑀 |𝑊 = 1, 𝐴 = 1]
+= 𝐸
+[
+𝑑𝑤 (𝑋 ) ·
+(
+𝑀𝐴
+𝐸 [𝑊𝐴] −
+𝐸 [𝑊𝑀𝐴]
+𝐸 [𝑊𝐴]2
+· 𝐴
+)]
+= 𝐸
+[
+𝑑𝑤 (𝑋 ) · (𝑀 − 𝐸 [𝑀 |𝑊 = 1, 𝐴 = 1]) · 𝐴
+𝐸 [𝑊𝐴]
+]
+The derivative of 𝐸 [𝑀 |𝑊 = 1, 𝐴 = 0] can be calculated similarly,
+and the claim follows. □
+Proposition 1 has a number of important consequences: First, it
+provides the basis for analyzing the distributional impact of algo-
+rithms or changes to algorithms, as part of an algorithmic auditing
+process, along the lines we demonstrated in our empirical appli-
+cation in Section 6. We provide a step-by-step guide for such an
+algorithmic auditing procedure in Section 7. Suppose that in our
+data the treatment𝑊 is plausibly exogenous given the features 𝑋 .
+Then, 𝑛(𝑥) can be estimated by regressing the influence function
+𝐼𝐹 (𝑌,𝑋 ) (for some statistic a) on𝑊 , controlling for 𝑋 , using for
+instance a causal forest or some other supervised learning method.
+The impact of switching from assignment algorithm𝑤∗ (𝑥) to some
+other algorithm𝑤 (𝑥) is then (to first order) given by the average
+of 𝑑𝑤 (𝑋 ) times 𝑛(𝑋 ), over the distribution of features X. This al-
+lows us to estimate the impact of the change of the algorithm on
+inequality, welfare, or between group differences.
+Second, Proposition 1 helps us elucidate the tension between
+conflicting objectives such as profits, fairness, and equality or wel-
+fare, and to connect these to the notion of welfare weights. Suppose,
+for instance, that 𝜋 is negative and that for some feature value 𝑥
+we have that 𝑛(𝑥) (for some measure of welfare a) is positive, while
+𝑝 (𝑥) is negative. This tells us that increasing the treatment prob-
+ability𝑤 (𝑥) at 𝑥 is good for welfare and bad for fairness. We can
+thus understand which parts of the feature space drive the tension
+between alternative objectives.
+Third, Proposition 1 allows us to characterize the optimal assign-
+ment 𝑥 → 𝑤 (𝑥) from the decision-maker’s point of view, when
+constrained to fair allocations; this is done in Corollary 1, below.
+Fourth, Proposition 1 allows us to understand whose welfare a
+status-quo decision procedure implicitly values, by deriving inverse
+welfare weights; this is done in Corollary 2 below. This insight is
+again relevant for the practice of algorithmic auditing. For a related
+approach, see for instance [8].
+Let us now reconsider the problem of maximizing ` subject
+to the fairness constraint 𝜋 = 0. The solution to this problem is
+characterized in Corollary 1, drawing on Proposition 1.
+Corollary 1 (Optimal policy under the fairness constraint).
+The solution to the problem of maximizing D ’s objective ` subject to
+the fairness constraint 𝜋 = 0 by choice of𝑤 (·) is given by
+𝑤 (𝑥) = 1(𝑙 (𝑥) > _𝑝 (𝑥)), (17)
+for some constant _, where we have chosen𝑤 (𝑥) arbitrarily for values
+of 𝑥 such that 𝑙 (𝑥) = _𝑝 (𝑥), and the equality holds with probability
+1.
+Proof. We are looking for a solution to
+max
+𝑤 ( ·)
+` =
+∫
+(𝑚(𝑥) − 𝑐)𝑝𝑋 (𝑥)𝑑𝑥 subject to
+𝜋 = 𝐸
+[
+𝑀𝑊𝐴
+𝐸 [𝑊𝐴] −
+𝑀𝑊 (1 −𝐴)
+𝐸 [𝑊 (1 −𝐴)]
+]
+= 0 and
+0 ≤ 𝑤 (𝑥) ≤ 1 ∀ 𝑥 .
+The Lagrangian for the objective and the fairness constraint is
+given by L = ` + _𝜋 . Consider a family of policies indexed by 𝜖 ,
+𝑤 (𝑥) = 𝑤∗ (𝑥) + 𝜖 · 𝑑𝑤 (𝑥), as in Proposition 1. The solution to our
+optimization problem has to satisfy the condition
+𝜕L
+𝜖
+≤ 0
+for all feasible changes 𝑑𝑤 , that is, for all 𝑑𝑤 such that
+𝑤∗ (𝑥) = 1 ⇒ 𝑑𝑤 (𝑥) ≤ 0
+𝑤∗ (𝑥) = 0 ⇒ 𝑑𝑤 (𝑥) ≥ 0.
+By Proposition 1,
+𝜕L
+𝜕𝜖
+=
+∫
+𝑑𝑤 (𝑥) (𝑙 (𝑥) + _𝑝 (𝑥)) 𝑝𝑋 (𝑥)𝑑𝑥 .
+Suppose there is some set of values 𝑥 of non-zero probability such
+that𝑤∗ (𝑥) < 1 and 𝑙 (𝑥) + _𝑝 (𝑥) > 0. Setting 𝑑𝑤 (𝑥) = 1 on this set
+would yield a contradiction. The claim then follows. □
+4 DISTRIBUTION OF POWER
+Fairness provides a framework to critique the unequal treatment of
+individuals 𝑖 with the same merit, where merit is defined in terms of
+D ’s objective. The equality framework takes a broader perspective
+by requiring that we consider the causal impact of an algorithm
+on the distribution of relevant outcomes 𝑌 across individuals 𝑖
+more generally. Both of these perspectives, however, do not address
+another key component: who gets to set the objective function and
+why?
+Here, we take a political economy perspective on algorithmic
+decision-making to provide a framework for examining this ques-
+tion. Political economy is concerned with the ownership of the
+means of production, as this brings both income and control rights
+[43]. In the setting of algorithmic decision-making, this maps into
+two related questions: first, who owns and controls data, and in
+particular data 𝑋 about individuals? And second, who gets to pick
+580
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Kasy and Abebe
+the algorithms W and objective functions ` that use this data? We
+are further concerned with the consequences of this structure of
+ownership and control. The answers to these questions depend on
+contingent historical developments and political choices, rather
+than natural necessity [47, 69].
+Implied welfare weights as a measure of power. In the present work,
+we propose the following framework for the political economy of
+algorithmic decision-making: we study actual decision procedures
+𝑤 (·) by considering the welfare weights 𝜔 that would rationalize
+these procedures as optimal. Put differently, we consider the dual
+problem of finding the optimal policy for a given measure of social
+welfare.
+Above, we discussed the effect of marginal policy changes on
+statistics a that might measure welfare. We argued that this effect
+can be written as 𝐸 [𝑑𝑤 (𝑋 ) · 𝐸 [𝜔 · (𝑌1 − 𝑌0) |𝑋 ]], where 𝜔 are
+“welfare weights,” measuring how much we care about a marginal
+increase of 𝑌 for a given individual. The optimal policy problem of
+maximizing a linear (or linearized) objective a = 𝐸 [𝜔 ·𝑌 ] net of the
+costs of treatment 𝐸 [𝑐 ·𝑊 ] defines a mapping
+(𝜔𝑖 )𝑖 → 𝑤∗ (·) = argmax
+𝑤 ( ·) ∈W
+𝐸
+[(
+𝜔 · (𝑌1 − 𝑌0) − 𝑐
+)
+·𝑤 (𝑋 )
+]
+. (18)
+We are now interested in the inverse mapping𝑤∗ (·) → (𝜔𝑖 )𝑖 . This
+mapping gives the welfare weights 𝜔 which would rationalize a
+given assignment algorithm𝑤 (·) as optimal. These welfare weights
+can be thought of as one measure of the effective social power
+of different individuals. The following corollary of Proposition 1
+characterizes this inverse mapping in the context of our binary
+treatment setting. We characterize the implied welfare weights 𝜔
+that would rationalize a given policy𝑤 (·).
+Corollary 2 (Implied welfare weights). Suppose that welfare
+weights are a function of the observable features 𝑋 , and that there is
+again a cost of treatment 𝑐 . A given assignment rule𝑤 (·) is a solution
+to the problem
+argmax
+𝑤 ( ·)
+𝐸 [𝑤 (𝑋 ) · (𝜔 (𝑋 ) · 𝐸 [𝑌1 − 𝑌0 |𝑋 ] − 𝑐)] (19)
+if and only if
+𝑤 (𝑥) = 1 ⇒ 𝜔 (𝑋 ) > 𝑐/𝐸 [𝑌1 − 𝑌0 |𝑋 ])
+𝑤 (𝑥) = 0 ⇒ 𝜔 (𝑋 ) < 𝑐/𝐸 [𝑌1 − 𝑌0 |𝑋 ])
+𝑤 (𝑥) ∈]0, 1[ ⇒ 𝜔 (𝑋 ) = 𝑐/𝐸 [𝑌1 − 𝑌0 |𝑋 ]). (20)
+This follows immediately from the Karush–Kuhn–Tucker condi-
+tions for the constrained optimization problem defining𝑤∗ (·).
+5 EXAMPLES FOR THE TENSIONS BETWEEN
+FAIRNESS AND EQUALITY
+We return to the limitations of a fairness-based perspective for-
+mulated at the outset. We illustrate each of these three limitations
+by providing examples where some change to the assignment al-
+gorithm 𝑤 (·) decreases un-fairness, while at the same time also
+increasing inequality and decreasing welfare. In each of the exam-
+ples, we consider the impact of an assignment rule𝑤 (𝑖𝑖)
+, relative
+to some baseline rule 𝑤 (𝑖)
+. We contrast fairness as measured by
+“predictive parity” to inequality (and welfare) as measured by either
+the variance of 𝑌 , or the average of 𝑌𝛾 , where 𝛾 < 1 measures the
+degree of inequality aversion.
+Legitimizing inequality based onmerit.We consider an improvement
+in the predictability of merit. Suppose that initially (under scenario
+𝑎), the decision-maker D only observes 𝐴, while under scenario 𝑏
+they can perfectly predict (observe) 𝑀 based on 𝑋 . Assume that
+𝑌 =𝑊 . Recall that 𝑐 denotes the cost of treatment, and assume that
+𝑀 is binary with 𝑃 (𝑀 = 1|𝐴 = 𝑎) = 𝑝𝑎 , where 0 < 𝑐 < 𝑝1 < 𝑝0 .
+Under these assumptions we get
+𝑊 (𝑖) = 1(𝐸 [𝑀 |𝐴] > 𝑐) = 1, 𝑊 (𝑖𝑖) = 1(𝐸 [𝑀 |𝑋 ] > 𝑐) = 𝑀.
+The policy 𝑎 is unfair (in the sense of predictive parity), since for
+this policy
+𝐸 [𝑀 |𝑊 (𝑖) = 1, 𝐴 = 1] = 𝑝1 < 𝑝0 = 𝐸 [𝑀 |𝑊 (𝑖) = 1, 𝐴 = 0],
+while the policy 𝑏 is fair, since
+𝐸 [𝑀 |𝑊 (𝑖𝑖) = 1, 𝐴 = 1] = 1 = 𝐸 [𝑀 |𝑊 (𝑖𝑖) = 1, 𝐴 = 0] .
+The increase in predictability has thus improved fairness.
+On the other hand, inequality of outcomes has also increased and
+welfare has decreased. By assumption𝑌 =𝑊 , so that Var(𝑖) (𝑌 ) = 0,
+Var(𝑖𝑖) (𝑌 ) = 𝐸 [𝑀] (1 − 𝐸 [𝑀]) > 0. Furthermore, expected welfare
+𝐸 [𝑌𝛾 ] has decreased, since 𝐸 (𝑖) [𝑌𝛾 ] = 1, 𝐸 (𝑖𝑖) [𝑌𝛾 ] = 𝐸 [𝑀] < 1.
+Narrow-bracketing. We consider a reform that abolishes affirmative
+action. Suppose that (𝑀,𝐴) is uniformly distributed on {0, 1}2,
+that 𝑀 is perfectly observable to the decision-maker D , and that
+0 < 𝑐 < 1. Suppose further that under scenario 𝑎 the decision-
+maker receives a reward (subsidy) of 1 for hiring members of the
+group 𝐴 = 1, but that this reward is removed under scenario 𝑏.
+Under these assumptions, we get
+𝑊 (𝑖) = 1(𝑀 +𝐴 ≥ 1), 𝑊 (𝑖𝑖) = 𝑀.
+As before, the policy under scenario 𝑎 is unfair, while the policy
+under scenario 𝑏 is fair, since
+𝐸 [𝑀 |𝑊 (𝑖) = 1, 𝐴 = 1] = .5 < 1 = 𝐸 [𝑀 |𝑊 (𝑖) = 1, 𝐴 = 0],
+while
+𝐸 [𝑀 |𝑊 (𝑖𝑖) = 1, 𝐴 = 1] = 1 = 𝐸 [𝑀 |𝑊 (𝑖𝑖) = 1, 𝐴 = 0] .
+Suppose now that potential outcomes are given by 𝑌𝑤 = (1 −
+𝐴) +𝑤. Under the two scenarios, the outcome distributions are
+𝑌𝑊
+(𝑖 )
+= 1 + 1(𝐴 = 0, 𝑀 = 1) ∼ 𝐶𝑎𝑡 (0, 3/4, 1/4), and
+𝑌𝑊
+(𝑖𝑖 )
+= (1 −𝐴) +𝑀 ∼ 𝐶𝑎𝑡 (1/4, 1/2, 1/4),
+wherewe use𝐶𝑎𝑡 to denote the categorical distribution on {0, . . . , 2}
+with probabilities specified in brackets. This implies that Var(𝑖) (𝑌 ) =
+3/16, Var(𝑖𝑖) (𝑌 ) = 1/2, and 𝐸 (𝑖) [𝑌𝛾 ] = .75 + .25 · 2𝛾 , 𝐸 (𝑖𝑖) [𝑌𝛾 ] =
+.5 + .25 · 2𝛾 . Thus, as before, the inequality of outcomes has in-
+creased and welfare has decreased when we move from scenario 𝑎
+to scenario 𝑏.
+Within-group inequality. We finally consider a reform that man-
+dates fairness to the decision-maker. Suppose that 𝑃 (𝐴 = 1) = .5,
+𝑐 = .7, and further that 𝑀 |𝐴 = 1 ∼ 𝑈𝑛𝑖 𝑓 ({0, 1, 2, 3}), 𝑀 |𝐴 =
+0 ∼ 𝑈𝑛𝑖 𝑓 ({1, 2}), We assume initially D is unconstrained, but
+581
+Fairness, Equality, and Power in Algorithmic Decision-Making FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Figure 1: Distribution of Compas risk scores for Black and white defendants (left) and distribution of estimated average causal
+effects given observable features of the risk score on jail time, across defendants (right). Estimation of causal effects was based
+on a causal forest; see text for details.
+Table 1: Counter-factual scenarios
+Black White All
+Scenario (Score>4) Recid|(Score>4) Jail time (Score>4) Recid|(Score>4) Jail time Score>4 Mean JT IQR JT SD of log JT
+Affirmative Action 0.49 0.67 49.12 0.47 0.55 36.90 0.48 44.23 23.8 1.81
+Status quo 0.59 0.64 52.97 0.35 0.60 29.47 0.49 43.56 25.0 1.89
+Perfect predictability 0.52 1.00 65.86 0.40 1.00 42.85 0.48 56.65 59.9 2.10
+Table 2: Comparison of the consequences of two counterfactual scenarios (affirmative action, perfect predictability) to the
+status quo for Black, white, and all defendants.
+the reform mandates predictive parity, 𝐸 [𝑀 |𝑊 (𝑖𝑖) = 1, 𝐴 = 1] =
+𝐸 [𝑀 |𝑊 (𝑖𝑖) = 1, 𝐴 = 0]. Then
+𝑊 (𝑖) = 1(𝑀 ≥ 1), 𝑊 (𝑖𝑖) = 1(𝑀 +𝐴 ≥ 2).
+Once again, the policy under scenario 𝑎 is unfair, while the policy
+under scenario 𝑏 is fair, since
+𝐸 [𝑀 |𝑊 (𝑖) = 1, 𝐴 = 1] = 2 > 1.5 = 𝐸 [𝑀 |𝑊 (𝑖) = 1, 𝐴 = 0], and
+𝐸 [𝑀 |𝑊 (𝑖𝑖) = 1, 𝐴 = 1] = 2 = 𝐸 [𝑀 |𝑊 (𝑖𝑖) = 1, 𝐴 = 0] .
+Assume that potential outcomes are given by𝑌𝑤 = 𝑀+𝑤. Under
+the two scenarios, the outcome distributions are
+𝑌𝑊
+(𝑖 )
+= 𝑀 + 1(𝑀 ≥ 1) ∼ 𝐶𝑎𝑡 (1/8, 0, 3/8, 3/8, 1/8),
+𝑌𝑊
+(𝑖𝑖 )
+= 𝑀 + 1(𝑀 +𝐴 ≥ 2) ∼ 𝐶𝑎𝑡 (1/8, 2/8, 1/8, 3/8, 1/8),
+wherewe use𝐶𝑎𝑡 to denote the categorical distribution on {0, . . . , 4}
+with probabilities specified in brackets. This implies Var(𝑖) (𝑌 ) =
+1.24, Var(𝑖𝑖) (𝑌 ) = 1.61, and, choosing 𝛾 = .5, 𝐸 (𝑖) [𝑌𝛾 ] = 1.43,
+𝐸 (𝑖𝑖) [𝑌𝛾 ] = 1.33. Again, the inequality of outcomes increases and
+welfare declines as we move from scenario 𝑎 to scenario 𝑏.
+6 EMPIRICAL STUDY
+We illustrate our arguments using the Compas risk score data for
+recidivism. These data have received much attention following Pro-
+Publica’s reporting on algorithmic discrimination in sentencing
+[2]. We map our setup to the Compas data as follows: 𝐴 denotes
+race (Black or white),𝑊 denotes a risk score exceeding 4 (as in Pro-
+Publica’s analysis, based on the Compas classification as medium
+or high risk), 𝑀 denotes recidivism within two years, and 𝑌 de-
+notes jail time. The predictive features 𝑋 that we consider include
+race, sex, age, juvenile counts of misdemeanors, felonies, and other
+infractions, general prior counts, as well as charge degree.
+We compare three counter-factual scenarios. (1) A counter-factual
+“affirmative action” scenario, where race-specific adjustments are
+applied to the risk scores. We decrease the scores generated by
+Compas by one unit for Black defendants, and increase them one
+unit for white defendants. (2) The status-quo scenario, taking the
+original Compas scores as given. (3) A counter-factual “perfect
+predictability” scenario, where scores are set to 10 (the maximum
+value) for those who actually recidivated within 2 years. Scores are
+set to 1 (the minimum value) for all others.
+For each of these scenarios, we impute corresponding values of
+𝑊 (i.e., a counter-factual score bigger than 4), and counter-factual
+jail time 𝑌 . The latter is calculated based on a causal-forest estimate
+[65] of the impact on 𝑌 of risk scores, conditional on the covari-
+ates in 𝑋 . This relies on the (strong) assumption of conditional
+exogeneity of risk-scores given 𝑋 .
+As can be seen in Table 1, fairness as measured by predictive
+parity improves when moving from the affirmative action scenario
+to the status-quo, and is fully achieved in the perfect predictability
+scenario. This follows because the difference in expected recidivism,
+582
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Kasy and Abebe
+conditional on having a score bigger than 4, between Black and
+white defendants decreases as we go from one scenario to the next.
+On the other hand, Table 1 also shows that inequality, both
+between and within racial groups, increases as we go from one
+scenario to the next. The difference in mean jail time between Black
+and white defendants increases from about 12 days to about 23
+days. The interquartile range in the distribution of counter-factual
+jail time increases from about 24 days to 60 days. And the standard
+deviation of log jail time increases from 1.8 to 2.1.
+7 A GUIDE FOR ALGORITHMIC AUDITING
+USING DISTRIBUTIONAL
+DECOMPOSITIONS
+In this section, we provide a step-by-step guide to algorithmic audit-
+ing for distributional impacts. The method we discuss here builds
+on our characterization of distributional impacts in Proposition
+1. This method enables an auditor to estimate the causal impact
+of switching from treatment assignment 𝑤∗ (·) (the baseline) to
+a counterfactual treatment assignment 𝑤 (·) on some statistic a
+of the distribution of outcomes 𝑌 . The approach is based on the
+framework introduced in Section 3.
+Step 0: Normative choices. Before any analysis can begin, a num-
+ber of important normative choices have to be made. First, we need
+to determine the relevant outcomes 𝑌 for individuals’ welfare – in-
+come, education, jail time, and so on. Second, we need to decide
+on the relevant measures of welfare or inequality a . A number of
+choices were discussed in the paper. One option, allowing to rep-
+resent the entire distribution, is to report the impact on a series
+of quantiles; e.g. all percentiles. Third, the population of interest
+needs to be determined: Do we care about inequality only in our
+sample, or the population in the state, or the population in the
+entire country? In many cases, the population of interest will be
+large relative to the sample treated by the algorithm.
+Step 1: Calculation of influence functions. The next step is to
+calculate the influence function for the measures of interest, at
+the appropriate baseline distribution of the population of interest.
+This influence function is then evaluated at each of the observed
+outcomes in our sample, and stored in a new variable. For example,
+for the variance of outcomes a = Var(𝑌 ), we impute 𝐼𝐹 (𝑦𝑖 ) =
+(𝑦𝑖 − 𝐸 [𝑌 ])2 − Var(𝑌 ) for each observation in the sample, where
+𝐸 [𝑌 ] and Var(𝑌 ) are evaluated for the population of interest. For
+the between-group difference of average outcomes, a = 𝐸 [𝑌 |𝐴 =
+1] − 𝐸 [𝑌 |𝐴 = 0], we impute 𝐼𝐹 (𝑦𝑖 , 𝑎𝑖 ) = 𝑦𝑖 ·
+(
+𝑎𝑖
+𝐸 [𝐴] −
+1−𝑎𝑖
+1−𝐸 [𝐴]
+)
+− a ,
+where again 𝐸 [𝐴] and a are evaluated for the population of interest.
+See [13] for further examples.
+Step 2: Causal effect estimation. The next step in the proposed
+analysis is to estimate the conditional average treatment effect of
+𝑊 on 𝐼𝐹 (𝑌 ) given the observed features 𝑋 . That is, to estimate
+𝑛(𝑥) = 𝐸
+[
+𝐼𝐹 (𝑌1, 𝑥) − 𝐼𝐹 (𝑌0, 𝑥) |𝑋 = 𝑥
+]
+, (21)
+in the notation of Proposition 1.
+Such causal estimation requires random variation of the treat-
+ment𝑊 conditional on 𝑋 . i.e., conditional statistical independence
+𝑊 ⊥ (𝑌0, 𝑌1) |𝑋 . (22)
+Conditional independence is ensured in experimental settings (e.g.,
+data coming from A/B tests or (contextual) bandits). More generally,
+independence might be a reasonable approximation if the space of
+features 𝑋 is sufficiently rich, and 𝑋 does not include any variables
+that are causally “downstream” from𝑊 or 𝑌 .
+Many estimators are available to estimate𝑛(𝑥) under the assump-
+tion of conditional independence; in our application we have used
+the causal forest approach of [65]. After estimating the function
+𝑛(·), an estimated value of 𝑛(𝑥𝑖 ) is imputed for every observation 𝑖
+in the sample.
+Step 3: Counterfactual assignment probabilities. In order to eval-
+uate the impact of an algorithm 𝑤 (·), we need to compare it to
+a baseline algorithm with assignment probabilities𝑤∗ (·). In Step
+3, we need to evaluate these assignment probabilities 𝑤 (𝑥𝑖 ) and
+𝑤∗ (𝑥𝑖 ) for all 𝑖 , and impute
+Δ𝑤 (𝑥𝑖 ) = 𝑤 (𝑥𝑖 ) −𝑤∗ (𝑥𝑖 ) (23)
+for all 𝑖 in the sample.
+Step 4: Evaluation of distributional impact. The last step of our
+analysis then requires putting the pieces together, and evaluating
+Δ̂a = 𝛼 · 1
+𝑛
+∑
+𝑖
+Δ𝑤 (𝑥𝑖 ) · 𝑛(𝑥𝑖 ), (24)
+where 𝛼 is the share of the population of interest that is assigned
+treatment by the algorithm. Δ̂a is the estimated impact of switch-
+ing from algorithm 𝑤∗ (·) to algorithm 𝑤 (·) on the measure a of
+inequality or welfare.
+8 CONCLUSION
+In this work, we articulate and discuss three limitations of fairness-
+based perspectives under leading notions of fairness: namely, that
+they legitimize inequalities justified by merit, rather than question-
+ing the status quo; that they are narrowly bracketed and do not
+adequately engage with the impact of algorithms on pre-existing
+inequalities; and that they do not consider within-group inequali-
+ties, leading to intersectional concerns [4, 14, 27, 40, 42, 46, 51, 52].
+To help alleviate these limitations, we consider two alternative per-
+spectives drawing on theories of justice and empirical economics.
+An inequality-centered perspective is pertinent in settings where
+we presume that inequalities of social outcomes are socially cre-
+ated, and the same holds for various forms of “merit” (marginal
+productivity, recidivism, etc). Here, any decision system can be
+viewed as a step in the causal pathway of reproducing or reducing
+these inequalities. An approach intending to minimize harm on
+disadvantaged groups therefore does better to consider the effect
+of any particular decision system (whether algorithmic or human)
+on inequality as a whole, rather than aiming to solely optimize for
+a fixed fairness notion within the algorithm. The latter also risks
+normatively privileging between group equality to within group
+equality (cf. for instance Black feminist critiques of second wave
+feminism [14, 27, 42]).
+A perspective focused on the distribution of power compels us
+to consider the design of the algorithms themselves: Don’t just ask
+how the algorithm treats different people differently, but also who
+gets to do the treating. By taking a political economy perspective,
+we examine what implicit distribution of social power justifies
+583
+Fairness, Equality, and Power in Algorithmic Decision-Making FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+the current choice of objectives. Such a question foregrounds how
+power gets allocated, andwhat is the process that leads some groups
+to have more control over data in decision making processes.
+These alternative perspectives focused on inequality and power
+are not intended to entirely solve the above fairness concerns, but
+rather to elucidate them and bring to the forefront concerns that
+haven’t been adequately considered in the literature thus far. In do-
+ing so, we add to a recent line of work aiming to broaden discussions
+on the social impact of algorithmic decision-making.
+ACKNOWLEDGEMENTS
+We thank Stefano Caria, Zöe Hitzig, Jon Kleinberg, Joshua Loftus,
+Daniel Privitera, Ana-Andreea Stoica, Sam Taggart, Bryan Wilder,
+Angela Zhou, and other members of the MD4SG Working Group
+on Inequality for helpful feedback and comments.
+A BALANCE FOR THE POSITIVE CLASS
+We introduced predictive parity as a definition of fairness above.
+In Proposition 1 we then characterized the impact of marginal
+policy changes on the measure 𝜋 of predictive parity. An alternative,
+related, notion of fairness is balance for the positive class, which
+requires that 𝜋 = 0, where
+𝜋 = 𝐸 [𝑊 |𝑀 = 1, 𝐴 = 1] − 𝐸 [𝑊 |𝑀 = 1, 𝐴 = 0]
+= 𝐸
+[
+𝑊 ·
+(
+𝑀𝐴
+𝐸 [𝑀𝐴] −
+𝑀 (1 −𝐴)
+𝐸 [𝑀 (1 −𝐴)]
+)]
+. (25)
+In analogy to Observation 1, the following is immediate.
+Observation 2. Suppose that (i)𝑚(𝑋 ) = 𝑀 (perfect predictabil-
+ity) and (ii)𝑤∗ (𝑥) = 1(𝑚(𝑋 ) > 𝑐) (unconstrained maximization of
+D ’s objective `). Then𝑤∗ (𝑥) satisfies balance for the positive class,
+i.e., 𝜋 = 0.
+As in Proposition 1, we can also characterize the impact of mar-
+ginal policy changes on 𝜋 as 𝑑𝜋 = 𝐸
+[
+𝑑𝑤 (𝑋 ) · 𝑝 (𝑋 )
+]
+, where
+𝑝 (𝑥) = 𝐸
+[(
+𝑀𝐴
+𝐸 [𝑀𝐴] −
+𝑀 (1 −𝐴)
+𝐸 [𝑀 (1 −𝐴)]
+) 𝑋 = 𝑥
+]
+=
+(
+𝐸 [𝑀𝐴|𝑋 = 𝑥]
+𝐸 [𝑀𝐴] − 𝐸 [𝑀 (1 −𝐴) |𝑋 = 𝑥]
+𝐸 [𝑀 (1 −𝐴)]
+)
+. (26)
+The proof is immediate.
+B AN INTRODUCTION TO INFLUENCE
+FUNCTIONS ANDWELFAREWEIGHTS
+In this section we provide a self-contained introduction to and
+review of influence functions and welfare weights. Influence func-
+tions are useful in various subfields of statistics. Welfare weights are
+useful, in particular, in public finance and optimal tax theory. Both
+welfare weights and influence functions correspond to definitions
+of derivatives, that is, local linear approximations to (non-linear)
+functionals of interest.
+Let 𝑃 denote a probability measure corresponding to the distri-
+bution of some real valued random variable 𝑌 , possibly jointly with
+additional features𝑋 . We are interested in a statistic a of 𝑃 , where a
+might for instance correspond to some measure of inequality or of
+social welfare. Our goal in the following is to provide a local linear
+approximation to a in a vicinity of some baseline distribution 𝑃∗.
+Discrete finite distributions. We first consider the case of discrete
+distributions with finite support, where the definition of influence
+functions and welfare weights is elementary. Let 𝛿𝑦 denote the
+measure with unit mass at the point 𝑦, and assume that
+𝑃 =
+𝑘∑
+𝑖=1
+𝑝𝑖𝛿𝑦𝑖 . (27)
+Denote 𝒑 = (𝑝1, . . . , 𝑝𝑘 ) as well as 𝒚 = (𝑦1, . . . , 𝑦𝑘 ). Then we can
+write, with a slight abuse of notation
+a (𝑃) = a (𝒑,𝒚) . (28)
+We assume that a is a differentiable function of all of its arguments.
+To give an example motivating the following definitions, sup-
+pose hat 𝑃 describes a distribution of income 𝑌 across different
+types of people 𝑖 . Then the welfare weights 𝜔𝑖 measure how much
+a would change if the income of people of type 𝑖 was marginally
+increased, while the influence function 𝐼𝐹𝑖 measures how much
+a would change if the share of people of type 𝑖 was marginally
+increased.
+Formally, the welfare weights 𝜔𝑖 are given by the derivative of
+a with respect to the vector of outcome values 𝒚, evaluated at the
+baseline distribution 𝑃∗,
+𝜔𝑖 =
+𝜕
+𝜕𝑦𝑖
+a (𝒑∗,𝒚)
+
+𝒚=𝒚∗ . (29)
+The influence function 𝐼𝐹𝑖 is given by the derivative of a with
+respect to the vector of probabilities 𝒑, evaluated at the baseline
+distribution 𝑃∗. A minor complication here is that the statistic a
+is, in general, only defined for probability vectors 𝒑, which satisfy∑
+𝑖 𝑝𝑖 = 1. The influence function at 𝑦𝑖 is therefore defined as the
+derivative with respect to 𝜖 of a evaluated at 𝑃∗ + 𝜖 · (𝜹𝑦𝑖 − 𝑃∗),
+that is,
+𝐼𝐹𝑖 =
+𝜕
+𝜕𝜖
+a (𝒑∗ + 𝜖 · (𝑒𝑖 − 𝒑∗); 𝒚)
+
+𝜖=0, (30)
+where 𝑒𝑖 is the 𝑖th unit vector.
+By the definition of differentiability of a , we can now locally
+approximate a in the following two ways:
+a (𝒑∗; 𝒚) = a (𝒑∗; 𝒚∗) +
+∑
+𝑖
+𝜔𝑖 · (𝑦𝑖 − 𝑦∗𝑖 ) + 𝑜 (∥𝒚 −𝒚∗∥), (31)
+a (𝒑; 𝒚∗) = a (𝒑∗; 𝒚∗) +
+∑
+𝑖
+𝐼𝐹𝑖 · (𝑝𝑖 − 𝑝∗𝑖 ) + 𝑜 (∥𝒑 − 𝒑∗∥) . (32)
+Influence functions for general distributions. We have introduced
+influence functions and welfare weights for discrete distributions.
+These concepts extend to functionals a of general probability mea-
+sures 𝑃 that describe some joint distribution of 𝑌 and 𝑋 . In par-
+ticular, suppose that a is Fréchet differentiable at 𝑃∗, in the sense
+that
+lim
+𝑃→𝑃∗
+∥(a (𝑃) − a (𝑃∗)) − 𝐷a (𝑃 − 𝑃∗)∥
+∥𝑃 − 𝑃∗∥ = 0, (33)
+where 𝐷a is a continuous linear functional with respect to the
+𝐿2 norm on the space of densities which is defined by ∥𝑃 ∥ =√∫
+(𝑑𝑃/𝑑𝑃∗)2𝑑𝑃∗ . The limit has to equal 0 for all sequences of
+probability measures 𝑃 converging to 𝑃∗.
+584
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Kasy and Abebe
+Recall that 𝐿2 is a Hilbert space, i.e., a vector space equipped
+with an inner product ⟨., .⟩. By the Riesz representation theorem, we
+know that for any continuous linear functional 𝐷 : 𝐿2 → R there
+exists an element 𝐼𝐹 ∈ 𝐿2, such that
+𝐷 (𝒑) = ⟨𝐼𝐹 ,𝒑⟩ = 𝐸𝒑 [𝐼𝐹 ] (34)
+for all 𝒑 ∈ 𝐿2. The vector 𝐼𝐹 is the dual representation of the linear
+functional 𝐷 .9
+Combining equations (33) and (34), and noting that by construc-
+tion 𝐸𝑃∗ [𝐼𝐹 ] = 0, we see that, again
+a (𝑃) = a (𝑃∗) + 𝐸𝑃 [𝐼𝐹 ] + 𝑜 (∥𝑃 − 𝑃∗∥) . (35)
+Uses of influence functions. Influence functions play a role in
+a number of different contexts in econometrics and statistics. In
+asymptotic distribution theory for estimators, and the derivation of
+efficiency bounds, one can show that any “regular” estimator â of
+the just-identified parameter a (𝑃) is asymptotically equivalent to a
+linearized plug-in estimator, â ≈ a (𝑃∗) + 𝐸𝑛 [𝐼𝐹 (𝑋 )] . This implies
+the asymptotic efficiency bound 𝑛Var(â) → Var(𝐼𝐹 (𝑋 )). See for
+instance [62], in particular chapter 3, and [63], chapter 20.
+In robust statistics, since estimators can be approximated by
+â ≈ a (𝑃∗) +𝐸𝑛 [𝐼𝐹 (𝑋 )], we get that the value of â can be dominated
+by a single outlier, even in large samples, unless 𝐼𝐹 is bounded. See
+for instance [? ].
+In the econometrics of partial identification, nonparametric mod-
+els with endogeneity tend to lead to representations of potential
+outcome distributions of the form 𝑃 (𝑌𝑑 ) = 𝛼𝑃1 (𝑌 )+(1−𝛼)𝑃2 (𝑌𝑑 ),
+where draws from 𝑃1 (𝑌 ) are observable, while the data are uninfor-
+mative about 𝑃2 (𝑌𝑑 ). A linear approximation to a (𝑃 (𝑌𝑑 )) then im-
+pliesa (𝑃 (𝑌𝑑 ))−a (𝑃∗) ≈ 𝛼𝐷a (𝑃1 (𝑌 )−𝑃∗)+(1−𝛼)𝐷a (𝑃2 (𝑌𝑑 )−𝑃∗) .
+The first term here is identified, the second term can be bounded if
+and only if 𝐷a is bounded on the admissible counterfactual distri-
+butions 𝑃2 (𝑌𝑑 ) - the same condition as in robust statistics. See for
+instance [? ], section 3.
+Lastly, the literature on distributional decompositions, consid-
+ers the context closest to the present paper. In labor economics,
+we are often interested in counterfactual distributions of the form
+𝑃 (𝑌 ) =
+∫
+𝑃1 (𝑌 |𝑋 )𝑑𝑃2 (𝑋 ), where we observe samples from the
+distributions 1 and 2. In order to estimate a (𝑃), we can again
+use the approximation a (𝑃) ≈ a (𝑃2) +
+∫
+𝐼𝐹 (𝑌 )𝑑𝑃 (𝑌 ) = a (𝑃2) +∫
+𝐼𝐹 (𝑌 )𝑑𝑃1 (𝑌 |𝑋 )𝑑𝑃2 (𝑋 ) = a (𝑃2) + 𝐸2 [𝐸1 [𝐼𝐹 (𝑌 ) |𝑋 ]] . The condi-
+tional expectation 𝐸1 [𝐼𝐹 (𝑌 ) |𝑋 ] can be estimated using regression
+methods, the expectation w.r.t. 𝑋 can be estimated using the 𝑃2
+sample average of predicted values from the regression. See for
+instance [17].
+Uses of welfare weights. Welfare weights are a commonly used
+tool in public finance and the theory of optimal taxation; see for
+instance [57], [11], and [58]. The typical problem of optimal taxation
+is to find a maximizer of
+a =
+∑
+𝑖
+𝜔𝑖 · 𝑢𝑖 , (36)
+where 𝑢𝑖 is a money-metric measure of individual utility (“equiva-
+lent variation”), and 𝜔𝑖 is the social value assigned to a marginal
+9
+This argument could be generalized further by considering weaker notions of differ-
+entiability, such as Gâteaux differentiability, and more general 𝐿𝑝 spaces, which have
+dual space 𝐿𝑞 where 1/𝑝 + 1/𝑞 = 1.
+unit of money for individual 𝑖 . As noted above, this functional form
+for a can be thought of as a local linear approximation to a more
+general differentiable social welfare function a .
+Typically, 𝜔𝑖 is smaller for those with higher income, reflecting
+a preference for redistribution. The problem of maximizing a is
+subject to a number of constraints, in particular informational con-
+straints, which depend on causal parameters (behavioral responses)
+that have to be determined empirically. A key insight that simplifies
+this optimization problem is the envelope theorem, which leverages
+the assumptions that individuals maximize their own welfare.
+REFERENCES
+[1] Rediet Abebe, Solon Barocas, Jon Kleinberg, Karen Levy, Manish Raghavan, and
+David G Robinson. Roles for computing in social change. In Proceedings of the
+2020 Conference on Fairness, Accountability, and Transparency, pages 252–260,
+2020.
+[2] Julia Angwin, Jeff Larson, Surya Mattu, and Lauren Kirchner. Machine bias:
+There’s software used across the country to predict future criminals. and it’s
+biased against blacks. Propublica, May 2016.
+[3] Susan Athey and Stefan Wager. Efficient policy learning. arXiv preprint
+arXiv:1702.02896, 2017.
+[4] Ada Uzoamaka Azodo. Issues in African feminism: A syllabus. Women’s Studies
+quarterly, 25(3/4):201–207, 1997.
+[5] Solon Barocas and Andrew D Selbst. Big data’s disparate impact. Calif. L. Rev.,
+104:671, 2016.
+[6] Gary S Becker. The economics of discrimination. 1957.
+[7] Ruha Benjamin. Race after technology: Abolitionist tools for the new jim code. John
+Wiley & Sons, 2019.
+[8] Daniel Björkegren, Joshua Blumenstock, and Samsun Knight. (machine) learning
+what policymakers value. Working Paper.
+[9] Meredith Broussard. Artificial unintelligence: How computers misunderstand the
+world. MIT Press, 2018.
+[10] Joy Buolamwini and Timnit Gebru. Gender shades: Intersectional accuracy dispar-
+ities in commercial gender classification. In Conference on fairness, accountability
+and transparency, pages 77–91, 2018.
+[11] Raj Chetty. Sufficient statistics for welfare analysis: A bridge between structural
+and reduced-form methods. Annual Review of Economics, 1(1):451–488, 2009.
+[12] Alexandra Chouldechova. Fair prediction with disparate impact: A study of bias
+in recidivism prediction instruments. Big data, 5(2):153–163, 2017.
+[13] F.A. Cowell andM.P. Victoria-Feser. Robustness properties of inequalitymeasures.
+Econometrica: Journal of the Econometric Society, pages 77–101, 1996.
+[14] Kimberle Crenshaw. Mapping the margins: Intersectionality, identity politics,
+and violence against women of color. Stanford Law Review, 43:1241, 1990.
+[15] Alexander D’Amour, Hansa Srinivasan, James Atwood, Pallavi Baljekar, D Sculley,
+and Yoni Halpern. Fairness is not static: deeper understanding of long term
+fairness via simulation studies. In Proceedings of the 2020 Conference on Fairness,
+Accountability, and Transparency, pages 525–534, 2020.
+[16] Virginia Eubanks. Automating inequality: How high-tech tools profile, police, and
+punish the poor. St. Martin’s Press, 2018.
+[17] S. Firpo, N. Fortin, and T. Lemieux. Unconditional quantile regressions. Econo-
+metrica, 77:953–973, 2009.
+[18] S. Firpo, N. Fortin, and T. Lemieux. Decomposition methods in economics.
+Handbook of Labor Economics, 4:1–102, 2011.
+[19] Sorelle A Friedler, Carlos Scheidegger, and Suresh Venkatasubramanian. On the
+(im) possibility of fairness. arXiv preprint arXiv:1609.07236, 2016.
+[20] Timnit Gebru. Oxford handbook on AI ethics book chapter on race and gender.
+arXiv preprint arXiv:1908.06165, 2019.
+[21] Maya Gupta, AndrewCotter, MahdiMilani Fard, and SerenaWang. Proxy fairness.
+arXiv preprint arXiv:1806.11212, 2018.
+[22] Moritz Hardt, Eric Price, and Nati Srebro. Equality of opportunity in supervised
+learning. In Advances in neural information processing systems, pages 3315–3323,
+2016.
+[23] Tatsunori B Hashimoto, Megha Srivastava, Hongseok Namkoong, and Percy
+Liang. Fairness without demographics in repeated loss minimization. arXiv
+preprint arXiv:1806.08010, 2018.
+[24] Ursula Hébert-Johnson, Michael P Kim, Omer Reingold, and Guy N Roth-
+blum. Calibration for the (computationally-identifiable) masses. arXiv preprint
+arXiv:1711.08513, 2017.
+[25] Hoda Heidari, Claudio Ferrari, Krishna Gummadi, and Andreas Krause. Fairness
+behind a veil of ignorance: A welfare analysis for automated decision making. In
+Advances in Neural Information Processing Systems, pages 1265–1276, 2018.
+[26] Hoda Heidari, Michele Loi, Krishna P Gummadi, and Andreas Krause. A moral
+framework for understanding fair ml through economic models of equality of
+585
+Fairness, Equality, and Power in Algorithmic Decision-Making FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+opportunity. In Proceedings of the Conference on Fairness, Accountability, and
+Transparency, pages 181–190, 2019.
+[27] bell hooks. Yearning: Race, gender, and cultural politics. 1992.
+[28] Lily Hu and Yiling Chen. A short-term intervention for long-term fairness in
+the labor market. In Proceedings of the 2018 World Wide Web Conference, pages
+1389–1398, 2018.
+[29] Lily Hu and Yiling Chen. Welfare and distributional impacts of fair classification.
+arXiv preprint arXiv:1807.01134, 2018.
+[30] Lily Hu and Yiling Chen. Fair classification and social welfare. In Proceedings of
+the 2020 Conference on Fairness, Accountability, and Transparency, pages 535–545,
+2020.
+[31] Ben Hutchinson and Margaret Mitchell. 50 years of test (un) fairness: Lessons
+for machine learning. In Proceedings of the Conference on Fairness, Accountability,
+and Transparency, pages 49–58, 2019.
+[32] Guido W Imbens and Donald B Rubin. Causal inference in statistics, social, and
+biomedical sciences. Cambridge University Press, 2015.
+[33] Nathan Kallus, Xiaojie Mao, and Angela Zhou. Assessing algorithmic fair-
+ness with unobserved protected class using data combination. arXiv preprint
+arXiv:1906.00285, 2019.
+[34] Maximilian Kasy. Partial identification, distributional preferences, and the welfare
+ranking of policies. Review of Economics and Statistics, 2015.
+[35] Michael Kearns, Seth Neel, Aaron Roth, and Zhiwei Steven Wu. Preventing
+fairness gerrymandering: Auditing and learning for subgroup fairness. In Inter-
+national Conference on Machine Learning, pages 2564–2572, 2018.
+[36] Michael Kearns, Seth Neel, Aaron Roth, and Zhiwei Steven Wu. An empirical
+study of rich subgroup fairness for machine learning. In Proceedings of the
+Conference on Fairness, Accountability, and Transparency, pages 100–109, 2019.
+[37] Toru Kitagawa and Aleksey Tetenov. Who should be treated? empirical welfare
+maximization methods for treatment choice. Econometrica, 86(2):591–616, 2018.
+[38] Jon Kleinberg, Sendhil Mullainathan, and Manish Raghavan. Inherent trade-offs
+in the fair determination of risk scores. arXiv preprint arXiv:1609.05807, 2016.
+[39] John Knowles, Nicola Persico, and Petra Todd. Racial bias in motor vehicle
+searches: Theory and evidence. Journal of Political Economy, 109(1):203–229,
+2001.
+[40] Mary Modupe Kolawole. Transcending incongruities: Rethinking feminism and
+the dynamics of identity in Africa. Agenda, 17(54):92–98, 2002.
+[41] Lydia T Liu, Sarah Dean, Esther Rolf, Max Simchowitz, andMoritz Hardt. Delayed
+impact of fair machine learning. arXiv preprint arXiv:1803.04383, 2018.
+[42] Audre Lorde. Age, race, class, and sex: Women redefining difference. Women in
+Culture: An intersectional anthology for gender and women’s studies, pages 16–22,
+1980.
+[43] K. Marx. Das Kapital: Kritik der politischen Ökonomie, volume 1. 1867.
+[44] AndreuMas-Colell, Michael DennisWhinston, and Jerry R. Green. Microeconomic
+theory. Oxford University Press, 1995.
+[45] Shira Mitchell, Eric Potash, Solon Barocas, Alexander D’Amour, and Kristian Lum.
+Prediction-based decisions and fairness: A catalogue of choices, assumptions,
+and definitions. arXiv preprint arXiv:1811.07867, 2018.
+[46] Ellis P Monk Jr. The cost of color: Skin color, discrimination, and health among
+african-americans. American Journal of Sociology, 121(2):396–444, 2015.
+[47] Evgeny Morozov. Socialize the data centers! New Left Review, 91, 2015.
+[48] Hussein Mouzannar, Mesrob I Ohannessian, and Nathan Srebro. From fair
+decision making to social equality. In Proceedings of the Conference on Fairness,
+Accountability, and Transparency, pages 359–368, 2019.
+[49] Sendhil Mullainathan. Algorithmic fairness and the social welfare function. In
+Proceedings of the 2018 ACM Conference on Economics and Computation, pages
+1–1, 2018.
+[50] Arvind Narayanan. Translation tutorial: 21 fairness definitions and their politics.
+In Proceedings of the 2018 Conference on Fairness, Accountability, and Transparency,
+2018.
+[51] Naomi Nkealah. (West) African feminisms and their challenges. Journal of
+literary Studies, 32(2):61–74, 2016.
+[52] Naomi N Nkealah. Conceptualizing feminism(s) in Africa: The challenges facing
+African women writers and critics. The English Academy Review, 23(1):133–141,
+2006.
+[53] Safiya Umoja Noble. Algorithms of oppression: How search engines reinforce racism.
+nyu Press, 2018.
+[54] Cathy O
+′
+Neil. Weapons of math destruction: How big data increases inequality
+and threatens democracy. Broadway Books, 2016.
+[55] John Rawls. A theory of justice. Harvard University Press, Cambridge, 1973.
+[56] John E Roemer. Theories of distributive justice. Harvard University Press, Cam-
+bridge, 1998.
+[57] Emmanuel Saez. Using elasticities to derive optimal income tax rates. The Review
+of Economic Studies, 68(1):205–229, 2001.
+[58] Emmanuel Saez and Stefanie Stantcheva. Generalized social welfare weights for
+optimal tax theory. American Economic Review, 106(1):24–45, 2016.
+[59] Mario L Small andDevah Pager. Sociological perspectives on racial discrimination.
+Journal of Economic Perspectives, 34(2):49–67, 2020.
+[60] Harini Suresh and John V Guttag. A framework for understanding unintended
+consequences of machine learning. arXiv preprint arXiv:1901.10002, 2019.
+[61] Latanya Sweeney. Discrimination in online ad delivery. Queue, 11(3):10–29, 2013.
+[62] A.A. Tsiatis. Semiparametric theory and missing data. Springer Verlag, 2006.
+[63] Aad W. van der Vaart. Asymptotic statistics. Cambridge University Press, 2000.
+[64] Sahil Verma and Julia Rubin. Fairness definitions explained. In 2018 IEEE/ACM
+International Workshop on Software Fairness (FairWare), pages 1–7. IEEE, 2018.
+[65] Stefan Wager and Susan Athey. Estimation and inference of heterogeneous treat-
+ment effects using random forests. Journal of the American Statistical Association,
+113(523):1228–1242, 2018.
+[66] Serena Wang, Wenshuo Guo, Harikrishna Narasimhan, Andrew Cotter, Maya
+Gupta, and Michael I Jordan. Robust optimization for fairness with noisy pro-
+tected groups. arXiv preprint arXiv:2002.09343, 2020.
+[67] MichaelWick, Jean-Baptiste Tristan, et al. Unlocking fairness: a trade-off revisited.
+In Advances in Neural Information Processing Systems, pages 8783–8792, 2019.
+[68] Xueru Zhang, Mohammad Mahdi Khalili, and Mingyan Liu. Long-term impacts
+of fair machine learning. Ergonomics in Design, 28(3):7–11, 2020.
+[69] Shoshana Zuboff. The age of surveillance capitalism: The fight for a human future
+at the new frontier of power. Profile Books, 2019.
+586

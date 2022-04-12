@@ -1,0 +1,180 @@
+
+Every year there are more than 3.6 mil-
+lion referrals made to child protection agen-
+cies across the US. The practice of screen-
+ing calls is left to each jurisdiction to fol-
+low local practices and policies, potentially
+leading to large variation in the way in
+which referrals are treated across the coun-
+try. Whilst increasing access to linked ad-
+ministrative data is available, it is difficult
+for welfare workers to make systematic use
+of historical information about all the chil-
+dren and adults on a single referral call.
+Risk prediction models that use routinely
+collected administrative data can help call
+workers to better identify cases that are
+likely to result in adverse outcomes. How-
+ever, the use of predictive analytics in the
+area of child welfare is contentious. There
+is a possibility that some communities—
+such as those in poverty or from particu-
+lar racial and ethnic groups—will be dis-
+advantaged by the reliance on government
+administrative data. On the other hand,
+these analytics tools can augment or re-
+place human judgments, which themselves
+are biased and imperfect. In this paper we
+describe our work on developing, validat-
+ing, fairness auditing, and deploying a risk
+prediction model in Allegheny County, PA,
+USA. We discuss the results of our analy-
+sis to-date, and also highlight key problems
+and data bias issues that present challenges
+for model evaluation and deployment.
+1 INTRODUCTION
+Every year there are more than 3.6 million refer-
+rals made to child protection agencies across the
+US. It is estimated that 37% of US children are
+investigated for child abuse and neglect by age
+18 years (Kim et al., 2017). These statistics indi-
+cate that far from being a rare occurrence, many
+more children are being pulled into the child wel-
+fare agencies than previously thought. Currently,
+screening these referral calls is left to each ju-
+risdiction to follow local practices and policies.
+These practices usually involve caseworkers gath-
+ering details about the adults and children associ-
+ated with the alleged victim. Often, the decision
+on whether to investigate or not is made without
+ever visiting the family or speaking with them.
+Whilst electronic case management systems
+and linked administrative data are increasingly
+available, it is difficult for child welfare workers
+to make systematic use of historical information
+about all the children and adults on a single refer-
+c© 2018 A. Chouldechova, E. Putnam-Hornstein, D. Benavides-Prado, O. Fialko & R. Vaithianathan.
+Algorithms in child welfare case study
+ral call. Fully interrogating a case history for all
+the people named on a call could take hours. The
+increasing pressure on ensuring that investigative
+resources are focused on the highest risk children
+means that there is some potential for predictive
+analytics to assist call screeners to more quickly
+and accurately assess each referral.
+Predictive Risk Modelling (PRM) uses rou-
+tinely collected administrative data to predict the
+likelihood of future adverse outcomes. By strate-
+gically targeting services to the riskiest cases, it
+is hoped that many of the adverse events can
+be prevented. Additionally, unnecessary inves-
+tigations which are burdensome for families and
+costly for the system could be avoided. PRM has
+been used previously in health and hospital set-
+tings (Panattoni et al., 2011; Billings et al., 2012)
+and has been suggested as a potentially useful
+tool that could be translated into child protec-
+tion settings (Vaithianathan et al., 2013).
+However, the use of predictive analytics in the
+area of child welfare is contentious. There is
+the possibility that some communities—such as
+those in poverty or from particular racial or eth-
+nic groups—will be disadvantaged by the reliance
+on government administrative data because they
+will typically have more data kept about them
+simply by dint of being poor and on welfare. Such
+families could then be flagged as high risk and
+be more frequently investigated. If the algorithm
+uses past investigations to produce a high risk
+score for a family, then this will exacerbate the
+original bias.
+On the other hand, these analytics tools can
+augment or replace human judgments, which
+themselves are potentially biased. There is a pos-
+sibility that caseworkers are basing their screen-
+ing decisions in part on personal experiences or
+current caseloads. Caseworker decisions may
+also be be affected by cognitive biases—for ex-
+ample over-weighting recent cases, unrelated to
+the current case, where a child has been fatally
+harmed. When making decisions under time
+pressure, caseworkers might be guilty of statisti-
+cal discrimination, where they use easily observed
+features (e.g. living in a neighborhood with high
+crime rates) as proxies for unobservable but more
+pertinent attributes (e.g. drug-use). Bias in hu-
+man decision-making is often difficult to assess,
+and the existing research does not provide a con-
+sensus view of racial bias in the child welfare sys-
+tem (Fluke et al., 2011).
+A subject where there is greater consensus con-
+cerns the relative accuracy of so-called “clinical”
+versus “actuarial” judgment.1 Some of the ear-
+liest research comparing human predictions to
+those of statistical models goes back to the pi-
+oneering work of Meehl (1954). Decades of re-
+search and several large scale meta-analyses have
+largely upheld the original conclusions: When it
+comes to prediction tasks, statistical models are
+generally significantly more accurate than human
+experts (Dawes et al., 1989; Grove et al., 2000;
+Kleinberg et al., 2017).
+Our goal in Allegheny County is to improve
+both the accuracy and equity of screening deci-
+sions by taking a fairness-aware approach to in-
+corporating prediction models into the decision-
+making pipeline. The present paper reports on
+the lessons that we have learned so far, our ap-
+proaches to predictive bias assessment, and sev-
+eral outstanding challenges. To be sure, at cer-
+tain points we offer more questions than an-
+swers. Our hope is that this report contributes to
+the rich ongoing conversation concerning the use
+of algorithms in supporting critical decisions in
+government—and the importance of considering
+fairness and discrimination in data-driven deci-
+sion making. While the work presented here is
+firmly grounded in the child maltreatment hot-
+line context, much of the discussion and our gen-
+eral analytic approach are broadly applicable to
+other domains where predictive risk modeling
+may be used. Readers are also encouraged to
+refer to the recent work of Shroff (2017) for an-
+other perspective on predictive analytics in the
+child welfare domain. This related work pro-
+vides an excellent report on various considera-
+tions that are important for model development,
+as well as strategies for effectively engaging with
+agency leadership.
+1.1. Organization of this paper
+We begin in the next section with some back-
+ground on the model development. As part of
+this discussion we describe both the tool that
+is currently deployed in Allegheny County and
+the competing models that are being developed
+1. The term “actuarial” has fallen out of fashion, and has
+in many cases been replaced with “machine learning”.
+as part of an ongoing redesign process. Then in
+Section 3 we investigate the predictive bias prop-
+erties of the current tool and a Random forest
+model that has emerged in the redesign as one
+of the best performing competing models. Our
+predictive bias assessment is motivated both by
+considerations of human bias and recent work on
+fairness criteria that has emerged in the algorith-
+mic fairness literature. Section 4 discusses some
+of the challenges in incorporating algorithms into
+human decision making processes and reflects on
+the predictive bias analysis in the context of how
+the model is actually being used. We discuss
+some of the concerns that have arisen as part
+of the redesign, and propose an “oracle test” as
+a tool for clarifying whether particular concerns
+pertain to the statistical properties of a model
+or are targeted at other potential deficiencies.
+We also briefly describe an independent ethical
+review of the modeling work that was commis-
+sioned by the County. Section 5 concludes with a
+reflection on several of the key outstanding tech-
+nical challenges affecting the evaluation and im-
+plementation of the model.

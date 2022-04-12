@@ -1,0 +1,181 @@
+
+Kearns, Neel, Roth, andWu [ICML 2018] recently proposed a notion
+of rich subgroup fairness intended to bridge the gap between statisti-
+cal and individual notions of fairness. Rich subgroup fairness picks
+a statistical fairness constraint (say, equalizing false positive rates
+across protected groups), but then asks that this constraint hold
+over an exponentially or infinitely large collection of subgroups de-
+fined by a class of functions with bounded VC dimension. They give
+an algorithm guaranteed to learn subject to this constraint, under
+the condition that it has access to oracles for perfectly learning ab-
+sent a fairness constraint. In this paper, we undertake an extensive
+empirical evaluation of the algorithm of Kearns et al. On four real
+datasets for which fairness is a concern, we investigate the basic
+convergence of the algorithm when instantiated with fast heuristics
+in place of learning oracles, measure the tradeoffs between fairness
+and accuracy, and compare this approach with the recent algorithm
+of Agarwal, Beygelzeimer, Dudik, Langford, and Wallach [ICML
+2018], which implements weaker and more traditional marginal
+fairness constraints defined by individual protected attributes. We
+find that in general, the Kearns et al. algorithm converges quickly,
+large gains in fairness can be obtained with mild costs to accuracy,
+and that optimizing accuracy subject only to marginal fairness
+leads to classifiers with substantial subgroup unfairness. We also
+provide a number of analyses and visualizations of the dynamics
+and behavior of the Kearns et al. algorithm. Overall we find this
+algorithm to be effective on real data, and rich subgroup fairness to
+be a viable notion in practice.
+CCS CONCEPTS
+• Computing methodologies → Machine learning;
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+KEYWORDS
+Algorithmic Bias, Subgroup Fairness, Fairness Auditing, Fair Clas-
+sification
+ACM Reference Format:
+In FAT* ’19: Conference on Fairness, Accountability, and Transparency (FAT*
+’19), January 29–31, 2019, Atlanta, GA, USA.
+1 INTRODUCTION
+The most common definitions of fairness in machine learning are
+statistical in nature. They proceed by fixing a small number of “pro-
+tected subgroups” (such as racial or gender groups), and then ask
+that some statistic of interest be approximately equalized across
+groups. Standard choices for these statistics include positive clas-
+sification rates [3], false positive or false negative rates [4, 8, 13]
+and positive predictive value [4, 13] — see [2] for more examples.
+These definitions are pervasive in large part because they are easy
+to check, although there are interesting computational challenges
+in learning subject to these constraints in the worst case — see e.g.
+[16].
+Unfortunately, these statistical definitions are not very meaning-
+ful to individuals: because they are constraints only over averages
+taken over large populations, they promise essentially nothing
+about how an individual person will be treated. Dwork et al. [7]
+enumerate a “catalogue of evils” which show how definitions of this
+sort can fail to provide meaningful guarantees. Kearns et al. [10]
+identify a particularly troubling failure of standard statistical def-
+initions of fairness, which can arise naturally without malicious
+intent, called “fairness gerrymandering”. They illustrate the idea
+with the following toy example shown in Figure 1, described as
+follows.
+Suppose individuals each have two sensitive attributes: race (say
+blue and green) and gender (say male and female). Suppose that
+these two attributes are distributed independently and uniformly
+at random, and are uncorrelated with a binary label that is also
+distributed uniformly at random. If we view gender and race as
+defining classes of people that we wish to protect, we could take a
+standard statistical fairness definition from the literature — say the
+equal odds condition of [8], which asks to equalize false positive
+rates across protected groups, and instantiate it with the four pro-
+tected groups: “Men”, “Women”, “blue people”, and “green people”.
+The following classifier satisfies this condition, although only by
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA Michael Kearns, Seth Neel, Aaron Roth, and Zhiwei Steven Wu
+Figure 1: Fairness Gerrymandering: A Toy Example [10]
+“cheating” and packing its unfairness into structured subgroups of
+the protected populations: it labels a person as positive only if they
+are a blue man or a green woman. This equalizes false positive
+rates across the four specified groups, but of course not over the
+finer-grained subgroups defined by the intersections of the two
+protected attributes.
+Kearns et al. [10] also proposed an approach to the problem of
+fairness gerrymandering: rather than asking for statistical defini-
+tions of fairness that hold over a small number of coarsely defined
+groups, ask for them to hold over a combinatorially or infinitely
+large collection of subgroups defined by a set of functions G of
+the protected attributes (Hébert-Johnson et al. [9] independently
+made a similar proposal). For example, we could ask to equalize
+false positive rates across every subgroup that can be defined as
+the intersection or conjunction of d protected attributes, for which
+there are 2d such groups. Kearns et al. [10] showed that as long
+as the class of functions defining these subgroups has bounded
+VC dimension, the statistical learning problem of finding the best
+(distribution over) classifiers inH subject to the constraint of equal-
+izing the positive classification rate, the false positive rate, or the
+false negative rate over every subgroup defined over G is solvable
+whenever the dataset size is sufficiently large relative to the VC
+dimension of G andH . Taking inspiration from the technique of
+Agarwal et al. [1], they were able to show that even with combi-
+natorially many subgroup fairness constraints, the computational
+problem of learning the optimal fair classifier is once again solvable
+efficiently whenever the learner has access to a black-box classi-
+fier (oracle) which can solve the unconstrained learning problems
+over G and H respectively. Similarly, given access to an oracle
+for G, they were able to efficiently solve the problem of auditing
+for rich subgroup fairness: finding the д ∈ G that corresponds to
+the subgroup for whom the statistical fairness constraint was most
+violated.
+While the work of Kearns et al. [10] is satisfying from a theocrat-
+ical point of view, it leaves open a number of pressing empirical
+questions. For example, their theory is built for an idealized setting
+with perfect learning oracles — in practice heuristic oracles may fail.
+Moreover, perhaps rich subgroup fairness is asking for too much
+in practice — maybe enforcing combinatorially many constraints
+leads to an untenable tradeoff with error. Finally, perhaps enforcing
+combinatorially many constraints is not necessary — perhaps on
+real data, it is enough to call upon the algorithm of [1] for enforc-
+ing statistical fairness constraints on the small number of groups
+defined by the marginal protected attributes, and rich subgroup
+fairness will follow incidentally. Put another way: Is the so-called
+fairness gerrymandering problem only a theoretical curiosity, or
+does it arise organically when standard classifiers are optimized
+subject to marginal statistical fairness constraints?
+In this paper, we conduct an extensive set of experiments to
+answer these questions. We study the algorithm from [10] — in-
+stantiated with fast heuristic learning oracles — when used to train
+a linear classifier subject to approximately equalizing false positive
+rates across a rich set of subgroups defined by linear threshold
+functions. On four real datasets, we characterize:
+(1) The basic convergence properties of the algorithm — al-
+though this algorithm has provable guarantees when instan-
+tiated with learning oracles for G andH , when these oracles
+are (necessarily) replaced with heuristics, the guarantees
+of the algorithm become heuristic as well. We find that the
+algorithm typically converges (Subsection 3.2), and provides
+a controllable trade-off between fairness and accuracy de-
+spite its heuristic guarantees (Subsection 3.3). We visualize
+the optimization trajectory of the algorithm (Subsection 3.5),
+and discrimination heatmaps showing the evolution of the
+subgroup discrimination of the algorithm over time (Subsec-
+tion 3.4).
+(2) The trade-off between subgroup fairness and accuracy. We
+find that for each dataset, there are appealing compromises
+between error and subgroup fairness. Thus achieving rich
+subgroup fairness may be possible in practice without a
+severe loss in predictive accuracy (Subsection 3.3).
+(3) The subgroup (unfairness) that can result when one applies
+more standard approaches, that either ignore fairness con-
+straints all together, or equalize false positive rates only
+across a small number of subgroups defined by individual
+protected attributes. By auditing the models produced by
+these standard approaches with the rich subgroup auditor
+of [10], we find that often subgroup fairness constraints are
+violated, even by algorithms which are explicitly equalizing
+false positive rates across the groups defined on the marginal
+protected attributes.
+In light of these findings, we submit that rich subgroup fairness
+constraints are both important, and can be satisfied at reasonable
+cost: both in terms of computation, and in terms of accuracy. We
+hope that algorithms like that of [10] which can be used to satisfy
+rich subgroup fairness become part of the standard toolkit for fair
+machine learning.
+1.1 Further Related Work
+While Kearns at al. [10] propose and study rich sub-group fairness
+for false positive and negative constraints, Hébert-Johnson et al.
+study the analogous notion for calibration constraints, which they
+call multi-calibration [9]. Kim et al. extend this style of analysis to
+accuracy constraints (asking that a classifier be equally accurate
+on a combinatorially large collection of subgroups) [11]. Kim et
+al. also extend it to metric fairness constraints [12], converting
+Fairness for Machine Learning FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+the individual metric fairness constraint of [7] into a statistical
+constraint that asks that on average, individuals in (combinatorially
+many) subgroups should be treated differently only in proportion
+to the average difference between individuals in the subgroups, as
+measured with respect to some similarity metric.

@@ -1,0 +1,1278 @@
+High Dimensional Model Explanations: An Axiomatic Approach
+Neel Patel
+University of Southern California
+neelbpat@usc.edu
+Martin Strobel
+National University of Singapore
+mstrobel@comp.nus.edu.sg
+Yair Zick
+University of Massachusetts, Amherst
+yzick@umass.edu
+ABSTRACT
+Complex black-box machine learning models are regularly used
+in critical decision-making domains. This has given rise to several
+calls for algorithmic explainability. Many explanation algorithms
+proposed in literature assign importance to each feature individ-
+ually. However, such explanations fail to capture the joint effects
+of sets of features. Indeed, few works so far formally analyze high
+dimensional model explanations. In this paper, we propose a novel
+high dimension model explanation method that captures the joint
+effect of feature subsets.
+We propose a new axiomatization for a generalization of the
+Banzhaf index; our method can also be thought of as an approxima-
+tion of a black-box model by a higher-order polynomial. In other
+words, this work justifies the use of the generalized Banzhaf index
+as a model explanation by showing that it uniquely satisfies a set
+of natural desiderata and that it is the optimal local approximation
+of a black-box model.
+Our empirical evaluation of our measure highlights how it man-
+ages to capture desirable behavior, whereas other measures that do
+not satisfy our axioms behave in an unpredictable manner.
+ACM Reference Format:
+Neel Patel, Martin Strobel, and Yair Zick. 2021. High Dimensional Model
+Explanations: An Axiomatic Approach. In Conference on Fairness, Account-
+ability, and Transparency (FAccT ’21), March 3–10, 2021, Virtual Event, Canada.
+ACM,NewYork, NY, USA, 11 pages. https://doi.org/10.1145/3442188.3445903
+1 INTRODUCTION
+Machine learning models are applied in a variety of high-stakes
+domains, such as healthcare, insurance, credit decisions and more.
+In order to offer high prediction accuracy over high-dimensional
+data, one must adopt increasingly complex models. Complex mod-
+els are, however, more difficult to understand. Explainability has
+been recently identified as an important design criterion, and has
+received widespread attention within the ML community; of partic-
+ular note is research into generating model explanations. Broadly
+speaking, model explanations are based on a labeled dataset as well
+as other potential sources of information. Most model explanation
+techniques focus on feature-based explanations: for each feature
+𝑖 , the model explanation outputs a value 𝜙𝑖 which signifies the
+importance of the 𝑖-th feature in determining model predictions.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+© 2021 Association for Computing Machinery.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+https://doi.org/10.1145/3442188.3445903
+The value 𝜙𝑖 can be thought of as a score — ‘Alice’s high income
+is highly indicative of her receiving a loan’ — or as a recourse
+— ‘had Alice’s income been lower by $10,000/year her loan would
+have been rejected’. Either way, the basic premise of attribute-based
+model explanations is to explain complex model decisions via a
+list of 𝑛 numerical values, where 𝑛 is the number of data features.
+Crucially, this approach fails to capture feature interactions. Features
+are often strongly interdependent, especially in complex ML models.
+For example: consider a black-box model that predicts sentiments
+associatedwith a paragraph of text. In such texts; there can be a high
+negative interaction effect between “not” and “bad”, which attribute-
+based model explanations will fail to capture: assigning influence
+to “bad” and “not” individually can be misleading. Consider the
+following review:
+It isn’t the greatest scifi flick I’ve every
+seen, but it is not a bad movie
+The above review is classified as a positive sentence. LIME [27] — a
+type of feature-based explanation — assigns high negative influence
+to the words “bad” and “not”. However, reviews omitting the word
+“bad” or “not” will be classified as negative. Explanation methods
+that indicate feature interactions, rather than just standalone scores,
+offer a much clearer picture of how the model makes its decisions.
+The current model explanation landscape offers a wide variety of
+model explanation methods; how should we pick the right one? In
+this paper, we propose an axiomatic approach: rather than starting
+with a candidate solution and then offering post-hoc justifications
+for using it, start with the properties one would like to have in a
+high-dimensional model explanation, and derive a solution that
+satisfies these properties. This is the approach we take in this paper.
+We axiomatize a high dimensional model explanation method,
+called the Banzhaf Interaction Index, or BII. This method faithfully
+captures how feature interactions influence model decision-making.
+Not only does our proposed model explanation satisfy a set of
+desirable properties, it is the only model explanation that satisfies
+all these properties.
+1.1 Our Contributions
+In this work, we propose a method for high-dimensional expla-
+nations for black-box models. Our main goal is to axiomatically
+capture higher-order feature interaction. Our main contribution
+is twofold: first, we propose a high-dimensional black-box model
+explanation method, axiomatically capturing higher-order feature
+interaction. Our characterization uses properties that are very nat-
+ural in the ML context, such as feature symmetry and effect mono-
+tonicity (Section 3). we obtain a new axiomatization of the Banzhaf
+interaction index which uniquely satisfies symmetry, limit condition,
+general-2-efficiency, and a newly proposed axiom (in the context
+of Banzhaf indices): monotonicity. Monotonicity is a rather gen-
+eral property which essentially means that the model explanation
+401
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Neel Patel, Martin Strobel, and Yair Zick
+should change in a manner faithful to the underlying data. This
+is very fundamental property for an interaction measure: which
+states that the net contribution of the subset of features for the
+machine learning model 𝑓 is more than that for the model 𝑔; then
+the interaction measure for those features for model 𝑓 should be
+more than the interaction measure for those features for model 𝑔.
+Second, we extend the idea of feature-based model explanations,
+which can be thought of as a local linear approximations of black-
+box models, to higher-order polynomial approximations. Especially,
+we show that our proposed measure can be obtained by approximat-
+ing the black-box model by a higher-order polynomial (Section 4).
+We evaluate our approach on real datasets. In particular, our
+experiments show that feature-based model explanations may fail
+to capture feature synergy; moreover, we show that other model
+explanations which fail to satisfy our axioms tend to behave in an
+undesirable manner (Section 5).
+1.2 Related Work
+While some model explanations provide record-based explanations
+[19], or generate explanations from source code [10], the bulk of the
+literature on the topic focuses on feature-based model explanations
+[2, 5, 9, 11, 30, 32]. Ancona et al. [3] offer an overview of feature
+basedmodel explanations for deep neural networks. The connection
+to cooperative game theory has been widely discussed and exploited
+in order to generate model explanations [2, 9, 11], with a particular
+focus on the Shapley value and its variants [28].
+Interaction Indices for Cooperative Games: Two widely accepted
+measures of marginal influence from cooperative game theory the
+Shapley value [28] and the Banzhaf value [6], are uniquely derived
+from a set of natural axioms (see also [35]). These measures do not
+capture player interactions; rather, they assign weights to individ-
+ual players. Owen [24] proposes the first higher-order solution for a
+cooperative game for pairwise players. Grabisch and Roubens [16]
+extend it to interaction between arbitrary subsets, and axiomatically
+derive the Shapley and the Banzhaf interaction indices. In a recent
+paper, Agarwal et al. [1] propose a new axiomatization for interac-
+tion among players which is inspired by the Taylor approximation
+of a Boolean function.
+Feature Interactions: Feature interaction has been studied by dif-
+ferent communities. Statistics offers classic ANOVA based feature
+interaction analysis [14, 15]. Some recent work in the deep learning
+literature discusses feature interaction: Tsang et al. [34] learns in-
+teractions by inspecting the inter-layer weight matrices of a neural
+network, Tsang et al. [33] construct a generalized additive model
+that contains feature interaction information. In another line of
+work, Cui et al. [8], Greenside et al. [17] compute the interaction
+among features by computing the (expected) Hessian; this can be
+thought as an extension of gradient-based influence measures for
+neural networks [3]. Datta et al. [11] also propose an influence
+measure for a set of features called Set-QII. It essentially measures
+the change in model output when we randomly change a fixed set
+of features. Lundberg et al. [21] propose the Shapley interaction
+index, specifically for tree-based models.
+2 PRELIMINARIES
+We denote sets with capital letters𝐴, 𝐵, . . . and use lowercase letters
+for functions, scalars, and features. To minimize notation clutter, we
+try to omit braces for singletons, pairs etc., e.g. we write 𝑓 (𝑖), 𝑆 ∪ 𝑖
+instead of 𝑓 ({𝑖}), 𝑆 ∪ {𝑖} and 𝑆 ∪ 𝑖 𝑗 instead of 𝑆 ∪ {𝑖, 𝑗}.
+Let 𝑁 = {1, . . . , 𝑛} be the set of features. A black-box model is
+a function mapping a set of 𝑛-dimensional input vectors X ⊆ R𝑛
+to R. Our objective is to generate a model explanation for a given
+point of interest (POI) ®𝑥 ∈ R𝑛 ; this explanation should (ideally) offer
+stakeholders some insight into the underlying decision-making
+process that ultimately resulted in the outcome they receive. In this
+work, we are interested in measuring the extent to which features,
+and their high-order interactions affect model decisions. In order to
+measure feature interaction effects, we adopt the baseline compar-
+ison approach [22, 31]; in other words, we assume the existence
+of a baseline vector ®𝑥 ′, to which we compare an input vector ®𝑥 , in
+order to generate a model explanation. For example, in the auto-
+matic loan acceptance/rejection domain ®𝑥 ′ could correspond to an
+all-zero vector (e.g. measuring the effect of an applicant having no
+money in their bank account, as opposed to the true amount they
+have), or a vector of mean values (e.g. comparing the applicant’s
+true income to the average population income).
+In order to generate model explanations, we need to formally
+reason about the effect of changing features in the POI ®𝑥 to their
+baseline values. Generally speaking, changing a single feature may
+have no significant effect on the model prediction. For example,
+if 𝑓 (income = 20𝑘, debt = 90𝑘) = 1, it may well be the case that
+changing either the applicant’s low income (20𝑘) or their high debt
+(90𝑘) would not result in them receiving the loan, however, it is
+unreasonable to claim that neither had an effect on the outcome.
+To formally reason about the joint effect of features, we define a
+function measuring their value as a set. Given a set of features
+𝑆 ⊆ 𝑁 , a point of interest ®𝑥 , a baseline ®𝑥 ′ and a model 𝑓 , we define
+a set function as
+𝑣 (𝑆, ®𝑥, ®𝑥 ′, 𝑓 ) = 𝑓 ( ®𝑥𝑆 , ®𝑥 ′𝑁 \𝑆 ) − 𝑓 ( ®𝑥 ′) . (1)
+In other words, the value we assign to a set of features 𝑆 is the
+extent to which they cause the model prediction to deviate from the
+baseline prediction; as a sanity check, we note that 𝑣 (∅, ®𝑥, ®𝑥 ′, 𝑓 ) =
+0, and 𝑣 (𝑁, ®𝑥, ®𝑥 ′, 𝑓 ) = 𝑓 ( ®𝑥) − 𝑓 ( ®𝑥 ′). This formulation induces a
+cooperative game, where features correspond to players. We refer
+to the game defined in (1) as the feature effect game. We omit ®𝑥 , ®𝑥 ′
+and 𝑓 (they will normally be fixed), focusing solely on the set of
+features 𝑆 .
+We often replace sets of features with a single feature demarcat-
+ing the entire set: given a set 𝑇 ⊆ 𝑁 , [𝑇 ] denotes a single feature
+corresponding to the set. The reduced game w.r.t. the nonempty
+𝑇 ⊆ 𝑁 is defined on the features 𝑁 \𝑇 ∪ [𝑇 ] with the characteristic
+function 𝑣 [𝑇 ] (·, 𝑓 ) : 2𝑁 \𝑇∪{[𝑇 ] } → R:
+𝑣 [𝑇 ] (𝑆) =
+{
+𝑣 (𝑆 ∪𝑇 ) [𝑇 ] ∈ 𝑆
+𝑣 (𝑆) otherwise
+Our objective is to generate high dimensional model explanations,
+i.e. functions that assign a value to every subset of features 𝑆 ⊆ 𝑁 .
+To do so, we define a feature interaction index 𝑆 ⊆ 𝑁 for 𝑣 as 𝐼 𝑣 (𝑆).
+In other words, under the game 𝑣 — namely the game defined in
+402
+High Dimensional Model Explanations: An Axiomatic Approach FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+(1) — 𝐼 𝑣 (𝑆) should roughly capture the overall effect that the set of
+features 𝑆 has on the value of 𝑣 . Going back to the feature effect
+game defined in (1), 𝐼 𝑣 (𝑆) should measure the degree to which
+switching the value of features in 𝑆 back to their baseline values
+affects the prediction for ®𝑥 . A key idea in our analysis is marginal
+effect: consider a single feature 𝑖 ∈ 𝑁 . Its marginal effect on a
+set 𝑇 ⊆ 𝑁 \ {𝑖} equals 𝑣 (𝑇 ∪ 𝑖) − 𝑣 (𝑇 ): the extent to which the
+value of 𝑣 (𝑇 ) changes when 𝑖 joins 𝑇 . The marginal effect of 𝑖 on 𝑇
+is denoted𝑚𝑖 (𝑇 ). In the context of the feature importance game,
+𝑚𝑖 (𝑇, 𝑣) is the marginal effect of knowing the feature 𝑖 , given that
+the values of features in the set𝑇 are known. This is similar to other
+definitions considered in the literature [11, 22]. When considering
+a pair of features 𝑖, 𝑗 ∈ 𝑁 , how would one define their marginal
+effect on a coalition 𝑇 ⊆ 𝑁 ? One very natural definition is to offset
+the effect of adding both features to 𝑇 by the marginal effects of
+adding 𝑖 and 𝑗 separately, i.e.
+𝑚𝑖 𝑗 (𝑇, 𝑣) = (𝑣 (𝑇 ∪ 𝑖 𝑗) − 𝑣 (𝑇 )) − (𝑣 (𝑇 ∪ 𝑖) − 𝑣 (𝑇 )) − (𝑣 (𝑇 ∪ 𝑗) − 𝑣 (𝑇 ))
+=𝑣 (𝑇 ∪ 𝑖 𝑗) − 𝑣 (𝑇 ∪ 𝑖) − 𝑣 (𝑇 ∪ 𝑗) + 𝑣 (𝑇 )
+We can define the marginal contribution of a general 𝑆 ⊆ 𝑁 , in a
+similar manner. Let𝑚𝑆 (𝑇, 𝑣) be:
+𝑚𝑆 (𝑇, 𝑣) =
+∑︁
+𝐿⊆𝑆
+(−1) |𝑆 |− |𝐿 |𝑣 (𝑇 ∪ 𝐿) .
+This is also known as the 𝑆 discrete derivative of 𝑣 at 𝑇 (echoing the
+inclusion-exclusion principle). We note that when 𝑇 = ∅,𝑚𝑆 (∅, 𝑣)
+is the Harsanyi dividend of 𝑆 , a well-known measure of the synergy
+(or surplus) generated by 𝑆 [26]. For𝑇 ≠ ∅,𝑚𝑆 (𝑇, 𝑣) can be thought
+of as the added value of having the coalition 𝑆 form, given that the
+players in 𝑇 have already committed to joining. More generally,
+𝑚𝑆 (𝑇, 𝑣) represents the marginal interaction between features in 𝑆
+within the set of features 𝑇 ∪ 𝑆 .
+3 AXIOMATIC CHARACTERIZATION OF
+GOOD MODEL EXPLANATIONS
+As previously discussed, our objective is to identify high-quality
+model explanations. When pursuing quality metrics for a model
+explanation, one can take one of two approaches: either show that
+the model explanation is the optimal solution to some target (e.g.
+minimizes some loss function) [27, 30], or that it satisfies a set of de-
+sirable properties [9, 11, 30]. We take both approaches in this work,
+resulting in a unique and optimal high-dimensional explanation;
+this is the Banzhaf interaction index (BII) [16]. Given a cooperative
+game 𝑣 , the Banzhaf interaction index for a subset 𝑆 ⊆ 𝑁 is
+𝐼 𝑣BII (𝑆) = 1
+2𝑛−|𝑆 |
+∑︁
+𝑇 ⊆𝑁 \𝑆
+∑︁
+𝐿⊆𝑆
+(−1) |𝑆 |− |𝐿 |𝑣 (𝐿 ∪𝑇 )
+=
+1
+2𝑛−|𝑆 |
+∑︁
+𝑇 ⊆𝑁 \𝑆
+𝑚𝑆 (𝑇, 𝑣) (2)
+In words, 𝐼 𝑣BII (𝑆) equals 𝑆 ’s expectedmarginal contribution to a set
+𝑇 ⊆ 𝑁 \𝑆 , sampled uniformly at random. Grabisch and Roubens [16]
+show that BII uniquely satisfies Linearity, Symmetry, Dummy, the
+Recursive Property, Generalized 2-Efficiency, and the Limit Condition.
+Theorem 3.2 proposes a ‘leaner’ axiomatization of BII , which, as
+we argue, is more sensible in the model explanation setting. We
+show that BII is the unique measure which satisfies four natural
+axioms: Symmetry,Generalized 2-Efficiency, the Limit Condition, and
+Monotonicity. The first three axioms are fairly standard assumptions
+in identifying ‘good’ solutions, generalized to interaction indices
+by [16].
+Symmetry (S): for any permutation 𝜋 over 𝑁 we have that
+𝐼 𝑣 (𝑆) = 𝐼𝜋𝑣 (𝜋𝑆). Here, 𝜋𝑆 equals {𝜋 (𝑖) : 𝑖 ∈ 𝑆}, and 𝜋𝑣 is
+the game where the value of a coalition 𝑇 equals 𝑣 (𝜋−1𝑇 ).
+Symmetry is a natural property for any interaction mea-
+sure: intuitively, it simply stipulates that features’ interac-
+tion value is independent of their identity, and depends only
+on their intrinsic coalitional worth.
+Generalized 2-Efficiency (GE): for any 𝑖, 𝑗 ∈ 𝑁 , and for any
+𝑆 ⊆ 𝑁 \ 𝑖 𝑗 :
+𝐼 𝑣[𝑖 𝑗 ] (𝑆 ∪ [𝑖 𝑗]) = 𝐼 𝑣 (𝑆 ∪ 𝑖) + 𝐼 𝑣 (𝑆 ∪ 𝑗) .
+Intuitively, merging two features into one feature encod-
+ing the same information results in no additional influence.
+Generalized 2-Efficiency extends the 2-Efficiency axiom pro-
+posed by [20] to characterize the Banzhaf value.
+Limit Condition (L): if 𝑁 is the set of players of the game
+𝑣 then 𝐼 𝑣 (𝑁 ) = 𝑚𝑁 (∅, 𝑣) =
+∑
+𝐿⊆𝑁 (−1)𝑛−|𝐿 |𝑣 (𝐿). In other
+words, the interaction value of the set 𝑁 equals exactly the
+added value of it forming, given that no subsets of players
+have pre-committed themselves to joining.
+Next, let us introduce the notion of monotonicity for interaction
+indices.
+Monotonicity (M): If ∀𝑇 ⊆ 𝑁 \𝑆 ,𝑚𝑆 (𝑇, 𝑣1) ≥ 𝑚𝑆 (𝑇, 𝑣2) and
+for some 𝑇 ∗ ⊆ 𝑁 \ 𝑆 strict inequality holds then 𝐼 𝑣1 (𝑆) >
+𝐼 𝑣2 (𝑆). Moreover, if ∀𝑇 ⊆ 𝑁 \ 𝑆 ,𝑚𝑆 (𝑇, 𝑣1) =𝑚𝑆 (𝑇, 𝑣2) then
+𝐼 𝑣1 (𝑆) = 𝐼 𝑣2 (𝑆). This idea extends the strong monotonicity
+axiom proposed by [35], which states that if 𝑚𝑖 (𝑇, 𝑣1) ≥
+𝑚𝑖 (𝑇, 𝑣2) for all 𝑇 ⊆ 𝑁 \ 𝑖 then 𝐼 𝑣1 (𝑖) ≥ 𝐼 𝑣2 (𝑖).
+Datta et al. [11] argue that the monotonicity axiom is better
+suited for charactering model explanations than the more ‘standard’
+linearity axiom used in the classic characterization of the Shapley
+value [28], as well as the original BII characterization [16].
+3.1 Characterization Result
+First, we show that the four axioms we propose imply a generalized
+version of the dummy property in Lemma 3.1. The main result
+of this section is Theorem 3.2 that characterizes our explanation
+method uniquely.
+Lemma 3.1. If 𝐼 𝑣 satisfies (S), (GE), (L) and (M) then if𝑚𝑆 (𝑇, 𝑣) = 0
+∀𝑇 ⊆ 𝑁 \ 𝑆 then 𝐼 𝑣 (𝑆) = 0.
+Proof. We begin by showing a weaker claim: if 𝑔 is a null game
+where 𝑔(𝑆) = 0 for all 𝑆 ⊆ 𝑁 , then 𝐼𝑔 (𝑆) = 0 for all 𝑆 ⊆ 𝑁 .
+For a given null game 𝑔, we have 𝑚𝑆 (𝑇,𝑔) = 0 for all 𝑆 ⊆ 𝑁
+and 𝑇 ⊆ 𝑁 \ 𝑆 . By symmetry, 𝐼𝑔 (𝑆1) = 𝐼𝑔 (𝑆2) for all 𝑆1, 𝑆2 ⊆ 𝑁
+with |𝑆1 | = |𝑆2 |, because for any permutation 𝜋 , 𝑔 = 𝜋𝑔. Also, by
+the Limit Condition(L), 𝐼𝑔 (𝑁 ) = 𝑚𝑁 (∅, 𝑔) = 0. Similarly, for all
+𝑖1 ≠ 𝑖2 ∈ 𝑁 , 𝐼𝑔 [𝑖1,𝑖2 ] (𝑁 \ 𝑖1𝑖2 ∪ [𝑖1, 𝑖2]) = 0. In fact, this property
+holds for all 𝑉 ⊂ 𝑁 : 𝐼𝑔 [𝑉 ] (𝑁 \ 𝑉 ∪ [𝑉 ]) = 0. Now we use (GE)
+property for 𝐼𝑔 [𝑉 ] (𝑁 \𝑉 ∪ [𝑉 ]) by sequentially removing all 𝑘 ∈ 𝑉
+403
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Neel Patel, Martin Strobel, and Yair Zick
+until it becomes a singleton. First, for all 𝑘1 ∈ 𝑉 ;
+0 = 𝐼𝑔 [𝑉 ] (𝑁 \𝑉 ∪ [𝑉 ]) = 𝐼𝑔 [𝑉 \𝑘1 ] (𝑁 \𝑉 ∪ [𝑉 \ 𝑘1])+
+𝐼𝑔 [𝑉 \𝑘1 ] (𝑁 \𝑉 ∪ 𝑘1) = 2𝐼𝑔 [𝑉 \𝑘1 ] (𝑁 \𝑉 ∪ [𝑉 \ 𝑘1])
+The second equality holds because of symmetry (S) property for
+the game 𝑔 [𝑉 \𝑘1 ] . Now for 𝑘2 ∈ 𝑉 \ 𝑘1; we similarly use the (GE)
+property to obtain 𝐼𝑔 [𝑉 \𝑘1 ] (𝑁 \𝑉 ∪ [𝑉 \ 𝑘1]) = 2𝐼𝑔 [𝑉 \𝑘1 ] (𝑁 \𝑉 ∪
+[𝑉 \ 𝑘1𝑘2]). We repeat this argument until only one element is left.
+We get 0 = 𝐼𝑔 [𝑉 ] (𝑁 \𝑉 ∪ [𝑉 ]) = 2 |𝑉 |−1𝐼𝑔 (𝑁 \𝑉 ∪𝑘). This equality
+holds for all 𝑉 ⊆ 𝑁 and all 𝑘 ∈ 𝑉 . Which shows that for all 𝑆 ⊆ 𝑁 ,
+𝐼𝑔 (𝑆) = 0.
+Now, to prove the second part of the lemma, consider any game
+𝑣 . If 𝑚𝑆 (𝑇, 𝑣) = 0 for all 𝑇 ⊆ 𝑁 \ 𝑆 , then 𝑚𝑆 (𝑇, 𝑣) = 𝑚𝑆 (𝑇,𝑔)
+for all 𝑇 ⊆ 𝑁 \ 𝑆 , therefore by the Monotonicity property(M),
+𝐼 𝑣 (𝑆) = 𝐼𝑔 (𝑆) = 0, which concludes the proof. □
+Before we prove the main theorem, we define important terms
+which will be helpful to prove the theorem.
+Given a set of features 𝑅 ⊆ 𝑁 , we define the primitive game 𝑝𝑅 as:
+𝑝𝑅 (𝑆) =
+{
+1, if 𝑅 ⊆ 𝑆
+0, else
+The set B𝑁 of all Boolean functions forms a vector space, and the
+set of primitive games P𝑁 = {𝑝𝑅 : 𝑅 ⊆ 𝑁 } of all primitive games
+is an orthonormal basis of the vector space B𝑁 . Therefore, any
+Boolean function 𝑣 (In this context a cooperative game 𝑣) is uniquely
+represented by a linear combination of primitive games. In other
+words, given a cooperative game 𝑣 : 2𝑁 → R, we can uniquely
+write as a linear combination of primitive games:
+𝑣 (·) =
+∑︁
+𝑅⊆𝑁
+𝑐𝑅𝑝
+𝑅 (·) (3)
+The unique decomposition of cooperative games is useful for our
+characterization of high-dimensional model explanations. We also
+require some technical claims which will be useful for our charac-
+terization result (for proofs see supplementary material [25]).
+Theorem 3.2. BII is the only high-dimensional model explanation
+satisfying (S),(GE),(L) and (M).
+Proof. We first show that BII satisfies all the properties. BII
+trivially satisfies (S), (L) and (M). To show that it satisfies (GE), take
+any 𝑆 ⊆ 𝑁 \ 𝑖 𝑗
+𝐼 𝑣BII (𝑆 ∪ 𝑖) = 1
+2𝑛−𝑠−1
+∑︁
+𝑇 ⊆𝑁 \(𝑆∪𝑖)
+𝑚𝑆∪𝑖 (𝑇, 𝑣)
+=
+1
+2𝑛−𝑠−1
+∑︁
+𝑇 ⊆𝑁 \(𝑆∪𝑖 𝑗)
+[𝑚𝑆 (𝑇 ∪ 𝑖, 𝑣) −𝑚𝑆 (𝑇, 𝑣)]
++ 1
+2𝑛−𝑠−1
+∑︁
+𝑇 ⊆𝑁 \(𝑆∪𝑖 𝑗)
+[𝑚𝑆 (𝑇 ∪ 𝑖 𝑗, 𝑣) −𝑚𝑆 (𝑇 ∪ 𝑗, 𝑣)]
+A similar calculation for 𝑗 shows that
+𝐼 𝑣BII (𝑆 ∪ 𝑗) = 1
+2𝑛−𝑠−1
+∑︁
+𝑇 ⊆𝑁 \(𝑆∪𝑖 𝑗)
+[𝑚𝑆 (𝑇 ∪ 𝑗, 𝑣) −𝑚𝑆 (𝑇, 𝑣)]
++ 1
+2𝑛−𝑠−1
+∑︁
+𝑇 ⊆𝑁 \(𝑆∪𝑖 𝑗)
+[𝑚𝑆 (𝑇 ∪ 𝑖 𝑗, 𝑣) −𝑚𝑆 (𝑇 ∪ 𝑖, 𝑣)]
+Thus, 𝐼 𝑣BII (𝑆 ∪ 𝑖) + 𝐼 𝑣BII (𝑆 ∪ 𝑗) equals
+1
+2𝑛−𝑠−2
+×
+∑︁
+𝑇 ⊆𝑁 \(𝑆∪𝑖 𝑗)
+[𝑚𝑆 (𝑇 ∪ 𝑖 𝑗, 𝑓 ) −𝑚𝑆 (𝑇, 𝑓 )] (4)
+Equation (4) shows that 𝐼 𝑣[𝑖 𝑗 ] (𝑆 ∪ [𝑖 𝑗]) = 𝐼 𝑣 (𝑆 ∪ 𝑖) + 𝐼 𝑣 (𝑆 ∪ 𝑗).
+BII satisfies the four axioms; to show that it uniquely satisfies
+them, we use the fact that 𝑣 can be uniquely expressed as the sum
+of primitive games;
+𝑣 =
+∑︁
+𝑅⊆𝑁
+𝐶𝑅𝑝
+𝑅 (5)
+We define the index Γ of a cooperative game 𝑣 to be the minimum
+number of terms in the expression of the form (5). We prove the
+theorem by induction on Γ. For Γ = 0, in Lemma 3.1, 𝐼 𝑣 (𝑆) = 0 for
+all 𝑆 ⊆ 𝑁 , which coincides with the Banzhaf interaction index.
+If Γ = 1 then 𝑣 = 𝐶𝑅𝑝
+𝑅 for some 𝑅 ⊆ 𝑁 . Consider 𝑆 ⊈ 𝑅;
+Proposition A1 in the supplementary material [25] implies that
+𝑚𝑆 (𝑇, 𝑣) = 0 for all 𝑇 ⊆ 𝑁 , which in turn implies 𝐼 𝑣 (𝑆) = 0 =
+𝐼 𝑣BII (𝑆). By Lemma A3 in the supplementary material [25], 𝐼 𝑣 (𝑅) =
+𝐶𝑅 , which equals 𝐼 𝑣BII (𝑅) by Proposition A2 in the supplementary
+material [25]. To complete the proof for the first inductive step,
+we need to show that for all 𝑆 ⊆ 𝑅, 𝐼 𝑣 (𝑆) = 𝐼 𝑣BII (𝑆) =
+𝐶𝑅
+2|𝑅 |−|𝑆 | .
+If 𝑆1, 𝑆2 ⊆ 𝑅 and 𝑠1 = 𝑠2 then by symmetry, 𝐼 𝑣 (𝑆1) = 𝐼 𝑣 (𝑆2): we
+can define a permutation 𝜋 over 𝑁 such that 𝑆2 bijectively maps
+to some 𝑆1, and all 𝑖 ∉ 𝑆1 ∪ 𝑆2 : are invariant. By the Symmetry
+property 𝐼 𝑣 (𝑆2) = 𝐼𝜋𝑣 (𝑆1); however, 𝜋𝑣 = 𝑣 because 𝑣 = 𝐶𝑅𝑝
+𝑅 .
+Now, consider any 𝑖1 ≠ 𝑖2 ∈ 𝑅 and define 𝑆 := 𝑅 \ {𝑖1, 𝑖2}; by the
+GE property, we can write
+𝐼 𝑣[𝑖1𝑖2 ] (𝑆 ∪ [𝑖1𝑖2]) = 𝐼 𝑣 (𝑆 ∪ 𝑖1) + 𝐼 𝑣 (𝑆 ∪ 𝑖2)
+which implies for any𝑄 ⊂ 𝑅 with |𝑄 | = |𝑅 |−1, 𝐼 𝑣 (𝑄) = 1
+2 𝐼
+𝑣[𝑖1𝑖2 ] (𝑆∪
+[𝑖1𝑖2]). The reduced game 𝑣 [𝑖1𝑖2 ] is
+𝑣 [𝑖1𝑖2 ] (𝑆 ′) =
+{
+𝐶𝑅, if 𝑆 ∪ [𝑖1𝑖2] ⊆ 𝑆 ′
+0, else
+By Lemma A3 in the supplementary material [25], 𝐼 𝑣[𝑖1𝑖2 ] (𝑆 ∪
+[𝑖1𝑖2]) = 𝐶𝑅 and 𝐼 𝑣 (𝑄) = 𝐶𝑅
+2 . This property holds for all 𝑇 ⊂ 𝑁 ,
+𝑣 [𝑇 ] ; 𝐼 𝑣[𝑇 ] (𝑁 \𝑇 ∪ [𝑇 ]) = 𝐶𝑅 . By inductively using the (GE) prop-
+erty, in a manner similar to Lemma A3 in the supplementary mate-
+rial [25], we show that 𝐼 𝑣 (𝑄) = 𝐶𝑅
+2|𝑅 |−|𝑄 | . By Proposition A2 in the
+supplementary material [25], this coincides with Banzhaf interac-
+tion index concluding the first inductive step.
+To complete the proof, assume that 𝐼 𝑣 (𝑆) coincides with the
+Banzhaf interaction index whenever the index of the game 𝑣 is at
+most Γ = 𝛾 . Suppose that 𝑣 has an index 𝛾 + 1, and expressed as
+𝑣 =
+𝛾+1∑︁
+𝑘=1
+𝐶𝑅𝑘𝑝
+𝑅𝑘
+Let 𝑅 =
+𝛾+1⋂
+𝑘=0
+𝑅𝑘 , and suppose that 𝑆 ⊈ 𝑅. We define another game𝑤 :
+𝑤 =
+∑︁
+𝑘 :𝑆⊆𝑅𝑘
+𝐶𝑅𝑘𝑝
+𝑅𝑘
+Since 𝑆 ⊈ 𝑅, the index of𝑤 is strictly smaller than 𝛾 + 1. We claim
+that for all 𝑇 ⊆ 𝑁 \ 𝑆 ;𝑚𝑆 (𝑇, 𝑣) =𝑚𝑆 (𝑇,𝑤). Indeed, consider any
+404
+High Dimensional Model Explanations: An Axiomatic Approach FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+𝑇 ⊆ 𝑁 \ 𝑆 ;𝑚𝑆 (𝑇, 𝑣) equals∑︁
+𝐿⊆𝑆
+(−1) |𝑆 |− |𝐿 |𝑣 (𝑇 ∪ 𝐿) =
+∑︁
+𝐿⊆𝑆
+(−1) |𝑆 |− |𝐿 |
+𝛾+1∑︁
+𝑘=1
+𝐶𝑅𝑘𝑝
+𝑅𝑘 (𝑇 ∪ 𝐿) =
+𝛾+1∑︁
+𝑘=1
+∑︁
+𝐿⊆𝑆
+(−1) |𝑆 |− |𝐿 |𝐶𝑅𝑘𝑝
+𝑅𝑘 (𝑇 ∪ 𝐿) =
+𝛾+1∑︁
+𝑘=1
+𝐶𝑅𝑘𝑚𝑆 (𝑇, 𝑝𝑅𝑘 ) =∑︁
+𝑘 :𝑆⊆𝑅𝑘
+𝐶𝑅𝑘𝑚𝑆 (𝑇, 𝑝𝑅𝑘 ) =𝑚𝑆 (𝑇,𝑤)
+The second-last equality holds by Proposition A1 in the supple-
+mentary material [25], hence by induction on Γ and monotonic-
+ity(M) 𝐼 𝑣 (𝑆) coincides with BII for all 𝑆 ⊈ 𝑅.
+It remains to show that 𝐼 𝑣 (𝑆) coincides with BII when 𝑆 ⊆ 𝑅.
+for any 𝑆 ⊆ 𝑅, consider any 𝑖 ∈ 𝑆 and define 𝑆 ′ := 𝑆 \ 𝑖 . Take any
+𝑗 ∈ 𝑁 such that 𝑗1 ∈ 𝑅1 \ 𝑅2 ∪ 𝑅2 \ 𝑅1. By the (GE) property, we
+can write
+𝐼 𝑣 (𝑆) = 𝐼 𝑣[𝑖 𝑗1 ] (𝑆 ′ ∪ [𝑖 𝑗1]) − 𝐼 𝑣 (𝑆 ′ ∪ 𝑗1) (6)
+In Equation (6), 𝑆 ′ ∪ 𝑗1 ⊈ 𝑅, therefore as previously shown,
+𝐼 𝑣 (𝑆 ′∪ 𝑗1) coincideswith BII for the game 𝑣 . Consider the restricted
+game 𝑣 [𝑖 𝑗1 ] :
+𝑣 [𝑖 𝑗 ] =
+𝛾+1∑︁
+𝑘=0
+𝐶𝑅𝑘𝑝
+𝑅𝑘\𝑖 𝑗1∪[𝑖 𝑗1 ]
+[𝑖 𝑗1 ]
+Consider 𝑗2 ≠ 𝑗1 ∈ 𝑅1 \ 𝑅2 ∪ 𝑅2 \ 𝑅1. By the (GE) property,
+𝐼 𝑣[𝑖 𝑗1 𝑗2 ] (𝑆 ′ ∪ [𝑖 𝑗1 𝑗2]) = 𝐼 𝑣[𝑖 𝑗1 ] (𝑆 ′ ∪ [𝑖 𝑗1]) + 𝐼 𝑣[𝑖 𝑗1 ] (𝑆 ′ ∪ 𝑗2) (7)
+In Equation (7), 𝑆 ′ ∪ 𝑗2 ⊈
+𝐼+1⋂
+𝑘=1
+𝑅𝑘 \ 𝑖 𝑗1 ∪ [𝑖 𝑗1], therefore as we
+have shown before, 𝐼 𝑣[𝑖 𝑗1 ] (𝑆 ′ ∪ 𝑗2) = 𝐼
+𝑣[𝑖 𝑗1 ]
+BII (𝑆 ′ ∪ 𝑗2). Let us denote
+𝑇 = 𝑅1 \ 𝑅2 ∪ 𝑅2 \ 𝑅1 and 𝑇 ′ = 𝑖 ∪𝑇 . By repeating this argument
+for all 𝑗3, . . . , 𝑗𝑡 ∈ 𝑇 and exploiting the (GE) property for each 𝑗ℓ ,
+we can write 𝐼 𝑣 (𝑆) as:
+𝐼 𝑣 (𝑆) = 𝐼 𝑣[𝑇 ′ ] (𝑆 ′ ∪ [𝑇 ′]) − 𝐼 𝑣 (𝑆 ′ ∪ 𝑗1) −
+𝑡∑︁
+𝑙=1
+𝐼 𝑣[𝑖 𝑗1 ... 𝑗ℓ ] (𝑆 ′ ∪ 𝑗ℓ )
+(8)
+All of the summands in (8) coincide with BII , because 𝑆 ′∪ 𝑗ℓ ⊈
+𝐼+1⋂
+𝑘=1
+𝑅𝑘 \ 𝑖 𝑗1 . . . 𝑗ℓ−1 ∪ [𝑖 𝑗1 . . . 𝑗ℓ−1] for all ℓ = 1, . . . , 𝑡 . We can write
+the reduced game 𝑣 [𝑇 ′ ] as
+𝑣 [𝑇 ′ ] = (𝐶𝑅1 +𝐶𝑅2 )𝑝 (𝑅1∩𝑅2\𝑖)∪[𝑇 ′ ]
+[𝑇 ′ ] +
+𝛾+1∑︁
+𝑘=3
+𝐶𝑅𝑘𝑝
+(𝑅𝑘\𝑇 ′)∪[𝑇 ′ ]
+[𝑇 ′ ]
+Thus, the index of the reduced game 𝑣 [𝑇 ′ ] is strictly smaller than
+𝛾 + 1. By induction, 𝐼 𝑣[𝑇 ′ ] (𝑆 ′ ∪ [𝑉 ]) coincides with BII for the
+reduced game 𝑣 [𝑇 ′ ] . 𝐼 𝑣 (𝑆) can be written as
+𝐼 𝑣 (𝑆) = 𝐼 𝑣[𝑇 ′ ] (𝑆 ′ ∪ [𝑇 ′]) −
+𝑡∑︁
+𝑙=1
+𝐼 𝑣[𝑖 𝑗1 ... 𝑗ℓ ] (𝑆 ′ ∪ 𝑗ℓ )
+By using the (GE) property inductively, 𝐼 𝑣BII (𝑆) can also be writ-
+ten in the same form, which implies that 𝐼 𝑣 (𝑆) coincides with the
+Banzhaf interaction index for all, 𝑆 ⊆ 𝑅. □
+3.2 Explaining Our Model Explanations
+Does the BII measure make sense in the model explanation do-
+main? This is purely a function of the strength of the axioms we set
+forth. Symmetry is natural enough: if a model explanation depends
+on the indices of its features then it fails a basic validity test. The
+index in which a feature appears has no bearing on the underlying
+trained model (ideally), nor does it affect the outcome.
+Recall that Generalized Efficiency requires that model explana-
+tions should be invariant under feature merging. In other words -
+artificially treating a pair of features as a single entity (while main-
+taining the same underlying model) should not have any effect on
+how feature behaviors are explained. Interestingly, Shapley values
+are not invariant under feature merging, a result shown by Lehrer
+[20]. The following examples illustrate what this entails in actual
+applications.
+Example 3.3. Consider an sentiment analysis task where a model
+predict if a movie review was positive. In a preliminary step the
+text is parsed by a parser to be machine readable. This can be done
+in many different ways. For example the sentence “This isn’t a
+absolutely terrible movie” Can be parsed as
+| This | isn’t | a | absolutely | terrible | movie | . |
+or as
+| This | is | n’t | a | absolut | ely | terrible | movie | . |.
+Generalized Efficiency ensures that the influences of “is” and “n’t”
+in the second version add up to the influence of “isn’t” in the first.
+In other words, Generalized Efficiency ensures that the influence of
+features generated through different parsers behaves in a sensible
+manner.
+Example 3.4. Features might be “merged” in another situation
+when features that were readily available during the training of
+a model end up being costly to obtain during its deployment. If
+additionally these features are highly correlated with other features
+they might just be coupled. E.g. generally birds can fly, so the
+features is_bird and can_fly may simply be merged at prediction
+time1, to make it easier to enter information into a classifier. Again,
+Generalized Efficiency ensures that the influence of the merged
+feature relates in a natural way to the influence of the original
+features.
+The Limit condition normalizes the overall influence to be the
+discrete derivative of 𝑣 (·, 𝑓 ) with respect to 𝑁 . In other words,
+the total influence distributed to sets of features equals the total
+marginal effect of reverting features to their baseline values. This is
+an interesting departure from other efficiency measures. Shapley-
+based measures require efficiency with respect to 𝑓 ( ®𝑥) (or variants
+thereof), i.e. the total amount of influence should equal the total
+value the classifier takes at the point of interest (or the difference
+between the classifier and the baseline value). We require that the
+total influence equals the (discretized) rate in which features change
+the outcome. This makes BII more similar in spirit to gradient
+based model explanations, which are often used for generating
+model explanations in several application domains [29].
+1The authors are aware of the existence of ostriches, emus, penguins and the fearsome
+cassowary.
+405
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Neel Patel, Martin Strobel, and Yair Zick
+Monotonicity is a very natural property in the model explanation
+domain: if a set of features has a greater effect on the value 𝑓 ( ®𝑥),
+this should be reflected in the amount of influence one attributes
+to it. This has already been established in prior works, for Shapley-
+based measures [11]. However, this property does not naturally
+generalize when using Shapley-based high-dimensional model ex-
+planations. Agarwal et al. [1] propose a novel generalization of the
+Shapley value to high-dimensional model explanations, which fails
+monotonicity for smaller interactions (size of < 𝑘) for 𝑘-th order
+explanations, however, interactions of size 𝑘 follow monotonicity.
+Example 3.5 highlights issues that may arise when monotonicity is
+not preserved.
+Example 3.5. Given a function 𝑓𝑐 (𝑥1, 𝑥2, 𝑥3) = 𝑐𝑥1𝑥2𝑥3 with
+𝑐 > 0 defined on binary input space (for example, 𝑓 is the result of an
+image classification task where 𝑥𝑖 denotes the presence/absence of
+particular super-pixel). We assume that the baseline is ®𝑥 ′ = (0, 0, 0).
+Thus, 𝑣 (𝑆, ®𝑥, ®𝑥 ′, 𝑓𝑐 ) = 0 if {2, 3} ⊈ 𝑆 , resulting in 𝑣 ({2, 3}, 𝑓𝑐 ) = 0
+and 𝑣 (𝑁, 𝑓𝑐 ) = 𝑣 ({1, 2, 3}, 𝑓𝑐 ) = 𝑐𝑥1𝑥2𝑥3. What is the interaction
+value between 1 and 2? Intuitively {1, 2} offer some degree of in-
+teraction that monotonically grows as 𝑐 increases. Moreover, it is
+easy to see that 𝑣 (·, 𝑓𝑐 ) ≥ 𝑣 (·, 𝑓𝑐′) whenever 𝑐 ≥ 𝑐 ′. Set-QII fails
+to satisfies the monotoncity, and fails to capture the interaction
+between {1, 2} for any 𝑐 . Set-QII({1, 2}, 𝑆, 𝑓𝑐 ) = 0 for all 𝑐 .
+Similarly, the Shapley-Taylor interaction index for 𝑆 = {1, 2} and
+𝑘 = 3 is 0 as it does not follow the monotonicity property, however
+for 𝑘 = 2 it satisfies monotonicity and interaction value for {1, 2} is
+𝑐
+3 . The BII value for {1, 2} is 𝑐 .
+In Section 4, we show that BII can be interpreted as a poly-
+nomial approximation, offering additional intuition as to why our
+explanation method is optimal.
+4 GEOMETRICAL INTERACTION AND BII
+The geometry of model explanations is relatively well understood
+for attribute-based methods [22, 27, 30]; Ribeiro et al. [27] view
+linear explanation methods as local linear approximations of 𝑓 (·)
+around a point of interest ®𝑥 . Linear model explanations can be
+thought of as functions taking the following form: 𝑔( ®𝑥) = 𝜙0 +∑𝑁
+𝑖=1 𝜙𝑖𝑥𝑖 , where𝜙𝑖 captures the importance of feature 𝑖 . Taking this
+interpretation, linear model explanations can be ‘objectively’ bad
+explanations: they are a poor local approximation of the underlying
+model 𝑓 as black-box model can be highly non-linear around ®𝑥
+[30, 33]. In order to better capture the behavior of a black-box
+model 𝑓 , we approximate it using higher-order polynomials. For
+better visualization, we first assume that the black-box model 𝑓 :
+{0, 1}𝑁 → R takes a binary input vector mainly referred to as the
+humanly understandable feature representation [22, 27]. First, we
+start with quadratic approximation of the black-box model 𝑓 (·),
+𝑔( ®𝑥) = 𝜙0 +
+𝑁∑︁
+𝑖=1
+𝜙𝑖𝑥𝑖 +
+∑︁
+𝑖< 𝑗
+𝜙𝑖, 𝑗𝑥𝑖𝑥 𝑗
+In the above equation, 𝜙𝑖, 𝑗 captures the interaction between fea-
+tures 𝑖 and 𝑗 ; 𝜙𝑖 , 𝜙 𝑗 capture the importance of 𝑖 and 𝑗 . Thus, it is not
+unreasonable to assume that 𝜙𝑖, 𝑗 captures the pure interaction ef-
+fect of 𝑖 and 𝑗 : we can delegate the singular effects to 𝜙𝑖 , having the
+resultant coefficient of 𝑥𝑖𝑥 𝑗 capture the ‘pure’ interaction between 𝑖
+and 𝑗 . This also connects with the idea of the Statistical Interactions
+[14, 15]. For instance, consider a sentiment analysis problem, both
+the tokens “bad” and “not” have negative influence on the predic-
+tion. However, when they are present together as “not bad”, their
+influence is positive. In this simple example, it would be desirable
+to have 𝜙{“not”,“bad”} > 0. The idea of higher order interactions can
+be extended similarly.
+Consider a global polynomial approximation of 𝑓 (·) by a 𝑘-
+degree polynomial:
+𝑔𝑘 ( ®𝑥) = 𝜙0+
+∑︁
+𝑆′⊂𝑁 : |𝑆′ |<𝑘
+©­«𝜙𝑆′
+∏
+𝑗 ∈𝑆′
+𝑥 𝑗
+ª®¬+
+∑︁
+𝑆⊆𝑁 ; |𝑆 |=𝑘
+©­«𝜙𝑆
+∏
+𝑗 ∈𝑆
+𝑥 𝑗
+ª®¬ . (9)
+Again, to capture interaction among the set of features 𝑆 such that
+|𝑆 | = 𝑘 , we should remove all internal interaction effects captured
+by 𝜙𝑆′ for 𝑆 ′ ⊂ 𝑆 as we intend to capture the The polynomial 𝑔𝑘 is
+meant to locally approximate 𝑓 around the POI ®𝑥 ; what is the best
+approximation? Finding the best fitting polynomial of the highest
+possible degree seems like a natural objective. However, taking this
+approach runs the risk of ignoring lower order feature interactions
+and their possible effects; this is shown in Example 4.1.
+Example 4.1. Consider the degree 3 polynomial studied in Ex-
+ample 3.5, 𝑓 (𝑥1, 𝑥2, 𝑥3) = 𝑐𝑥1𝑥2𝑥3 with the baseline set to (1, 1, 1)
+(rather than (0, 0, 0) as was the case in Example 3.5). The best ap-
+proximation to 𝑓 is clearly itself. However, if we do so, then the
+interaction coefficients for variable pairs will be zero. This is ar-
+guably undesirable: for example, if ®𝑥 = (0, 0, 1), then 𝑥3 has virtually
+no impact (it is already set at the baseline). Similarly, 𝑥1 and 𝑥2
+have little individual effect, but do have significant joint effect - it
+is only when both are set to 1 that we observe any change in label.
+Now we formally define the optimization problem to find the
+“best” 𝑘-degree polynomial approximation of the black-box model
+𝑓 (·) globally. Let P𝑘 be the set of 𝑘-degree polynomials. We are
+interested in finding a polynomial 𝑔𝑘
+𝑓
+(·) which globally minimizes
+the quadratic loss between 𝑓 ( ®𝑥) and 𝑔( ®𝑥) ∈ P𝑘 for all ®𝑥 ∈ 2𝑁 , i.e.
+𝑔𝑘
+𝑓
+( ®𝑥) = argmin
+𝑔 ( ·) ∈P𝑘
+∑︁
+®𝑥 ∈2𝑁
+[𝑓 ( ®𝑥) − 𝑔( ®𝑥)]2 . (10)
+The interaction among features in 𝑆 with |𝑆 | = 𝑘 is measured
+as the coefficient of
+∏
+𝑖∈𝑆 𝑥𝑖 in the least square approximation of
+𝑓 (·) with a polynomial of degree 𝑘 . Theorem 4.2 shows that this
+geometrical definition of feature interaction coincides with the
+Banzhaf interaction index.
+Theorem 4.2. Let 𝑔𝑘
+𝑓
+( ®𝑥) be the 𝑘-degree solution of the optimiza-
+tion problem in Equation (10). Then the coefficients of
+∏
+𝑖∈𝑆 𝑥𝑖 for
+|𝑆 | = 𝑘 in 𝑔𝑘
+𝑓
+( ®𝑥) is given by 𝐼 𝑣BII (𝑆).
+The proof of the Theorem is a direct corollary of [18, Theo-
+rem 4.2]. Theorem 4.2 shows that k-th order interaction obtains via
+least square approximation of the black-box model using k-th order
+polynomial coincides with BII and extend a geometrical argument
+for “good" feature-based explanation to feature interactions. More-
+over, the least square approximation of the model via polynomial
+also resonates with the Statistical interaction among features as we
+already discussed. Therefore BII is not only obtained from strong
+axiomatic but also derived from an intuitive optimization problem.
+406
+High Dimensional Model Explanations: An Axiomatic Approach FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+5 EXPERIMENTAL EVALUATION
+In this section, we experimentally illustrate the need for high di-
+mensional model explanations and the axioms discussed above.
+We consider two-well known benchmark datasets; the UCI Adult
+dataset [13] tries to predict whether an individual’s income ex-
+ceeds $50,000/year based on census data, and the IMDB movie re-
+view dataset [23] tries to predict the positive/negative sentiment of
+movie reviews based on their word content.
+For the Adult dataset we train a 3-level decision three (see Fig-
+ure 1) which achieves an 84% test accuracy. We use this easily
+comprehensible model to show the shortcomings of existing meth-
+ods and the importance of our axioms. We also train a random
+forest with 50 estimators and a maximum depth of 10 that achieves
+a slightly higher accuracy of 86%2.
+For the IMDB dataset we train the BERT language model3 [12],
+which achieves 89% evaluation accuracy; the BERT-Base model we
+use has 110M parameters, making it virtually incomprehensible to
+humans.
+Like many other model explanation methods, BII assumes the
+existence of a baseline, i.e. a vector having “typical” values which
+can be used as a reference for the point of interest when creating
+the explanation. In the Adult dataset, we assume the baseline for
+continuous features to be their median value; categorical features
+are one-hot encoded, and the baseline is assumed to be zero. For
+the IMDB dataset, each word is a distinct feature, and the baseline
+is an empty sentence (i.e. all features set to 0).
+5.1 Baseline Explanation Frameworks
+We compare BII with an interaction measure based on the Shapley
+interaction index (SII) [16] and ametric that falls into the framework
+proposed in [11] which we call Set-QII. For all methods we consider
+a version using the baseline i.e. the BII and SII values are the
+respective game-theoretic measures when “playing” the game of
+setting features to the baseline. Set-QII measures the influence
+of a (set of) features by measuring the difference of the function
+value on the point of interest and a single another point where the
+values of this (set of) feature(s) is set to the baseline. For all three
+metrics, we consider model explanations capturing single feature
+influences and pairwise feature interactions. We briefly discuss the
+computational complexity in the supplementary material [25].
+To further illustrate the importance of measuring interactions we
+also study the well known LIME method [27] which only generates
+individual feature importance.
+We also consider a naive approach to create feature interactions
+which we call the additive expansion. The additive expansion of a
+feature-based explanation methods is computing joint influence
+of feature 𝑖 and 𝑗 (interaction among features 𝑖 and 𝑗 ) by simply
+adding individual influence of features 𝑖 and 𝑗 , 𝐼 (𝑖 𝑗) = 𝐼 (𝑖) + 𝐼 ( 𝑗).
+This is a naive way to compute the joint effect of features when only
+individual feature importance is provided. Via additive expansion
+we can create a feature-interaction measure from LIME , as well as
+2We use keras library to train decision tree and random forest https://github.com/keras-
+team/keras.
+3We use pertained BERT model for the IMDB dataset available at https://github.com/
+artemisart/bert-sentiment-IMDB.
+ad-hoc feature-interaction measures from the feature-importance
+versions of Banzhaf, Shapley and QII.
+5.2 The Importance of Interactions
+While seemingly obvious, we begin our empirical investigation
+with a simple question: are there instances where high-dimensional
+model explanations are needed? In other words, is it possible that
+feature-wise explanations offer sufficient explanations in practice?
+Our first experiment indicates that high-dimensional explanations
+matter. In Figure 2, we visualize interactions for the movie review
+described in the Introduction (Section 1). We compute pairwise
+interactions using BII among features for the BERT model. We
+represent the explanations generated by BII as a symmetric matrix,
+where the 𝑖-th diagonal element represents the influence of feature
+𝑖 in the decision tree and (𝑖, 𝑗)-th element of the matrix for 𝑖 < 𝑗
+represents the interaction between 𝑖 and 𝑗 .
+Comparing Figures 2 and 3, it is immediately clear why feature
+importance offers additional insights. The values generated by LIME
+are indicative of a negative review (whereas the review we examine
+is positive), and look somewhat odd: ‘not’ has a strong positive
+influence. On the other hand, the interactions make it clear that
+BERT has picked up on the fact that ‘not bad’ indicates a good
+review. We compare additional BII feature interactions for the
+BERT model and the IMDB classification task in the supplementary
+material [25] (Figures 1 to 5). LIME and BII mostly agree for the
+individual feature importance; however, BII captures non-trivial
+interactions among pairs of words that are impossible to observe
+only from feature-based explanation.
+In Figure 4, we plot the explanation generated by BII and
+LIME for individuals with Marital Status =yes, Capital Gain ∈
+{5095, 7073} and Education Level < 12 from the adult dataset
+for the simple tree classifier (see Figure 1). LIME suggests that
+Capital Gain is the most important feature and the other two fea-
+tures have minor importance. However, for any coalition of features
+(activated features are set to their POI value, and the others to their
+baseline value: Marital Status = No and Capital Gain = 0),
+changing only Marital Status or Capital Gain to their POI
+value does not significantly change the prediction value; but, chang-
+ing both of them concurrently to their POI value results in a signif-
+icant increase in prediction probability (see Table 1). BII success-
+fully captures these insights in Figure 4, and suggests that the high
+positive interaction between Capital Gain and Marital Status
+is responsible for the positive label. When considering feature inter-
+action, there is high positive interaction between Capital Gainand
+Marital Status, an insight that linear explanations do not capture,
+as seen in Table 1.
+Figure 5 summarizes the explanations generated by BII , SII ,
+LIME and QII for a married woman with a Capital Gain (CG) of
+5178 with Education Level = 13 in the adult test data for the sim-
+ple tree classifier (Figure 1). Column (a) is the additive expansion of
+the feature-importance versions of these measures and Column (b)
+shows the methods that explicitly consider interactions. Both BII
+and SII indicate a negative synergy between Education Level
+and Capital Gain, whereas all methods indicate positive individ-
+ual importance. Hence, additive expansions fail to capture negative
+interactions, even for relatively simple models.
+407
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Neel Patel, Martin Strobel, and Yair Zick
+Marital Status
+Capital Gain > 7073 Education Level > 12
+Education Level > 12 Age > 20 Capital Gain > 5095 Capital Gain > 5095
+0.03 0.15 0.00 0.98 0.30 0.98 0.67 1.00
+No Yes
+No Yes No Yes
+No Yes No Yes No Yes No Yes
+Figure 1: A three-level decision tree trained on the adult dataset, achieving 84% test accuracy.
+Table 1: This example shows the joint importance of the interactions between Capital Gain and Marital Status in the coalition of
+{Age, Education Level}, and the monotonicity property in the tree𝑇 (Figure 1). The prediction probability becomes 1.00when Marital Status
+and Capital Gain both join the coalition {Age, Education Level}; however, when the Marital Status or Capital Gain join individually in the
+coalition {Age, Education Level}, the prediction probability becomes 0.67 and 0.15 respectively. This shows that the features have synergistic
+effect, which is not captured by linear explanations (this holds for other coalitions, not just {Age, Education Level}).
+Features POI Base Coalition
+{A,EL} {A,EL,MS} {A,EL,CG} {A,EL,MS,CG}
+Marital Status (MS) Yes No No Yes No Yes
+Capital Gain (CG) 6021 0 0 0 6021 6021
+Age (A) 32 37 32 32 32 32
+Education Level (EL) 13 10 13 13 13 13
+Prediction 1.00 0.03 0.15 0.67 0.15 1.00
+5.3 Monotonicity Matters
+Having established the importance of measuring feature synergy,
+let us turn to evaluating the importance of our proposed ax-
+ioms. To do so, we consider a modified version of the tree de-
+picted in Figure 1. The output in the second-to-last leaf is changed
+from 0.67 to 0.01, i.e. married people with high Education Level
+but low Capital Gain are now classified as not having a high
+paying job. This change does not affect the prediction of the
+two points discussed above. However, this increases the interac-
+tion between Capital Gain and Marital Status: having a lower
+Capital Gain (or being unmarried) both lead to a negative out-
+come. More formally, we denote the cooperative game induced by
+the original tree by 𝑓 and the one induced by the modified tree by
+𝑓 ′. Under 𝑓 ′, the joint marginal gains increase:
+𝑚MS,CG ({Age, Education Level}, 𝑓 ′) >
+𝑚MS,CG ({Age, Education Level}, 𝑓 ),
+and𝑚MS,CG (𝑇, 𝑓 ′) = 𝑚MS,CG (𝑇, 𝑓 ) for any other coalition 𝑇 . Ac-
+cording to the monotonicity property, the interaction index value
+among {Age, Education Level} should be higher under 𝑓 ′ than
+𝑓 . This change is reflected in Shapley interactions and BII as both
+measures satisfy monotonicity (see Figure 5, column (b) for actual
+interaction and column (c) for interaction after the modification).
+Set-QII, however, is unchanged; it fails to satisfy monotonicity,
+and even for this small example cannot distinguish between the
+two trees. Similarly, the interaction between Capital Gain and
+Education Number should also increase which is again reflected
+by SII and BII ; Set-QII fails to show this (see Figure 5).
+5.4 The Effects of 2-Efficiency
+Table 2 highlights how failure to satisfy generalized 2-
+efficiency can lead to counterintuitive interactions when
+features are merged. We calculated the SII values for
+Education Level and Education Number for a random for-
+est with Marital Status (left) and Capital Gain (right) on some
+sampled points; we recalculated them after merging the features to
+[Education Level; Education Number]. These features can be
+naturally merged as they are in fact identical: Education Number
+is just a numerical representation of Education Level.
+In some instances, the interaction values of Education Level
+and Education Number with other features differ in sign (i.e.
+one has positive interaction and another has a negative interac-
+tion). In this case, under 2-efficiency, the interaction value of the
+merged feature [Education Level; Education Number] should
+lie somewhere between the two. In Table 2, we show some of
+the points where the Shapley interaction of Marital Status and
+Capital Gain with merged feature deviates from the expected in-
+teractions. For example, for Point 2, the SII of Education Level
+with Marital Status is −0.32 and Education Number with
+Marital Status is 0.123, therefore the interaction after merg-
+ing Education Number and Education Level should be less
+than 0.123; however, the SII interaction value between
+Marital Status and the merged feature is 0.161 — more than
+408
+High Dimensional Model Explanations: An Axiomatic Approach FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Table 2: Failure to satisfy generalized 2-efficiency leads to counterintuitive interactions after features aremerged.Wemerge Education Level
+and Education Number (which are actually identical); Shapley interaction values with Marital Status (left) and Capital Gain (right) before
+and after the features are merged tend to overestimate the expected merged value (as compared to the expected value under generalised
+2-efficiency).
+Interaction with Marital Status Interaction with Capital Gain
+Pt. 1 Pt. 2 Pt. 3 Pt. 4 Pt. 5 Pt. 1 Pt. 2 Pt. 3 Pt. 4 Pt. 5
+Education Level (EL) -.068 -.032 -.028 -.066 -.044 -.017 0 .016 .015 -.002
+Education Number (EN) .05 .123 .118 .041 .17 .016 -.007 -.009 -.006 -.011
+[EL;EN] -.077 .161 .154 -.077 .23 .013 -.013 .017 .019 .014
+Expected [EL;EN] -.018 .091 .090 -.025 .126 -.001 -.007 .007 .009 .009
+Difference -.059 .070 .064 -.052 -.103 .014 -.006 .010 .010 .005
+Negative interaction No interaction Positive interaction
+It
+It
+isn’t
+isn
+’t
+the
+th
+e
+greatest
+gr
+ea
+te
+st
+scifi
+sc
+ifi
+flick
+fli
+ck
+I’ve
+I’v
+e
+every
+ev
+er
+y
+seen,
+se
+en
+,
+but
+bu
+t
+it
+it
+is
+is
+not
+no
+t
+a
+a
+bad
+ba
+d
+movie
+m
+ov
+ie
+Negative interaction No interaction Positive interaction
+Figure 2: Feature importance and interactions for the movie
+review given in the introduction generated via BII . BII is
+able to pick up on the strong positive interaction between
+“not” and “bad” that leads to a positive prediction for this re-
+view. Note that the individual importance of “not” and “bad”
+is rather weak - their synergy is assigned importance.
+0.123! In other words, SII placed far too much influence on two
+identical merged features. We show additional examples in Table 2.
+Since BII satisfies generalized 2-efficiency, influence is preserved
+under merging and thus matches the expected outcome.
+−2 −1 0 1 2 3 4
+every
+isn’t
+bad
+greatest
+not
+0.22
+−0.31
+−0.71
+0.98
+2.74
+Influence
+Figure 3: LIME feature importance for the movie review
+given in Section 1. The measure assigns significant weight
+to the word “not”, but little weight to “bad”.
+BII LIME
+CG
+CG
+0.35 0 0.71
+EL
+EL
+0 0
+MS
+MS
+0.65
+Negative Positive
+0 0.5
+CG
+MS
+EL
+0.63
+0.31
+9 · 10−2
+Influence
+Figure 4: The explanation generated by BII and LIME for an-
+other point in the dataset.LIME fails to capture interactions.
+6 DISCUSSION AND FUTUREWORK
+Designing provably sound higher-order explanations for machine
+learning models in high stake domains is an important problem.
+409
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Neel Patel, Martin Strobel, and Yair Zick
+(a) Additive expansion (b) Actual interactions (c) After monotone shift
+Banzhaf
+CG
+CG
+0.28 0.46 1
+EL
+EL
+0.18 0.9
+MS
+MS
+0.72
+CG
+CG
+0.28 −0.2 0.56
+EL
+EL
+0.18 0.07
+MS
+MS
+0.72
+CG
+CG
+0.44 0.12 0.88
+EL
+EL
+0.02 −0.24
+MS
+MS
+0.57
+Shapley
+CG
+CG
+0.22 0.4 1
+EL
+EL
+0.18 0.96
+MS
+MS
+0.78
+CG
+CG
+0.22 −0.23 0.63
+EL
+EL
+0.18 0.1
+MS
+MS
+0.78
+CG
+CG
+0.43 0.13 0.9
+EL
+EL
+0.04 −0.31
+MS
+MS
+0.6
+Qii
+CG
+CG
+0.28 0.29 1
+EL
+EL
+0.01 0.74
+MS
+MS
+0.72
+CG
+CG
+0.28 0.6 0.72
+EL
+EL
+0.01 0.83
+MS
+MS
+0.72
+CG
+CG
+0.76 0.6 0.72
+EL
+EL
+0.01 0.83
+MS
+MS
+0.72
+Negative interaction No interaction Positive interaction
+Figure 5: The explanations for a married woman with a Capital Gain (CG) of 5178 with Education Level = 13 (i.e. Masters) in the adult test
+data for the above tree. (a) Linear explanations highlight the importance of Marital Status (MS) and Capital Gain (CG), they fail to show
+how these to features interact. (b) The positive interaction between Capital Gain (CG) and Marital Status (MS) highlights that both features
+a needed for a positive outcome. (c) After the tree gets modified to strengthen the interaction, the explanation proposed in Set-QII does not
+change, failing monotonicity.
+Ideally, we want to design explanations we can trust. We offer a
+variety of reasons to trust in BII : it uniquely satisfies a set of
+natural properties — if we believe that these are sensible then our
+job is done. That said, the authors believe that a normative approach
+is critical in the design of fair, transparent AI solutions. Rather than
+debating approaches, one should debate the fundamental properties
+they are guaranteed to satisfy. Deriving model explanations from
+norms offers an intuitive justification for the chosen interaction
+measure, which fosters trust in the explanation method. As shown
+in Section 5, some of our fundamental properties are absolutely
+critical for the design of sensible explanations. Even if one adheres
+to an optimization-based approach to explanation design, we show
+that BII is the optimal solution to a natural objective.
+While BII certainly satisfies several design criteria, it is not
+without issues. The first challenge is computational. Feature-based
+explanations are computationally intensive as it is, so it should be
+no surprise that computing higher-order interactions comes at a
+higher cost. There are, however, good reasons to believe that BII
+can be computed efficiently on simpler ML model classes, and that
+low error approximations can be found quickly. This, we believe, is
+an important direction for future work.
+ACKNOWLEDGMENTS
+This research was supported by an NRF Research Fellowship R-252-
+000-750-733 and the NRF AI Research award is R-252-000-A20-490.
+This work was done when the first and the third author were affili-
+ated with the National University of Singapore. The authors thank
+GAIW 2020, WHI 2020, NeurIPS 2020, and FAccT 2021 reviewers
+for their useful comments.
+410
+High Dimensional Model Explanations: An Axiomatic Approach FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+REFERENCES
+[1] Ashish Agarwal, Kedar Dhamdhere, and Mukund Sundararajan. 2019. A New
+Interaction Index inspired by the Taylor Series. arXiv preprint arXiv:1902.05622
+(2019). arXiv:1902.05622
+[2] Marco Ancona, Enea Ceolini, Cengiz Öztireli, and Markus Gross. 2017. A unified
+view of gradient-based attribution methods for deep neural networks. In NIPS
+2017-Workshop on Interpreting, Explaining and Visualizing Deep Learning. 1–11.
+[3] Marco Ancona, Enea Ceolini, Cengiz Öztireli, and Markus Gross. 2018. Towards
+better understanding of gradient-based attribution methods for Deep Neural
+Networks. In Proceedings of the 6th International Conference on Learning Repre-
+sentations (ICLR). 1–16.
+[4] Yoram Bachrach, Evangelos Markakis, Ariel D Procaccia, Jeffrey S Rosenschein,
+and Amin Saberi. 2008. Approximating power indices. In Proceedings of the
+7th International Conference on Autonomous Agents and Multi-Agent Systems
+(AAMAS). 943–950.
+[5] David Baehrens, Timon Schroeter, Stefan Harmeling, Motoaki Kawanabe, Katja
+Hansen, and Klaus-Robert Müller. 2010. How to explain individual classification
+decisions. Journal of Machine Learning Research 11 (2010), 1803–1831.
+[6] John F Banzhaf III. 1964. Weighted voting doesn’t work: A mathematical analysis.
+Rutgers Law Review 19 (1964), 317.
+[7] Georgios Chalkiadakis, Edith Elkind, and Michael Wooldridge. 2011. Compu-
+tational aspects of cooperative game theory. Synthesis Lectures on Artificial
+Intelligence and Machine Learning 5, 6 (2011), 1–168.
+[8] Tianyu Cui, Pekka Marttinen, and Samuel Kaski. 2019. Recovering Pairwise
+Interactions Using Neural Networks. arXiv preprint arXiv:1901.08361 (2019).
+arXiv:1901.08361
+[9] Amit Datta, Anupam Datta, Ariel D Procaccia, and Yair Zick. 2015. Influence in
+classification via cooperative game theory. In Proceedings of the 24th International
+Joint Conference on Artificial Intelligence (IJCAI). 511–517.
+[10] Anupam Datta, Matthew Fredrikson, Gihyuk Ko, Piotr Mardziel, and Shayak Sen.
+2017. Use privacy in data-driven systems: Theory and experiments with machine
+learnt programs. In Proceedings of the 24th ACM SIGSAC Conference on Computer
+and Communications Security (CCS). 1193–1210.
+[11] Anupam Datta, Shayak Sen, and Yair Zick. 2016. Algorithmic transparency via
+quantitative input influence: Theory and experiments with learning systems.
+In Proceedings of the 37th IEEE Symposium on Security and Privacy (Oakland).
+598–617.
+[12] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2018. Bert:
+Pre-training of deep bidirectional transformers for language understanding. arXiv
+preprint arXiv:1810.04805 (2018).
+[13] Dheeru Dua and Casey Graff. 2019. UCI Machine Learning Repository. http:
+//archive.ics.uci.edu/ml
+[14] Ronald Aylmer Fisher. 1992. Statistical methods for research workers. In Break-
+throughs in statistics. Springer, 66–70.
+[15] Andrew Gelman. 2005. Analysis of variance—why it is more important than ever.
+Annals of Statistics 33, 1 (2005), 1–53.
+[16] Michel Grabisch and Marc Roubens. 1999. An axiomatic approach to the concept
+of interaction among players in cooperative games. International Journal of Game
+Theory 28, 4 (1999), 547–565.
+[17] Peyton Greenside, Tyler Shimko, Polly Fordyce, and Anshul Kundaje. 2018. Dis-
+covering epistatic feature interactions from neural network models of regulatory
+DNA sequences. Bioinformatics 34, 17 (2018), i629–i637.
+[18] Peter L Hammer and Ron Holzman. 1992. Approximations of pseudo-Boolean
+functions; applications to game theory. Zeitschrift für Operations Research 36, 1
+(1992), 3–21.
+[19] Pang Wei Koh and Percy Liang. 2017. Understanding black-box predictions via
+influence functions. In Proceedings of the 34th International Conference on Machine
+Learning (ICML). 1885–1894.
+[20] Ehud Lehrer. 1988. An axiomatization of the Banzhaf value. International Journal
+of Game Theory 17, 2 (1988), 89–99.
+[21] Scott M. Lundberg, Gabriel G. Erion, and Su-In Lee. 2018. Consistent Individu-
+alized Feature Attribution for Tree Ensembles. arXiv preprint arXiv:1802.03888
+(2018). arXiv:1802.03888
+[22] Scott M Lundberg and Su-In Lee. 2017. A unified approach to interpreting model
+predictions. In Proceedings of the 31st Annual Conference on Neural Information
+Processing Systems (NIPS). 4765–4774.
+[23] Andrew L. Maas, Raymond E. Daly, Peter T. Pham, Dan Huang, Andrew Y. Ng,
+and Christopher Potts. 2011. Learning Word Vectors for Sentiment Analysis.
+In Proceedings of the 49th Annual Meeting of the Association for Computational
+Linguistics: Human Language Technologies (HLT). 142–150.
+[24] Guillermo Owen. 1972. Multilinear extensions of games. Management Science 18,
+5-part-2 (1972), 64–79.
+[25] Neel Patel, Martin Strobel, and Yair Zick. [n.d.]. Online Supplemen-
+tary Material: High Dimensional Model Explanation: An Axiomatic Ap-
+proach. https://github.com/DataDrivenStrategicCollaborationGroup/High-
+Dimensional-Model-Explanations-An-Axiomatic-Approach
+[26] Bezalel Peleg and Peter Sudhölter. 2007. Introduction to the Theory of Cooperative
+Games. Springer.
+[27] Marco Tulio Ribeiro, Sameer Singh, and Carlos Guestrin. 2016. Why should
+i trust you?: Explaining the predictions of any classifier. In Proceedings of the
+22nd International Conference on Knowledge Discovery and Data Mining (KDD).
+1135–1144.
+[28] Lloyd S Shapley. 1953. A value for n-person games. Contributions to the Theory
+of Games 2, 28 (1953), 307–317.
+[29] Karen Simonyan, Andrea Vedaldi, and Andrew Zisserman. 2013. Deep inside
+convolutional networks: Visualising image classification models and saliency
+maps. arXiv preprint arXiv:1312.6034 (2013). arXiv:1312.6034
+[30] Jakub Sliwinski, Martin Strobel, and Yair Zick. 2019. A Characterization of
+Monotone Influence Measures for Data Classification. In Proceedings of the 33rd
+AAAI Conference on Artificial Intelligence (AAAI). 718–725.
+[31] Mukund Sundararajan and Amir Najmi. 2019. The many Shapley values for
+model explanation. arXiv preprint arXiv:1908.08474 (2019). arXiv:1908.08474
+[32] Mukund Sundararajan, Ankur Taly, and Qiqi Yan. 2017. Axiomatic attribution
+for deep networks. In Proceedings of the 34th International Conference on Machine
+Learning (ICML). 3319–3328.
+[33] Michael Tsang, Dehua Cheng, and Yan Liu. 2017. Detecting statistical interactions
+from neural network weights. arXiv preprint arXiv:1705.04977 (2017).
+[34] Michael Tsang, Hanpeng Liu, Sanjay Purushotham, Pavankumar Murali, and
+Yan Liu. 2018. Neural interaction transparency (NIT): disentangling learned
+interactions for improved interpretability. In Proceedings of the 32nd Annual
+Conference on Neural Information Processing Systems (NeurIPS). 5804–5813.
+[35] H Peyton Young. 1985. Monotonic solutions of cooperative games. International
+Journal of Game Theory 14, 2 (1985), 65–72.
+411

@@ -1,0 +1,169 @@
+
+Increasingly, programming tasks involve automating and deploy-
+ing sensitive decision-making processes that may have adverse
+impacts on individuals or groups of people. The issue of fairness
+in automated decision-making has thus become a major problem,
+attracting interdisciplinary attention. In this work, we aim to make
+fairness a first-class concern in programming. Specifically, we pro-
+pose fairness-aware programming, where programmers can state
+fairness expectations natively in their code, and have a runtime
+system monitor decision-making and report violations of fairness.
+We present a rich and general specification language that allows
+a programmer to specify a range of fairness definitions from the
+literature, as well as others. As the decision-making program exe-
+cutes, the runtime maintains statistics on the decisions made and
+incrementally checks whether the fairness definitions have been
+violated, reporting such violations to the developer. The advantages
+of this approach are two fold: (i) Enabling declarative mathematical
+specifications of fairness in the programming language simplifies
+the process of checking fairness, as the programmer does not have
+to write ad hoc code for maintaining statistics. (ii) Compared to ex-
+isting techniques for checking and ensuring fairness, our approach
+monitors a decision-making program in the wild, which may be
+running on a distribution that is unlike the dataset on which a
+classifier was trained and tested.
+We describe an implementation of our proposed methodology
+as a library in the Python programming language and illustrate its
+use on case studies from the algorithmic fairness literature.
+CCS CONCEPTS
+• Theory of computation → Program specifications; • Soft-
+ware and its engineering → Specification languages;
+KEYWORDS
+Probabilistic specifications; Fairness; Assertion languages; Runtime
+monitoring; Runtime verification
+ACM Reference Format:
+Aws Albarghouthi and Samuel Vinitsky. 2019. Fairness-Aware Program-
+ming. In FAT* ’19: Conference on Fairness, Accountability, and Transparency,
+January 29–31, 2019, Atlanta, GA, USA. ACM, New York, NY, USA, 9 pages.
+https://doi.org/10.1145/3287560.3287588
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+https://doi.org/10.1145/3287560.3287588
+1 INTRODUCTION
+With algorithmic decision-making becoming the norm, the issue
+of algorithmic fairness has been identified as a key problem of
+interdisciplinary dimensions. Across the vast computer science
+community, the past few years have delivered a range of practical
+techniques aimed at addressing the fairness question.
+In this work, we aim to make fairness a first-class concern in
+programming. Specifically, we propose fairness-aware programming,
+where developers can state fairness expectations natively in their
+code, and have a runtime system monitor decision-making and
+report violations of fairness. This programming-language-based
+approach to fairness yields two advantages:
+• The developer can declaratively state their fairness expecta-
+tions natively in their code and have them checked. As such,
+the developer need not write ad hoc code for collecting statis-
+tics and checking whether fairness definitions are violated—
+they simply state the fairness definitions that they expect to
+hold. We argue that embedding notions of fairness directly
+within the programming language reduces the barrier to in-
+vestigating fairness of algorithmic decision-making.
+• The past few years have witnessed numerous techniques for
+constructing fair classifiers [1, 4, 11, 13, 25], as well as for
+testing and auditing fairness of existing decision-making pro-
+cedures [2, 8, 12, 23]. Generally, these techniques assume a
+provided dataset or distribution that is representative of the
+population subject to decision-making. Unfortunately, the data
+may be itself biased—e.g., due to historical discrimination—or
+it may simply be unrepresentative of the actual population.
+By monitoring actual algorithmic decisions as they are made,
+we can check whether fairness is violated in the wild, which,
+for instance, may exhibit different population characteristics
+than the data used for training and validation in a machine
+learning setting.
+Fairness Specifications Consider a software developer who con-
+structed a decision-making procedure following the best practices
+for ensuring certain notions of fairness relevant to their task. Once
+they have deployed their decision-making procedure, they want to
+ensure that their fairness assumptions still hold. To enable them
+to do so, we propose treating fairness definitions as first-class con-
+structs of a programming language. Thus, the developer can specify,
+in their code, that a given procedure f (perhaps a learned classifier)
+satisfies some notion of fairness φ. As the procedure makes the
+decisions, the runtime system monitors the decisions, potentially
+inferring that φ is violated, therefore alerting the developer.
+The approach we propose is analogous to the notion of asser-
+tions, which are ubiquitous in modern programming languages. For
+instance, the developer might assert that x > 0, indicating that
+they expect the value of x to be positive at a certain point in the
+program. If this expectation ends up being violated by some exe-
+cution of the program, the program crashes and the developer is
+alerted that their assertion has been violated. We propose doing
+the same for fairness definitions. The difficulty, however, is that
+fairness definitions are typically probabilistic, and therefore detect-
+ing their violation cannot be done through a single execution as
+in traditional assertions. Instead, we have to monitor the decisions
+made by the procedure, and then, using statistical tools, infer that
+a fairness property does not hold with reasonably high confidence.
+To enable this idea, we propose a rather general and rich lan-
+guage of specifications that can capture a range of fairness defi-
+nitions from the literature, as well as others. As an example, our
+specification language can capture notions of group fairness, for
+example, that of Feldman et al. [11]:
+@spec(pr(r|s) / pr(r|¬s) > 0.8)
+def f(x,s):
+...
+In this example, the developer has specified (using the annotation
+@spec) that the hiring procedure f (whose return variable is r) has
+a selection rate for minorities (denoted by s) that is at least 0.8 that
+of non-minorities.
+Generally, our specification language allows arbitrary condi-
+tional expectation expressions over events concerning the input
+and return arguments of some procedure. Further, we extend the
+language to be able to specify hyperproperties [5], which refer to
+two different executions of a procedure. This allows us to specify,
+for example, properties like individual fairness, where we have to
+compare between pairs of inputs to a procedure that are similar.
+Section 2 provides concrete examples.
+Runtime Analysis To determine that a procedure f satisfies a
+fairness specification φ, we need to maintain statistics over the in-
+puts and outputs of f as it is being applied. Specifically, we compile
+the specification φ into runtime monitoring code that executes ev-
+ery time f is applied, storing aggregate results of every probability
+event appearing in φ. For instance, in the example above, the mon-
+itoring code would maintain the number of times the procedure
+returned true for a minority applicant. Every time f is applied, the
+count is updated if needed. In the case of hyperproperties, like indi-
+vidual fairness, the runtime system has to remember all decisions
+made explicitly, so as to compare new decisions with past ones.
+Assuming that inputs to the decision-making procedure are
+drawn from an unknown distribution of the underlying population,
+we can employ concentration of measure inequalities to estimate
+the probability of each event in φ and therefore whether φ is vio-
+lated, with some prespecified probability of failure. If the runtime
+code detects a violation, we may ask it to completely halt applica-
+tions of the decision-making program until further investigation.
+Python Implementation We have implemented a prototype of
+our proposed ideas in the Python programming language. Fair-
+ness specifications are defined as Python decorators, which are
+annotations that wrap Python functions and therefore affect their
+behavior. In our setting, we use them to intercept calls to decision-
+making functions and monitor the decisions made. To illustrate our
+approach, we consider two case studies drawn from the fairness
+literature and demonstrate how our approach may flag violations
+of fairness.
+Contributions We summarize our contributions as follows:
+• Fairness-aware programming:We propose a programming-
+language approach to fairness specification, where the devel-
+oper declaratively states fairness requirements for sensitive
+decision-making procedures in their code.
+• Incremental runtime analysis:Wepropose a runtime-checking
+technique that incrementally checks the provided fairness
+specifications every time a decision is made. The decision-
+making procedure is flagged when a fairness specification is
+falsified with high confidence—after witnessing enough deci-
+sions.
+• Implementation & case studies: We describe an implemen-
+tation of our proposed methodology as a library in the Python
+programming language—using Python decorators—and illus-
+trate its use on case studies from the algorithmic fairness
+literature.

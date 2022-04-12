@@ -1,0 +1,1670 @@
+Bidding Strategies with Gender Nondiscrimination Constraints for Online Ad Auctions
+Milad Nasr
+University of Massachusetts Amherst
+milad@cs.umass.edu
+Michael Carl Tschantz
+International Computer Science Institute
+mct@icsi.berkeley.edu
+ABSTRACT
+Interactions between bids to show ads online can lead to an adver-
+tiser’s ad being shown to more men than women even when the
+advertiser does not target towards men. We design bidding strate-
+gies that advertisers can use to avoid such emergent discrimination
+without having to modify the auction mechanism. We mathemati-
+cally analyze the strategies to determine the additional cost to the
+advertiser for avoiding discrimination, proving our strategies to be
+optimal in some settings. We use simulations to understand other
+settings.
+CCS CONCEPTS
+• Information systems→ Online advertising.
+KEYWORDS
+targeted advertising, online auctions, fairness constraints, MDPs
+ACM Reference Format:
+Milad Nasr and Michael Carl Tschantz. 2020. Bidding Strategies with Gender
+Nondiscrimination Constraints for Online Ad Auctions. In Conference on
+Fairness, Accountability, and Transparency (FAT* ’20), January 27–30, 2020,
+Barcelona, Spain. ACM, New York, NY, USA, 11 pages. https://doi.org/10.
+1145/3351095.3375783
+1 INTRODUCTION
+Prior work found Google showing an ad for the Barrett Group, a
+career coaching service promoting the seeking of high paying jobs,
+more often to simulated men than to simulated women [7]. Later
+work enumerates possible causes of this disparity [6].
+One possibility, raised by Google itself [25], is that the Barrett
+Group targeted both men and women equally, but other advertisers,
+on average, focused more on women, which would be in line with
+subsequent findings [18]. In this possibility, the Barrett Group found
+itself outbid for just women by the other advertisers who were
+willing to pay more than it was for reaching women but not for
+men. These other advertisers might be promoting products that
+many find acceptable to target towardwomen, such as dresses. Thus,
+it’s possible that each advertiser’s targeting appears reasonable in
+isolation but interacts to bring about emergent discrimination for a
+job-related ad.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6936-7/20/02. . . $15.00
+https://doi.org/10.1145/3351095.3375783
+For conscientious advertisers of products that should be broad-
+casted to women and men at equal rates, such an outcome is unac-
+ceptable but currently difficult to avoid. While Google offers the
+ability to skew ads toward men or toward women, it provides no
+way to ensure that both men and women see the ad an equal num-
+ber of times. As discussed above, simply not targeting by gender is
+not enough to guarantee parity. Even running two ad campaigns of
+equal size is insufficient since the size is determined by budget and
+not the number of ads shown, which means that parity would only
+be achieved if women and men are equally expensive to reach.
+We consider how advertisers can ensure approximate demo-
+graphic parity for its ads without changing Google’s ad auction
+mechanism, which is based on a second-price auction [10]. Given
+that an advertiser wishes to maximize its utility by reaching the
+people most likely to respond to its ads, we model the advertiser’s
+utility function along with the parity goal as a constrained bidding
+problem. We consider both a strict absolute parity constraint and a
+more relaxed relative constraint inspired by the US EEOC’s four-
+fifths rule on disparate impact [9]. Although using a second-price
+auction suggests that the advertisers should bid their true value of
+showing an ad, a parity constraint and multiple rounds of the auc-
+tion interact to make deviations from this truthful strategy optimal.
+Intuitively, as in multi-round second-price auctions with budget
+constraints [12], it is sometimes better to bid less to preserve the
+ability to participate in later auctions that might have a lower cost
+of winning. More interestingly, unlike with just budget constraints,
+it is also sometimes better to bid more to ensure an acceptable
+degree of parity, enabling participation in other auctions later.
+Given these complexities, finding an optimal bidding strategy
+for such a constrained bidding problem is non-trivial. We do so
+by modeling them as Markov Decision Problems (MDPs). Solving
+these MDPs using traditional methods, such as value iteration, is
+made difficult by the continuous space of possible bid values over
+which to optimize. To avoid this issue, we find recursive formulae
+for each type of constraint providing the optimal bid value and
+solve for their values instead. This approach allows us to solve the
+MDPs without needing to explicitly maximize over the possible
+actions as in value iteration.
+We compare this optimal constrained bidding strategy to the
+optimal unconstrained strategy for both real and simulated data
+sets. The cost to the advertiser for ensuring parity varies by setting,
+but is manageable under the more realistic settings explored. In all
+cases, the revenue of the simulated ad auctioneer (Google’s role)
+remains roughly the same or goes up.
+By not modifying the core auction algorithm used by Google
+and instead suggesting bidding strategies that could be deployed
+by the advertisers, we believe this work provides a practical path
+towards nondiscriminatory advertising.
+2 RELATEDWORK
+The most closely related work, recently looked at enforcing par-
+ity constraints with auction mechanisms, whereas we do so with
+bidding strategies [4, 5]. While both approaches have their use
+cases, we believe ours is easier to deploy since just the advertisers
+wanting the feature need to make changes to implement it. We fur-
+ther discuss tradeoffs between deployment approaches in Section 8.
+Our approach also differs by using strict constraints whereas theirs
+uses probabilistic constraints. Probabilistic constraints allow more
+utility but may be insufficient in cases where approximate parity is
+required, as when disparate impact is prohibited. At an algorithmic
+level, they differ by using gradient decent.
+A similar alternative approach could use auction mechanisms
+with Guaranteed ad Delivery (GD) [22, 26]. An advertiser can act
+as two parties to the auction, one for each gender, and use GD to
+ensure an equal number of wins for each party. Unlike our bidding
+strategy, which an advertiser can unilaterally employ, this approach
+requires the ad exchange to change its auction mechanisms.
+Prior works have looked at how to enforce (proportional) parity
+constraints on the classifications produced by ML algorithms [2, 3,
+16, 28]. We instead look at auctions.
+Priorworks have usedMDPs tomodel ad slot auctions. Li et al. [19]
+and Iyer et al. [13–15] have used them to find optimal bidding strate-
+gies when advertisers do not know the exact values of each type of
+ad slot and learn values by winning them. They showed that adver-
+tisers should overbid to learnmore information. Gummadi et al. [12]
+described the optimal bidding strategy for the second-price auc-
+tion in which each advertiser has a limited budget, which leads to
+underbidding. Zhang et al. [29] derived optimal real-time bidding
+strategies when each ad slot have different properties.
+3 ONLINE AD AUCTIONS
+When a person visits a webpage, the webpage will often contain
+dynamically loaded ads at fixed locations on the page. These ads
+each occupy an ad slot, a location at a time (or page load) on the
+webpage. In some cases, the website selects which ads to show
+in which slots itself, such as with Facebook. In other cases, the
+website contracts with a third-party, to fill and charge for the slots
+in exchange for payments to the website. In either case, we call the
+entity choosing how to fill the slots an ad exchange. For example,
+Google runs an ad exchange, Google Ad Manager, which includes
+slots put up for sale by websites with its AdSense tool.
+Typically, an ad exchange auctions off the slots it controls to
+advertisers. It can use real-time bidding to auction off the slots as
+the webpage loads. The website and the ad exchange can offer
+advertisers various amounts of information about the slot, such
+as the webpage it is on and demographics about who is loading
+the page. Advertisers performing programmatic advertising use a
+dynamic bidding strategy that adjusts their bids according to how
+well they expect their ads to perform in the offered slot. To avoid
+having to create programs for executing such strategies on their
+own, advertisers often use a demand-side platform (DSP). Figure 1
+demonstrates a sketch of the interactions.
+An ad exchange may accept bids that are more complex than
+just a single price, such as including an offer to pay a bonus if the
+website visitor clicks the ad [10]. Exchanges wishing to maximize
+Ad Exchange
+Person
+1.Request
+ a page 2.Request an ad
+5.Return an ad
+3. Get advertisers
+ bids
+4. Find the best
+ advertiser
+DSP
+Advertisers
+6.Receive 
+page with ad
+DSP
+Figure 1: Online advertisement interactions
+the amount of bonuses it receives, or to avoid annoying visitors,
+might consider the quality of the ad and its fit for the slot. For sim-
+plicity, we will defer further consideration of these complications
+to Section 9 and presently presume that all bids are simply offers
+to pay for showing the ad.
+Second price auctions is a commonmechanism for resolving such
+auctions, with Google using a variation of one [10], and we will
+presume the ad exchange uses one. In this auction mechanism, the
+exchange selects the highest bidder as the winner but only charges
+the bidder the price offered by the second highest bidder. Under
+certain circumstances, this mechanism ensures that each bidder’s
+optimal strategy is to bid the actual amount it values the slot at,
+making the mechanism truthful. Since ad exchanges sometimes sell
+more than one slot at time, such as for a webpage with multiple
+slots, they often use generalized second-price auctions, known as
+position auctions [8, 27].
+Wemodel the above economy as a sequential game of incomplete
+information, where in each round of the game a set of self-interested
+rational advertisers bid to win an ad slot through a second-price
+auction. We allow bids to vary over auctions and assume that each
+advertiser has a geometric lifespan. For simplicity, we make the
+total number of advertisers α equal in all auctions by assuming that
+every time an advertiser dies a new advertiser joins.
+At time t , each advertiser i submits a bid bti . Let b
+t
+−i be the bids
+of other the advertisers. The ad exchange platform runs a second-
+price auction where advertiser i wins the ad slot if its bid is higher
+than all other bids: bti > maxbt
+−i . For simplicity, we assume no ties,
+ensuring that such a winner exists. Let ati be 1 if the advertiser i
+wins at round t and be 0 otherwise. If the advertiser i wins it will
+pay the second highest bid dti = maxbt
+−i . The cost of the auction t
+is cti = ati ∗ d
+t
+i since the advertiser i only pays if it wins.
+The ad slot auctioned at t has a value vti for the advertiser i .
+When an advertiser i wins auction t , it gets an immediate reward,
+which is the value vti less its price d
+t
+i . Thus, the utility of advertiser
+i gained at each round is uti = ati ∗ v
+t
+i − c
+t
+i = ati (v
+t
+i − d
+t
+i ). Let the
+geometric parameter for the lifespan distribution for advertiser i be
+δi . The total utility for each advertiser isUi =
+∑∞
+t=0 δ
+t
+i ∗a
+t
+i (v
+t
+i −d
+t
+i )
+where δ ti is δi raised to the t th power, not indexing by t .
+The advertiser i should select its bidsbti tomaximize the expected
+value of Ui , where the expectation is over its value vti and the bids
+of other advertisers bt
+−i . The advertiser can use market research, its
+prior experiences, and any information provided by the ad exchange
+to estimate these uncertain values. In the case of a pure second-
+price auction, the values of the other bids bt
+−i are irrelevant and the
+optimal strategy is to always set its bid bti equal to its estimation of
+its value vti .
+However, this result does not carry over to all second-price auc-
+tions with constraints, including the parity constraints we consider.
+In this case, the behavior the other advertisers matters, but estimat-
+ing it for individual ad slots is difficult. Furthermore, the advertiser
+is unlikely to estimate the value of every ad slot individually even
+for a pure second-price auction. Rather, the advertiser will likely
+model ad slots as each having a type belonging to a set Θ of reason-
+able size. The types will represent the most important information
+to the advertiser about the slot. For simplicity, we will typically
+assume that Θ has just two types, one for each gender. For each
+type θ , the advertiser will estimate the expected value vθi of a slot
+of type θ .
+For estimating the other bids, prior research [13, 14] has shown
+it reasonable to model them as coming from a stationary fixed dis-
+tribution, due to the large number of other advertisers. To simplify
+our analysis, we denote the CDF of other bids for a slot of type θ
+by дθi . Finally, let p
+θ
+i be the probability that advertiser i assigns to
+the type θ .
+With these estimations, we compute estimations of other key
+quantities. The probability of winning on auction t for a slot of type
+θ with a bid of x is q(x ;дθi ) = Pr(maxbt
+−i ≤ x) = дθi (x)
+(α−1)
+where
+α is the number of advertisers at each ad slot auction. The expected
+value of the utility for the advertiser i for a single auction given the
+distribution of the other advertisers’ bids дi is
+E[uti ] =
+∑
+θ
+pθi ∗ q(v
+t
+i ;д
+θ
+i ) ∗ (v
+t
+i − d
+t
+i ) (1)
+The expected value of the total utility for each advertiser is
+E[Ui ] =
+∞∑
+t=1
+δ t−1i
+∑
+θ
+pθi q(v
+t
+i ;д
+θ
+i )(v
+t
+i − d
+t
+i ) (2)
+4 PARITY CONSTRAINTS
+Advertisers may have concerns in addition to attempting to maxi-
+mize the utility Ui , such as complying with laws and social norms.
+In some cases, this will include ensuring that its ads reach various
+protected groups to the same degree. For example, an employer
+may desire that a job ad be shown to an equal number of women
+and men to comply with laws prohibiting gender discrimination
+in hiring [6]. Such advertisers would like to place their bids in a
+manner to ensure such demographic parity.
+However, the above auction mechanism, as well Google’s actual
+mechanism as far as we can tell, does not offer any way of ensuring
+that a job ad is shown to an approximately equal number of women
+and men, as required by laws prohibiting gender discrimination
+in hiring [6]. Furthermore, ad exchanges may be unwilling to sup-
+port such constraints given that only some advertisers have such
+concerns. Thus, our goal is to provide advertisers with a bidding
+strategy that dynamically adjusts bids to preserve the gender par-
+ity of the viewers, which advertisers can unilaterally use without
+needing changes to the auction mechanism of the ad exchange.
+As an additional benefit of not modifying the ad auction mech-
+anism, our bidding strategy can be used for any type of auction.
+However, we design and analyze them with only with second-price
+auctions in mind.
+We will focus on an advertiser that wants to show an ad to equal
+numbers of men and women. A particularly careful advertiser may
+desire that this parity constraint holds not only at the end of ad
+campaign but throughout. Such continuous parity ensures that the
+advertiser would pass an audit checking for this property at any
+point in time. It also ensures meeting the parity goal if the the ad
+campaign must be cut short or if a sudden influx of competing
+advertisers prevents winning addition slots.
+Meeting this strict goal is impossible since the first ad must
+go to either a man or woman, and not both. To account for this,
+we relax this goal to allow for approximate parity. We distinguish
+between absolute (additive) and relative (ratio) approximate parity
+and first consider an absolute constraint. An advertiser hasK-parity
+if after each auction, the maximum difference between the number
+of auctions that it wins for each gender is not more than K .
+Our goal is to find the optimal bidding strategy for advertisers
+obeying such a constraint. This task is difficult since a constrained
+advertiser must consider not just the immediate reward of winning
+a slot, but also how it may close or open the possibility of winning
+additional slots later. To see this, we will consider three examples
+involving a simplified setting in which an advertiser i is subject to
+1-parity and knows exactly how long it will live. In each example,
+it values men and women both at 20 (with no variance), but other
+advertisers value women at an expected value of 21 and men at an
+expected value of 5. This setting reflects that advertisers are willing
+to pay more, on average, for women than men [18].
+In the first example we consider, the advertiser knows that it
+will live for exactly one ad auction. In this case, the advertiser i
+will bid the value of the immediate reward 20 that it receives for
+winning an auction regardless of whether it is subject to a 1-parity
+constraint, since winning the auction has no effect other than that
+immediate reward. It will win an auction for a man and lose an
+auction for a woman.
+Next, consider the advertiser’s behavior for a series of two auc-
+tions. The interesting case is two men in a row. In this case, adver-
+tiser i can only win one of the slots since it is subject to a 1-parity
+constraint. Thus, the utility of the advertiser will be smaller from
+having 1-parity, but it need not be half that of when it is unre-
+stricted. If the number of women is small enough (p ≪ 0.5), the
+advertiser can assume it will get twomen in a row and can lower the
+value of its bid on the first man in hopes of winning at a discount,
+given the fluctuations in the other advertisers’ bids. We call this
+underbidding, although we emphasize that it is underbidding with
+respect to its immediate reward, not with respect to what is overall
+rational. Underbidding effectively allows the advertiser i to skip
+the first auction if the variance in the other advertisers’ bids pro-
+duces a high competing bid. This is similar to how underbidding is
+optimal in some repeated second-price auctions with a constrained
+budget [12]. The degree of underbidding must balance the chance
+of getting a male slot at a discount with the risk of either losing
+both auctions or getting a female slot for the second auction.
+The opposite, overbidding, can also occur. To see this, consider
+a series of three auctions with a woman followed by two men. In
+this case, the advertiser i can win both men, despite the 1-parity
+constraint, provided that it first wins the woman. Thus, winning the
+woman produces not just an immediate reward, but also a future
+reward by unlocking the ability to win more men. If we presume
+negligible variance in the other bids, the advertiser i will have to
+bid 22 to win the woman and pay the second price of 21, yielding
+an immediate reward of −1 by bidding 1 over the the advertiser’s
+inherent value of 20 for the female ad slot. Since the immediate
+reward of a male slot is 20 − 5 = 15, being able to win the second
+man means a net positive gain of 15− 1 = 14. (We ignore the effects
+of underbidding since we are now considering negligible variance
+in the other advertiser’s bids, which makes the effect go away.)
+We find this distinction between the immediate reward and the
+future rewards coming from future flexibility useful for determining
+the optimal bidding strategy. However, doing so requires not only
+making the above intuitions quantitative, but also dealing with
+additional probabilistic factors, such as the genders of ad slots
+not being known in advance and the uncertain duration of the
+auction sequence. To overcome these difficulties, we switch to a
+more systematic model for each type of constraint.
+5 ABSOLUTE PARITY CONSTRAINTS
+To make absolute constraints precise, let Γ denote a set of groups.
+We are typically interested in the case where Γ = {m,w} with m
+denoting men and w women. We use p to denote the probability of
+a male ad slot (i.e., pmi ). We use n
+γ
+i to denote the number ad slots
+for people in group γ won by the constrained advertiser i .
+Definition 1 (K-parity). An advertiser i obeys a K-strict ab-
+solute parity constraint, or K-parity for short, for a set of groups Γ
+iff, after each auction, for all groups γ and γ ′ in Γ, the number of
+auctions that it wins satisfies nγi − n
+γ ′
+i ≤ K .
+The constraint is strict by requiring that approximate parity holds
+at all times with certainty and not merely with high probability.
+We study approximating the optimal bidding stagy that an ad-
+vertiser desiring to meet a K-parity constraint can use to do so. In
+our analysis, we assume all of the advertisers have an unlimited
+budget. Thus, they can bid on all auctions in its lifespan, unless
+maintaining the K-parity constraint precludes it.
+5.1 Modeling
+To find the optimal bidding strategy for an advertiser subject to K-
+parity, we model the problem as a Markov Decision Problem (MDP).
+The obvious state space for such an MDP would have states of the
+form ⟨nmi ,n
+w
+i ,θ⟩, where n
+m
+i and nwi is the current number male
+and female slots won, respectively, and θ is the type of the ad slot
+currently being auctioned off, which we presume corresponds to a
+gender. (θ could be generalized to allow targeting toward certain
+men and women.) Observing that only nmi −n
+w
+i matters, we instead
+use a smaller space of (2K+1)∗ |Θ| states. We denote each state by a
+tuple ⟨k,θ⟩, where k is the difference between male and female slots
+won. When the advertiser wins an ad slot for a male viewer, the
+advertiser goes from state k to k + 1; for a female, it goes from k to
+k − 1. The value of the θ is decided by a random process depending
+upon the value of p, where p is probability of the viewer being male.
+To find the optimal solution, we write the Bellman equation for
+the MDP in the steady state. Since we consider the steady state
+regime, we also replace the value of each ad slot by its expected
+value (i.e., vθi ). The value function for each state except for the two
+states ⟨K ,m⟩ and ⟨−K ,w⟩ has two parts: a reward function R that
+indicates the immediate reward of taking action bi and N that is
+the future value the advertiser gets by doing that action. We write
+the value functions as follows:
+V (k,θ ;дi ) = max
+bi
+{
+Rθ (bi ;д
+θ
+i ) + δN
+θ (bi ,k ;дi )
+}
+(3)
+Rw(bi ;д
+w
+i ) and R
+m(bi ;д
+m
+i ) show the reward value that advertiser i
+will receive if it wins an ad slot auction viewed by female or male:
+Rθ (bi ;д
+θ
+i ) = q(bi ;д
+θ
+i )(v
+θ
+i − d
+θ
+i ) (4)
+N θ (bi ,k ;дi ), the future value that advertiser i gets by bidding bi
+at state ⟨k,θ⟩, consists of two parts. The first part N θ
+win is the value
+that the advertiser gets if it wins while the second part N θ
+lose is the
+value when it loses. We treat дi as providing both д
+m
+i and дwi .
+N θ (bi ,k ;дi ) = q(bi ;д
+θ
+i ) ∗ N
+θ
+win(k ;дi ) + (1 − q(bi ;д
+θ
+i )) ∗ N
+θ
+lose(k ;дi )
+with
+Nm
+win(k ;дi ) = pV (k + 1,m;дi ) + (1 − p)V (k + 1,w;дi )
+Nw
+win(k ;дi ) = pV (k − 1,m;дi ) + (1 − p)V (k − 1,w;дi )
+N θ
+lose(k ;дi ) = pV (k,m;дi ) + (1 − p)V (k,w;дi )
+As for the two edge cases, their values are solely determined by the
+values of their successor states since the advertiser cannot win the
+current auction:
+V (K ,m;дi ) = δ ∗ (pV (K ,m;дi ) + (1 − p)V (K ,w;дi ))
+V (−K ,w;дi ) = δ ∗ (pV (−K ,m;дi ) + (1 − p)V (−K ,w;дi ))
+5.2 Computing Optimal Bidding Strategies
+Computing V with an MDP solver, such as value iteration, is com-
+plicated by the bid space being continuous. Computing V for a
+discretization of this space will require a fine discretization to avoid
+rounding errors, which will mean slow convergence. Using numer-
+ical optimization methods is complicated by V not being a linear
+function in bi . To avoid these complexities, we instead rewriteV in
+a form that can be solved without any optimization.
+To identify the optimal bidding strategy, we observe that the two
+edge cases do not involve a decision and the strategy of bidding 0
+is forced for them. We also observe that for the remaining states
+the valuation function (3) includes many terms that do not change
+under various bidding strategies. We collect these constants into
+a term Λi , which we can ignore while optimizing the strategy.
+We replace q(bi ;д
+θ
+i )d
+t
+i by c(bi ;д
+θ
+i ), the estimated cost of each ad
+slot. The remainder of the valuation function provides the conjoint
+valuation function Φθi , a decomposition previously used by Iyer
+et al. [13, 14]. Our Lemma 1 in Appendix A [21] shows that
+V (k,θ ;дi ) = max
+bi
+{
+q(bi ;д
+θ
+i )Φ
+θ
+i (k ;дi ) − c(bi ;д
+θ
+i ) + Λi (k ;дi )
+}
+= max
+bi
+{
+q(bi ;д
+θ
+i )Φ
+θ
+i (k ;дi ) − c(bi ;д
+θ
+i )
+}
++ Λi (k ;дi ) (5)
+where
+Λi (k ;д
+m
+i ,д
+w
+i ) = δ (pV (k,m;дi ) + (1 − p)V (k,w;дi ))
+The conjoint valuation Φ represents the reward for winning, both
+immediate and long-term, which is why it is multiplied by the prob-
+ability of winning q(bi ;д
+θ
+i ). The expected cost of winning c(bi ;д
+θ
+i )
+ALGORITHM 1: Iterative approach to find V
+Input: K, дi , α, vm, vw , ϵ
+Initialize V [−K : K, m] ← vm+vw
+∆← 0
+for k in {−K, . . . , K } do
+for θ in {m, w} do
+V ′[k, θ ] ← Rθ (Φθ (k );дθi ) + δN
+θ (Φθ (k ), k ;дi )
+∆← max(∆, |V ′[k, θ ] −V [k, θ ] |)
+end
+end
+V ← V ′
+until ∆ < ϵ
+is subtracted from this product. Φ breaks down along the lines of
+winning and losing cases, as N did:
+Φθ (k ;дi ) = v
+θ
+i + δ (Φ
+θ
+win(k ;дi ) − Φ
+θ
+lose(k ;дi )) (6)
+where
+Φm
+win(k ;дi ) = pV (k + 1,m;дi ) + (1 − p)V (k + 1,w;дi )
+Φw
+win(k ;дi ) = pV (k − 1,m;дi ) + (1 − p)V (k − 1,w;дi )
+Φθlose(k ;дi ) = pV (k,m;дi ) + (1 − p)V (k,w;дi )
+The term vθi represents the immediate value of winning the ad slot.
+The reminder considers the gain that the advertiser gets from the
+future by winning (moving to a new state) or losing (staying put).
+The difference between future rewards for winning and those for
+losing corresponds to the amount of overbidding (or underbidding)
+called for, which explains the subtraction in (6).
+The following theorem shows the use of this decomposition.
+Theorem 1. For all K , i , дi , and states ⟨k,θ⟩ other than the edge
+cases ⟨K ,m⟩ and ⟨−K ,w⟩, the optimal bid for i subject to K-parity
+under the distribution дi at the state ⟨k,θ⟩ is Φθi (k ;дi ).
+The proof is in Appendix B [21].
+This theorem means that we do not need to search the space
+of possible bid values to find the optimal bid. Rather, we can just
+compute the optimal bid using Φ. While Φ depends upon the value
+function V , we can recursively make use of this fact to compute V
+without such a search either. In particular, the theorem implies that
+V (k,θ ;дi ) = Rθ (Φθi (k ;дi );д
+θ
+i ) + δN
+θ (Φθi (k ;дi ),k ;дi )
+However, this equation is still not a closed-form solution. Thus,
+Algorithm 1 does this calculation iteratively to converge to the
+states’ values. Although, showing the convergence in general is
+an open problem, as discussed in Section 7, our experiments find
+convergence within a reasonable tolerance within a feasible number
+of iterations.
+To use our approach, an advertiser (or DSP) runs Algorithm 1 to
+compute the value functionV and stores it as a look-up table. Then,
+for each new ad auction, the advertiser first checks if it winning
+the auction would violate the parity constraint. If so, it will not
+participate in the auction (i.e., bids zero). Otherwise, The advertiser
+bids the value of Φθi (k ;дi ), which can be easily computed from
+value functions.
+6 RATIO CONSTRAINTS
+While constraints on the difference between the number of ads
+shown to each gender are intuitive, the EEOC’s four-fifths rule
+found in US regulations against disparate impact in employment
+instead focuses on a ratio [9]. The ratio considered is not simply
+between the number of ads shown to each gender. Rather, it ac-
+knowledges that parity can be unrealistic due to having differing
+numbers of male and female applicants. It adjusts for that factor by
+comparing the fraction of female applicants receiving a job offer to
+the fraction male applicants receiving a job offer. It requires that
+this ratio of ratios be between 5/4 and 4/5. We provide a similar
+constraint that compares two ratios, checking whether the fraction
+of female ad slots won is within a factor of r to the fraction of male
+ad slots won.
+Strictly enforcing such a check creates problems when the num-
+ber of slots seen so far is small since the fractions won may be
+very far apart even when the number of ads shown to each gender
+only differs by 1. To avoid this issue, we also allow an additive
+difference in the number of ads show to each gender. The resulting
+rule may be viewed as a hybrid between a pure ratio constraint and
+the absolute constraint we have already presented.
+We use similar notation as in Section 5.1 to express this constraint
+in a manner that avoids division by zero.
+Definition 2 ((r ,K)-ratio). An advertiser obeys a (r ,K)-strict
+relative constraint, or (r ,K)-ratio constraint for short, for groups
+Γ iff, after each auction, for all groups γ and γ ′ in Γ, the number of
+auctions that it wins satisfies rpγnγ ′ ≤ pγ ′nγ + K where pγ and pγ ′
+are the probability of seeing slots for groups γ and γ ′, respectively.
+6.1 Modeling
+Similar to the K-parity constraint, we limit ourselves to the case
+where Γ and Θ only contain two types, which we treat as male and
+female. We use p as the probability of a male. We denote each state
+by a triplet ⟨nmi ,n
+w
+i ,θ⟩, where n
+m
+i and nwi is the current number
+male and female slots won, respectively.
+While we reuse the immediate reward function Rθ from (4), we
+rewrite the value function V and future value function N . When
+winning the slot would not violate the constraint,
+V (nmi ,n
+w
+i ,θ ;дi ) = max
+bi
+{
+Rθ (bi ;д
+θ
+i ) + δN
+θ (bi ,n
+m
+i ,n
+w
+i ;дi )
+}
+When offered a male that may not be won because r (1−p)(nmi +1) >
+pnwi + K where nmi is the current number of males won,
+V (nmi ,n
+w
+i ,m;дi ) = δ
+(
+pV (nmi ,n
+w
+i ,m;дi ) + (1 − p)V (n
+m
+i ,n
+w
+i ,w;дi )
+)
+When a female may not be won since rp(nwi + 1) > (1 − p)n
+m
+i + K ,
+V (nmi ,n
+w
+i ,w;дi ) = δ
+(
+pV (nmi ,n
+w
+i ,m;дi ) + (1 − p)V (n
+m
+i ,n
+w
+i ,w;дi )
+)
+We call these two cases edge cases.
+We set the future value N θ (bi ,n
+m
+i ,n
+w
+i ;дi ) at
+q(bi ;д
+θ
+i ) ∗ N
+θ
+win(n
+m
+i ,n
+w
+i ;дi ) + (1 − q(bi ;д
+θ
+i )) ∗ N
+θ
+lose(n
+m
+i ,n
+w
+i ;дi )
+with
+Nm
+win(n
+m
+i ,n
+w
+i ;дi ) = pV (n
+m
+i +1,n
+w
+i ,m;дi ) + (1−p)V (n
+m
+i +1,n
+w
+i ,w;дi )
+Nw
+win(n
+m
+i ,n
+m
+i ;дi ) = pV (n
+m
+i ,n
+w
+i +1,m;дi ) + (1−p)V (n
+m
+i ,n
+w
+i +1,w;дi )
+N θ
+lose(n
+m
+i ,n
+w
+i ;дi ) = pV (n
+m
+i ,n
+w
+i ,m;дi ) + (1−p)V (n
+m
+i ,n
+w
+i ,w;дi )
+ALGORITHM 2: Iterative approach to find V
+Input: r, K, p, дi , α, vm, vw , ϵ, M
+Initialize V [0 : M, 0 : r (1−p)p M + K, m] ← vm+vw
+V [0 : M, 0 : r (1−p)p M + K, w] ← vm+vw
+∆← 0
+for nm
+i in {0, . . . , M } do
+for nw
+i in {0, . . . , r (1−p)p M + K } do
+for θ in {m, w} do
+V ′[nm
+i , n
+w
+i , θ ] ←
+Rθ (Φθ (nm
+i , n
+w
+i );д
+θ
+i ) + δN
+θ (Φθ (nm
+i , n
+w
+i ), n
+m
+i , n
+w
+i ;дi )
+∆← max(∆, |V ′[nm
+i , n
+w
+i , θ ] −V [n
+m
+i , n
+w
+i , θ ] |)
+end
+end
+end
+V ← V ′
+until ∆ < ϵ
+6.2 Computing Optimal Bidding Strategies
+We use a similar approach as in Section 5.2 to find optimal strate-
+gies. As before, we force the strategy to bid zero when winning
+would violate the constraint and do not include these cases in the
+optimization. As justified in Appendix C [21], we rewrite the value
+V (nmi ,n
+w
+i ,θ ;дi ) as
+max
+bi
+{
+q(bi ;д
+θ
+i )Φ
+θ
+i (n
+m
+i ,n
+w
+i ;дi ) − c(bi ;д
+θ
+i )
+}
++ Λi (n
+m
+i ,n
+w
+i ;дi ) (7)
+where
+Λi (n
+m
+i ,n
+w
+i ;д
+m
+i ,д
+w
+i ) = δ (pV (nmi ,n
+w
+i ,m;дi ) + (1 − p)V (n
+m
+i ,n
+w
+i ,w;дi ))
+and
+Φθ (nmi ,n
+w
+i ;дi ) = v
+θ
+i + δ (Φ
+θ
+win(n
+m
+i ,n
+w
+i ;дi ) − Φ
+θ
+lose(n
+m
+i ,n
+w
+i ;дi ))
+where
+Φm
+win(n
+m
+i ,n
+w
+i ;дi ) = pV (n
+m
+i +1,n
+w
+i ,m, ;дi ) + (1−p)V (n
+m
+i +1,n
+w
+i ,w;дi )
+Φw
+win(n
+m
+i ,n
+w
+i ;дi ) = pV (n
+m
+i ,n
+w
+i +1,m;дi ) + (1−p)V (n
+m
+i ,n
+w
+i +1,w;дi )
+Φθlose(n
+m
+i ,n
+w
+i ;дi ) = pV (n
+m
+i ,n
+w
+i ,m;дi ) + (1−p)V (n
+m
+i ,n
+w
+i ,w;дi )
+Theorem 2. For all r , K , i , дi , and states ⟨nmi ,n
+w
+i ,θ⟩ other than
+the edge cases, the optimal bid for i subject to (r ,K)-ratio parity under
+the distribution дi at the state ⟨nmi ,n
+w
+i ,θ⟩ is Φ
+θ
+i (n
+m
+i ,n
+w
+i ;дi ).
+The proof is similar to that of Theorem 1.
+This theorem eliminates the need for searching the space of
+possible bids at each state to find the optimal one. Whereas we
+could bound the state space for K-parity by tracking the difference
+k instead of the actual numbers of male and female ad slots won, we
+cannot similarly bound the state space for the (r ,K)-ratio constraint.
+In practice, however, each advertiser either has a limited budget or
+is advertising for a limited time allowing us to estimate a finite set
+of reachable states. We useM to indicate estimated the maximum
+number of male ad slots won. Algorithm 2 computes the value of
+each state reachable assuming thatM is not surpassed.
+An advertiser using our approach, does so in the same manner
+as with our approach to parity constraints. That is, it first runs
+Algorithm 2 and storesV as a look-up table. It skips auctions when
+winning would violate the constraint and otherwise bids Φθi (k ;дi ),
+computed from V .
+We can extend this approach to recover if the advertiser underes-
+timatesM . In this case, the advertiser can use a linear approximation
+to estimate the optimal bid. To do so, let ρ =
+nw
+i
+nm
+i
+(M−1). If ρ is an in-
+teger value, then the advertiser bids Φθ (ρ,M−1). Otherwise, the ad-
+vertiser bidsΦθ (⌊ρ⌋,M−1)+ (ρ−⌊ρ⌋)∗(Φθ (⌈ρ⌉,nmi )−Φ
+θ (⌊ρ⌋,nmi )).
+7 EXPERIMENTS
+We simulate various scenarios to show the feasibility of our method
+and to measure the impact of our fairness constraints on utility. To
+do so, we implemented a second-price auction simulator in Python,
+where each advertiser gets the gender of the website viewer before
+selecting its bid and participating in the ad slot auction. To simulate
+the viewer, we draw their genders independent and identically from
+a binomial distribution with probability p where p is the probability
+of the viewer be male.
+We focus on one advertiser i and measure how its utility changes
+when it has either a fairness constraint or not. When having a fair-
+ness constraint, it uses our bidding strategy, with δ set to 0.999
+(unless otherwise noted) and ϵ set to 0.001. When not, it bids its
+immediate value vti for the ad slot t , as is rational for an uncon-
+strained second-price auction. We assume that the other advertisers
+are unconstrained and they always bid their immediate values.
+To obtain distributions over ad values, we used both a real dataset,
+the Yahoo! A1 Search Marketing Advertiser Bidding Dataset, and a
+simulated one. Since the Yahoo! A1 data does not have exact times-
+tamps, we could not use it to estimate the number of advertisers
+(i.e., α ) for each ad auction. To estimate α , we visited top websites,
+according to https://www.alexa.com/topsites, that have ads using
+header bidding [23]. For one month (June 2019), we collected how
+many advertisers bid on a specific ad slot. In our observations of
+these sites, we never saw more than 10 advertisers bid on an ad
+slot. In line with this observation, we assume that there are α = 10
+advertisers bidding for each ad slot.
+7.1 Real Dataset
+The Yahoo! A1 Search Marketing Advertiser Bidding Dataset con-
+tains anonymized bids of advertisers participating in Yahoo! Search
+Marketing auctions for the top 1000 search queries from June 15,
+2002, to June 14, 2003. The dataset includes 18 millions bids from
+more than 10,000 advertisers, but without the exact timestamps or
+information about the ad viewer. Each record in this dataset indi-
+cates a course timestamp with 15 minutes precision, the advertiser,
+the keyword, and the bid.
+In our analysis, we assumed bids have a stationary distribution.
+We evaluate this assumption on our dataset. We use a specific
+keyword (keyword number 2) and we gathered all of bids from
+different advertisers in four days period (starting 2/15/2003). Then,
+we compute the empirical distribution of the bids of the first two
+days and the second two days. Figure 2 presents the distribution of
+the bids for these periods, showing that the distributions are very
+similar in both periods, supporting our stationarity assumption.
+The figure also shows that the bids follow a log-normal distribution,
+in line with the findings of Balseiro et al. [1].
+0.0 2.5 5.0 7.5 10.0 12.5
+Bid
+0.000
+0.025
+0.050
+0.075
+0.100
+0.125
+0.150
+0.175
+F
+ra
+ct
+io
+n
+Lognorm
+First two days
+Last two days
+Figure 2: Distribution of the bids for two different periods.
+The distributions are similar in both periodswhich supports
+the assumption that bids distribution are stationary.
+We enforce a separate parity constraint on each keyword in the
+dataset to ensure that they each get roughly equal numbers of male
+and female viewers. Each keyword has a different bid value distri-
+bution and we have our simulated constrained advertiser model
+each keyword with a separate MDP to compute the optimal bid-
+ding strategy for each. We assume that the constrained advertiser
+updates its model parameters every two days.
+As mentioned, the Yahoo A1 dataset does not contain the exact
+timestamps. Therefore, we cannot exactly determine which adver-
+tisers participated in any single ad auction. We randomly select a
+set of advertisers’ bids from each 15-minute interval for each of our
+ad auctions. Since the dataset does not include information about
+the viewers, we sample the bids for both female and male viewers
+from the same set of bid values, making their values equal.
+Figures 3(a), 3(b), and 3(c) show the total utility ratio of the
+K-parity and (r ,K)-ratio versions to the unconstrained version
+of the advertiser i for various values of K , r , and p on Yahoo A1
+bid dataset. Here, and in the other simulations, we compute this
+ratio by simulating constrained and unconstrained versions of the
+advertiser i , using the same draw of values across the two versions.
+We do this 100 times, computing the average of total utilitiesUi for
+each version. We then plot the ratio of these two averages. Since
+the value of ad slots for both female and male viewers are equal,
+the total utility of an unconstrained advertiser will not change for
+different values of p. On the other hand, a constrained advertiser
+will get different utilities based on the distribution of the men and
+women viewers. K-parity and (r ,K)-ratio constraints are harder
+to achieve for extreme values of p. Turning to the effects of K ,
+the results show that when K is large, the K-parity advertiser can
+reach the utility of the unconstrained advertiser. Also by relaxing
+r , (r ,K)-ratio advertiser achieves higher utility.
+To show the benefit of our approach compared to simply bid-
+ding immediate values, we compare the utility ratio across both
+approaches. Figures 3(d) and 3(e) show that our bidding strategy
+allows the advertiser to achieve a higher utility ratio. We note that
+Table 1: Parameters for the log-normal distribution used in
+the modeling the bids in the ad slot auctions. σ 2 is always
+0.7.
+Scenario name Others Advertiser i
+µm
+−i µw
+−i µmi µwi
+Equal price - Female valuable -2.8 -2.8 -3.5 -2.4
+Expensive female - Equal value -3.5 -2.4 -2.8 -2.8
+the difference in these utility ratios is muted by assuming that each
+gender is equally valuable to the advertiser. This assumption comes
+from the real dataset not showing which ad slots are for men and
+which are for women. We avoid this limitation when we use our
+synthetic data.
+7.2 Synthetic Data
+We use a synthetic dataset to explore how changing their relative
+values of men and women affects the advertiser’s utility. We gener-
+ate two synthetic datasets using a log-normal distribution to sample
+the advertisers bids. Table 1 shows the model parameter settings
+used for the two scenarios.
+To show the effect of assigning different values to men and
+women, consider an advertiser that gives more value to female slots
+than to male ones, as shown in the Equal price - Female valuable
+scenario. Figure 4(a) shows the utility ratio for the K-parity and
+unconstrained versions of the advertiser in this scenario. The K-
+parity version has its maximum utility ratio when there are more
+male than female slots. This may seem counterintuitive since the
+advertiser values females more, but the measured ratio reflects
+that an abundance of males means that the K-parity version will
+not have to operate much differently from the unconstrained one.
+This is due to their abundance making overbidding less needed,
+decreasing the K-parity version’s costs. Figures 4(b) and 4(c) show
+similar results for the (r ,K)-ratio constraint.
+Lambrecht et al. [18] empirically showed that ad slots for young
+women are more expensive. To simulate this setting, we consid-
+ered a scenario in which the other advertisers prefer females (i.e.,
+дwj (x) ≤ дmj (x) for all j , i and x). We used the Expensive female -
+Equal value parameter settings for this scenario. We have advertiser
+i value both types equally, at the average of the two different values
+used by the other advertisers. Figure 4(d) plots the total utility ratio
+as before (solid line). Note that as women become rare, the K-parity
+version struggles relative to the unconstrained one since the other
+advertisers snap up the few women leaving the constrained version
+unable to bid for men. The figure also shows the total utility ratio
+for a constrained version of the advertiser i that uses the same sim-
+ple bidding strategy as the unconstrained advertisers (dashed line).
+Note that ratio is lower than with our optimal bidding strategy,
+showing its value. This difference comes from our optimal bidding
+strategy overbidding for the female viewers, delaying the afore-
+mentioned effect. Figure 4(e) shows that under the ratio constraint,
+which is less strict, the optimal strategy can do even better.
+Figures 4(f) and 4(g) further explore overbidding using a variation
+on the Expensive female - Equal value scenario. Rather than keep the
+0.2 0.4 0.6 0.8
+p
+0.2
+0.4
+0.6
+0.8
+1.0
+T
+ot
+al
+U
+ti
+lit
+y
+R
+at
+io
+K=1 K=10 K=100
+(a) Cost of K -parity
+0.2 0.4 0.6 0.8
+p
+0.80
+0.85
+0.90
+0.95
+1.00
+T
+ot
+al
+U
+ti
+lit
+y
+R
+at
+io
+r=1.00 r=0.80 r=0.50
+(b) Cost of (r, 5)-ratio
+0.2 0.4 0.6 0.8
+p
+0.80
+0.85
+0.90
+0.95
+1.00
+T
+ot
+al
+U
+ti
+lit
+y
+R
+at
+io
+K=1 K=5 K=10
+(c) Cost of (0.8, K )-ratio
+0.2 0.4 0.6 0.8
+p
+0.3
+0.4
+0.5
+0.6
+0.7
+0.8
+0.9
+1.0
+T
+ot
+al
+U
+ti
+lit
+y
+R
+at
+io
+K-parity Optimal K-parity Simple
+(d) Costs for 10-parity for the optimal strategy and for simple
+immediate value
+0.2 0.4 0.6 0.8
+p
+0.88
+0.90
+0.92
+0.94
+0.96
+T
+ot
+al
+U
+ti
+lit
+y
+R
+at
+io
+(r,K)-ratio Optimal (r,K)-ratio Simple
+(e) Costs for (0.8, 5)-ratio for the optimal strategy and for simple
+immediate value
+Figure 3: Experimental results for Yahoo A1 bidding dataset
+value that the advertiser i assigns to males fixed at µmi = −2.5, we
+vary it to see the effect on overbidding. Rather than plot µmi itself,
+we plot the ratio of µmi to the value assigned to males by the other
+advertisers. Figure 4(f) shows this value ratio by using various lines.
+Overbidding is not needed when the ratio is 1 since the advertiser i
+can outbid the other advertisers without surpassing its immediate
+reward. For ratios above 1, as the rate p of male viewers increases,
+the optimal K-parity advertiser will increase its overbidding on the
+female viewers since they become more scarce. Figure 4(g) shows
+that as µmi (and, thus, the male value ratio of advertiser i to the
+other advertisers) increases, the overbidding for females increases.
+Figure 4(h) plots the utility ratio as the value of the rate δ at
+which the advertiser i will leave the ad network changes. Rather
+than plot δ directly, it plots the expected lifespan of the advertiser
+computed from δ . It shows that for short lived advertisers, K-parity
+has no effect since the advertiser is unlikely to reach K wins for
+either gender. However, the constraint rapidly has an effect as the
+advertiser lives long enough to win this number of slots.
+Ad Exchange Revenue. Also important is how our strategy im-
+pacts the revenue of the ad exchange. We explored the ratio of the
+ad exchange’s revenue when there is one constrained advertisers
+for each ad slot auction to the case where all advertisers are un-
+constrained for all of our scenarios (for both the real and synthetic
+datasets). In most cases, the ad exchange revenue did not decrease
+at all. The worst case happens for a (1.0, 1)-ratio constrained adver-
+tiser on the Yahoo! A1 data, where the ratio of revenues is 0.993. The
+ad exchange can avoid this worst case by having lower bounds on
+K and r . Therefore, implementing this feature will not significantly
+reduce the ad exchange’s revenue.
+In fact, supporting constraints may raise the ad exchange’s rev-
+enues. Our observations show constrained advertisers often over-
+bid, which increases the exchange’s revenue. Figure 5 compares
+the revenue of the exchange for various numbers of constrained
+advertisers (ρ) using the Yahoo! A1 dataset. As expected, by in-
+creasing the number of constrained advertisers, the the revenue of
+ad exchange’s increases above a ratio of 1 with the revenue from
+having only unconstrained advertisers.
+Performance. Algorithms 1 and 2, each of which only has to run
+once for each parameter setting, completed in under 2 minutes and
+under 10 minutes, respectively. Calculating bids during auctions,
+each took the 2 microseconds. We used a 2013 MacBook Pro with a
+2.3 GHz Intel Core i7 and 16GB of 1600MHz DDR3 memory.
+8 DEPLOYMENT
+We envision two ways in which advertisers could use our bidding
+strategy. First, ad exchanges can implement it for them as a feature
+in the ad buying interface. Such exchanges could use the data it
+has to determine the demographics of individuals viewing ad slots
+and adjust bids accordingly. While this would require a change to
+the ad exchange, it would not require modifying the core auction
+mechanism, making it a more straightforward feature to add.
+0.2 0.4 0.6 0.8
+p
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+T
+ot
+al
+U
+ti
+lit
+y
+R
+at
+io
+K=1 K=10 K=100
+(a) Cost of K -parity for Equal price - Female
+valuable scenario
+0.2 0.4 0.6 0.8
+p
+0.2
+0.4
+0.6
+0.8
+T
+ot
+al
+U
+ti
+lit
+y
+R
+at
+io
+r=1.00 r=0.80 r=0.50
+(b) Cost of (r, 5)-ratio for Equal price - Female
+valuable scenario
+0.2 0.4 0.6 0.8
+p
+0.1
+0.2
+0.3
+0.4
+0.5
+0.6
+0.7
+T
+ot
+al
+U
+ti
+lit
+y
+R
+at
+io
+K=1.00 K=5.00 K=10.00
+(c) Cost of (0.8, K )-ratio for Equal price - Fe-
+male valuable scenario
+0.2 0.4 0.6 0.8
+p
+0.2
+0.4
+0.6
+0.8
+1.0
+T
+ot
+al
+U
+ti
+lit
+y
+R
+at
+io
+K-parity Optimal K-parity Simple
+(d) Costs for 10-parity for the optimal strategy and for
+simple immediate value bidding for Expensive female -
+Equal value scenario
+0.2 0.4 0.6 0.8
+p
+0.2
+0.3
+0.4
+0.5
+0.6
+0.7
+0.8
+T
+ot
+al
+U
+ti
+lit
+y
+R
+at
+io
+(r,K)-ratio Optimal (r,K)-ratio Simple
+(e) Costs for (0.8, 5)-ratio for the optimal strategy and for
+simple immediate value bidding for Expensive female -
+Equal value scenario
+0.2 0.4 0.6 0.8
+Probability of male viewer (p)
+0.00
+0.01
+0.02
+0.03
+0.04
+0.05
+0.06
+O
+ve
+rb
+id
+fo
+r
+fe
+m
+al
+e
+vi
+ew
+er
+Ratio=1 Ratio=2 Ratio=3
+(f) Average amount of overbidding for the fe-
+male viewers for values of p
+1.0 1.5 2.0 2.5 3.0
+Ratio of avg. men value to avg. men price
+0.00
+0.01
+0.02
+0.03
+0.04
+0.05
+O
+ve
+rb
+id
+fo
+r
+fe
+m
+al
+e
+vi
+ew
+er
+(g) Average overbidding for female viewers
+for ratios of average male viewer value to
+price of male viewers with p = 0.5
+0 2500 5000 7500 10000 12500
+Expected lifespan
+0.6
+0.7
+0.8
+0.9
+1.0
+T
+ot
+al
+U
+ti
+lit
+y
+R
+at
+io
+K=10 K=50 K=100
+(h) Cost of 10-parity for values of δ as the ex-
+pected lifespan of the advertiser in the Expen-
+sive female - Equal value scenario
+Figure 4: Experimental results for synthetic datasets
+Second, the strategy could be used either directly by the adver-
+tiser or offered to them by demand-side platforms as a feature. This
+approach does not require any changes to the ad exchange. It has
+the disadvantage of only working for ad exchanges that support
+real-time bidding and programmatic advertising with rich enough
+data to infer the group membership of the people viewing ad slots.
+Additionally, such rich data can pose privacy concerns.
+We believe that either of these approaches to deployment would
+be more straightforward than any way of deploying an auction
+mechanism that enforces parity constraints [5] or Guaranteed ad
+Delivery (GD) [22, 26]. Only the ad exchange would be able to im-
+plement such functionality. Presumably, ad exchanges have already
+selected the auction mechanism that they believe would be best
+for their business and would be reluctant to change it in a way
+that could have wide-ranging effects. Given that Google uses a
+generalization of second-price auctions [10], it may believe that the
+theoretical result that second-price auctions are optimal in certain
+settings has some bearing on its setting. Thus, it may believe that
+0.2 0.4 0.6 0.8
+p
+1.00
+1.05
+1.10
+1.15
+1.20
+T
+ot
+al
+R
+ev
+en
+ue
+R
+at
+io
+ρ=1 ρ=2 ρ=5
+Figure 5: Ratio of the ad revenue with constrained advertis-
+ers and without for various numbers of advertisers subject
+to a (0.8, 5)-ratio constraint, computed with the Yahoo A1
+dataset.
+any change to its auction mechanism is likely to reduce its prof-
+its, a strong disincentive. We believe that ad exchanges would be
+more willing to implement a change that instead only alters the
+bids of advertisers who opt in since it would be equivalent to one
+that advertisers could already implement unilaterally by altering
+their bids. Furthermore, since our approach changes just opted-in
+advertisers’ bids, there is a sense in which they pay for it.
+We believe that our approach is computationally feasible. In
+some cases, an advertiser may have to solve more than one MDP.
+For example, the advertiser may wish to enforce a separate par-
+ity constraint for two different webpages whose ad slots differ in
+characteristics included in the MDP. The advertiser will have to
+solve an MDP for each ad campaign targeting a different type of ad
+auction, with its own expected values, bid distributions, and parity
+constraints. Given modern approaches to solving large MDPs [24]
+and the ability to rent cloud computing resources, we believe that
+advertisers sophisticated enough to model a large number of differ-
+ent auction types will be able to solve them as well. Once solved,
+the advertiser can reuse the solution for every instance of the auc-
+tion type. Thus, addressing each incoming bid request from the ad
+exchange takes little more than a table lookup.
+9 EXTENSIONS AND FUTUREWORK
+Our model of ad exchanges does not include that advertisers often
+pay exchanges more when the viewer clicks on an ad. Thus, the
+expected valuevi and cost ci of a slot depends upon not just the bid
+prices but also the fit of the ad for the slot, which can be estimated
+with online tracking and machine learning. It may seem that these
+changes will have to be linked since a clicked ad both increases the
+value and cost, but by the linearity of expectations, we can consider
+the average of each. This changes the reward on the transitions
+in the MDP, but not structure of the MDP (the state space and
+the transition relation). Therefore, an advertiser can still use our
+approach to find optimal bids.
+We used a simple model in which the expected value of each
+female slot is equal to the others, and the expected value of each
+male slot is equal to the others. Advertisers can use online tracking,
+machine learning, and other techniques to compute more fine-
+grained estimations of slot values. We can accommodate such fine-
+grained modeling by increasing the size of the set Θ of types, which
+will increase the size of state space.
+Future work could accommodate constraints for non-binary sen-
+sitive attributes, such as age and location (a proxy for race, which is
+apparently not explicitly tracked by any ad exchange), leading to a
+larger set Γ of protected groups. Multiple simultaneous constraints
+can lead to having multiple Γ. Although our MDPs can be extended
+to such cases using a cross-product-like construction, the MDP size
+will be exponential in the number of constraints and their values,
+motivating more significant theoretical future work. Nevertheless,
+we suspect that the limited number of protected attributes tracked
+by ad exchanges, fast MDP solvers [24], and cloud computing will
+make our approach fast enough in practice.
+The constraints we explore are very strict in that they must
+hold at all times, as opposed to holding with high probability or
+asymptotically, which might be acceptable in some settings. In
+related problems, parity may only be required at the end of certain
+checkpoints, such as at the end of a hiring season. Exploring such
+relaxations can be future work.
+Our work is an example of the tension between not using pro-
+tected attributes and avoiding disparity in outcomes. Our ratio
+constraint avoids disparity in outcomes and is based on the four-
+fifths rule found in U.S. antidiscrimination rules around disparate
+impact [9]. However, that rule is with respect to employment prac-
+tices that are, on their face, neutral toward protected groups. Our
+constraints explicitly use protected attributes to enforce strict quo-
+tas. In some cases, “Quotas are expressly forbidden” by U.S. reg-
+ulations [11]. Resolving this tension between competing antidis-
+crimination goals is tricky (see, e.g., [20]). An analysis of when our
+approach would be legal would be context and country specific and
+beyond the scope of this work. However, we will mention that, in
+some cases, U.S. antidiscrimination laws would not apply, such as
+to private clubs [17]. In such cases, the advertiser may be guided
+by its ethics to use our approach to avoid disparity in outcomes.
+10 CONCLUSION
+Adding parity constraints results in a surprisingly complex bidding
+problem, exhibiting both over- and underbidding relative to the
+advertiser’s immediate value of an ad slot. Despite this complexity,
+we show a practical way of computing optimal bids, to within a
+small approximation factor ϵ . This enables us to characterize how
+the cost of parity depends upon not just its level of strictness K or
+r , but also the base rate p of types, their relative values to both the
+governed advertiser i and to other advertisers, and the lifespan (or
+discounting factor) δ , in sometimes counterintuitive ways.
+ACKNOWLEDGMENTS
+Milad Nasr is supported by a Google PhD Fellowship. We gratefully
+acknowledge funding support from the National Science Founda-
+tion (Grants 1237265 and 1704985). The opinions in this paper are
+those of the authors and do not necessarily reflect the opinions of
+any funding sponsor or the United States Government.
+REFERENCES
+[1] Santiago Balseiro, Anthony Kim, Mohammad Mahdian, and Vahab Mirrokni.
+2017. Budget management strategies in repeated auctions. In Proceedings of the
+26th International Conference on World Wide Web. International World Wide Web
+Conferences Steering Committee, 15–23.
+[2] Toon Calders, Faisal Kamiran, and Mykola Pechenizkiy. 2009. Building Classifiers
+with Independency Constraints. In Proceedings of the 2009 IEEE International
+Conference on Data Mining Workshops. IEEE Computer Society, Washington, DC,
+USA, 13–18. https://doi.org/10.1109/ICDMW.2009.83
+[3] Toon Calders and Sicco Verwer. 2010. Three naive Bayes approaches for
+discrimination-free classification. Data Mining and Knowledge Discovery 21,
+2 (2010), 277–292. https://doi.org/10.1007/s10618-010-0190-x
+[4] Elisa Celis, Anay Mehrotra, and Nisheeth Vishnoi. 2019. Toward Controlling
+Discrimination in Online Ad Auctions. In Proceedings of the 36th International
+Conference on Machine Learning (Proceedings of Machine Learning Research),
+Kamalika Chaudhuri and Ruslan Salakhutdinov (Eds.), Vol. 97. PMLR, Long Beach,
+California, USA, 4456–4465. http://proceedings.mlr.press/v97/mehrotra19a.html
+[5] L. Elisa Celis, Anay Mehrotra, and Nisheeth K. Vishnoi. 2019. Toward Controlling
+Discrimination in Online Ad Auctions. ArXiv/CoRR 1901.10450v2 (May 2019).
+https://arxiv.org/abs/1901.10450
+[6] Amit Datta, Anupam Datta, Jael Makagon, Deirdre K. Mulligan, and Michael Carl
+Tschantz. 2018. Discrimination in Online Advertising: AMultidisciplinary Inquiry.
+In Proceedings of the 1st Conference on Fairness, Accountability and Transparency
+(Proceedings of Machine Learning Research), Sorelle A. Friedler and ChristoWilson
+(Eds.), Vol. 81. PMLR, New York, NY, USA, 20–34.
+[7] Amit Datta, Michael Carl Tschantz, and Anupam Datta. 2015. Automated Experi-
+ments on Ad Privacy Settings: A Tale of Opacity, Choice, and Discrimination. In
+Proceedings on Privacy Enhancing Technologies (PoPETs). De Gruyter Open.
+[8] Benjamin Edelman, Michael Ostrovsky, and Michael Schwarz. 2007. Internet
+Advertising and the Generalized Second-Price Auction: Selling Billions of Dollars
+Worth of Keywords. American Economic Review 97, 1 (March 2007), 242–259.
+https://doi.org/10.1257/aer.97.1.242
+[9] Equal Employment Opportunities Commission. 1978. Uniform Guidelines on
+Employee Selection Procedures. 29 CFR Part 1607.
+[10] Google. 2018. Ad targeting: About the ad auction. AdSense Help. https:
+//support.google.com/adsense/answer/160525?hl=en.
+[11] United States Government. 2014. Placement Goals. Title 41 of the Code of Federal
+Regulations §60-2.16(e)(1).
+[12] R Gummadi, Peter B Key, and Alexandre Proutière. 2011. Optimal bidding strate-
+gies in dynamic auctions with budget constraints. In Allerton. IEEE, 588.
+[13] Krishnamurthy Iyer, Ramesh Johari, and Mukund Sundararajan. 2011. Mean field
+equilibria of dynamic auctions with learning. ACM SIGecom Exchanges 10, 3
+(2011), 10–14.
+[14] Krishnamurthy Iyer, Ramesh Johari, and Mukund Sundararajan. 2012. Mean
+Field Equilibria of Dynamic Auctions with Learning. SSRN 1799085 (2012), 1–49.
+http://ssrn.com/abstract=1799085
+[15] Krishnamurthy Iyer, Ramesh Johari, and Mukund Sundararajan. 2014. Mean
+Field Equilibria of Dynamic Auctions with Learning. Manage. Sci. 60, 12 (Dec.
+2014), 2949–2970. https://doi.org/10.1287/mnsc.2014.2018
+[16] Toshihiro Kamishima, Shotaro Akaho, Hideki Asoh, and Jun Sakuma. 2012.
+Fairness-Aware Classifier with Prejudice Remover Regularizer. In Proceedings
+of the 2012 European Conference on Machine Learning and Knowledge Discov-
+ery in Databases - Volume Part II. Springer-Verlag, Berlin, Heidelberg, 35–50.
+https://doi.org/10.1007/978-3-642-33486-3_3
+[17] Margaret E. Koppen. 1993. The Private Club Exemption from Civil Rights Legis-
+lation - Sanctioned Discrimination or Justified Protection of Right to Associate.
+Pepp. L. Rev. 20, 2 (1993), 643–688.
+[18] Anja Lambrecht and Catherine E. Tucker. 2018. Algorithmic Bias? An Empirical
+Study into Apparent Gender-Based Discrimination in the Display of STEMCareer
+Ads. SSRN (March 2018). https://ssrn.com/abstract=2852260
+[19] Sai-Ming Li, MohammadMahdian, and R Preston McAfee. 2010. Value of learning
+in sponsored search auctions. In International Workshop on Internet and Network
+Economics. Springer, 294–305.
+[20] Zachary Lipton, Julian McAuley, and Alexandra Chouldechova. 2018. Does
+mitigating ML’s impact disparity require treatment disparity? In Advances in
+Neural Information Processing Systems 31, S. Bengio, H. Wallach, H. Larochelle,
+K. Grauman, N. Cesa-Bianchi, and R. Garnett (Eds.). Curran Associates, Inc., 8125–
+8135. http://papers.nips.cc/paper/8035-does-mitigating-mls-impact-disparity-
+require-treatment-disparity.pdf
+[21] Milad Nasr and Michael Carl Tschantz. 2020. Appendix to Bidding Strategies with
+Gender Nondiscrimination Constraints for Online Ad Auctions. Supplementary
+material for FAT* ’20.
+[22] Konstantin Salomatin, Tie-Yan Liu, and Yiming Yang. 2012. A unified optimiza-
+tion framework for auction and guaranteed delivery in online advertising. In
+Proceedings of the 21st ACM international conference on Information and knowledge
+management. ACM, 2005–2009.
+[23] Amin Sayedi. 2018. Real-time bidding in online display advertising. Marketing
+Science 37, 4 (2018), 553–568.
+[24] Aviv Tamar, Shie Mannor, and Huan Xu. 2014. Scaling Up Robust MDPs using
+Function Approximation. In Proceedings of the 31st International Conference on
+Machine Learning (Proceedings of Machine Learning Research), Eric P. Xing and
+Tony Jebara (Eds.), Vol. 32. PMLR, Bejing, China, 181–189. http://proceedings.
+mlr.press/v32/tamar14.html
+[25] Deborah M. Todd. 2015. CMU researchers see disparity in targeted on-
+line job ads. Pittsburgh Post-Gazette (July 2015). http://www.post-
+gazette.com/business/career-workplace/2015/07/08/Carnegie-Mellon-
+researchers-see-disparity-in-targeted-online-job-ads/stories/201507080107.
+[26] John Turner. 2012. The planning of guaranteed targeted display advertising.
+Operations research 60, 1 (2012), 18–33.
+[27] Hal R. Varian. 2007. Position auctions. International Journal of Industrial Or-
+ganization 25, 6 (Dec. 2007), 1163–1178. https://ideas.repec.org/a/eee/indorg/
+v25y2007i6p1163-1178.html
+[28] Rich Zemel, Yu Wu, Kevin Swersky, Toni Pitassi, and Cynthia Dwork. 2013.
+Learning Fair Representations. In Proceedings of the 30th International Conference
+on Machine Learning (ICML-13), Sanjoy Dasgupta and David Mcallester (Eds.),
+Vol. 28. JMLR Workshop and Conference Proceedings, 325–333. Issue 3. http:
+//jmlr.org/proceedings/papers/v28/zemel13.pdf
+[29] Weinan Zhang, Shuai Yuan, and Jun Wang. 2014. Optimal real-time bidding
+for display advertising. In Proceedings of the 20th ACM SIGKDD international
+conference on Knowledge discovery and data mining. ACM, 1077–1086.

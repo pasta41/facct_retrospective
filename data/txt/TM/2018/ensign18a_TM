@@ -1,0 +1,131 @@
+
+Predictive policing systems are increasingly
+used to determine how to allocate police
+across a city in order to best prevent crime.
+Discovered crime data (e.g., arrest counts)
+are used to help update the model, and
+the process is repeated. Such systems have
+been empirically shown to be susceptible to
+runaway feedback loops, where police are
+repeatedly sent back to the same neighbor-
+hoods regardless of the true crime rate.
+In response, we develop a mathemati-
+cal model of predictive policing that proves
+why this feedback loop occurs, show empir-
+ically that this model exhibits such prob-
+lems, and demonstrate how to change the
+inputs to a predictive policing system (in
+a black-box manner) so the runaway feed-
+back loop does not occur, allowing the true
+crime rate to be learned. Our results are
+quantitative: we can establish a link (in our
+model) between the degree to which run-
+away feedback causes problems and the dis-
+parity in crime rates between areas. More-
+over, we can also demonstrate the way in
+which reported incidents of crime (those re-
+ported by residents) and discovered inci-
+dents of crime (i.e. those directly observed
+by police officers dispatched as a result of
+∗ This research was funded in part by the NSF
+under grants IIS-1633387, IIS-1513651, and IIS-
+1633724. Code for our urn simulations can
+be found at https://github.com/algofairness/
+runaway-feedback-loops-src.
+† Corresponding author.
+the predictive policing algorithm) interact:
+in brief, while reported incidents can atten-
+uate the degree of runaway feedback, they
+cannot entirely remove it without the in-
+terventions we suggest.
+Keywords: Feedback loops, predictive
+policing, online learning.
+1 INTRODUCTION
+Machine learning models are increasingly being
+used to make real-world decisions, such as who
+to hire, who should receive a loan, where to send
+police, and who should receive parole. These de-
+ployed models mostly use traditional batch-mode
+machine learning, where decisions are made and
+observed results supplement the training data for
+the next batch.
+However, the problem of feedback makes tradi-
+tional batch learning frameworks both inappro-
+priate and (as we shall see) incorrect. Hiring
+algorithms only receive feedback on people who
+were hired, predictive policing algorithms only
+observe crime in neighborhoods they patrol, and
+so on. Decisions made by the system influence
+the data that is fed to it in the future. For ex-
+ample, once a decision has been made to patrol
+a certain neighborhood, crime discovered in that
+neighborhood will be fed into the training appa-
+ratus for the next round of decision-making.
+In this paper, we focus on predictive policing
+– an important exemplar problem demonstrating
+c© 2018 D. Ensign, S.A. Friedler, S. Neville, C. Scheidegger & S. Venkatasubramanian.
+Runaway Feedback Loops in Predictive Policing
+these feedback issues. Predictive policing is in-
+creasingly employed to determine where to send
+police, who to target for surveillance, and even
+who may be a future crime victim (Perry, 2013).
+We focus on the most popular of these forms
+of predictive policing (with PredPol, HunchLab,
+IBM, and other companies entering the market)
+which attempts to determine how to deploy po-
+lice given historical crime data.
+Definition 1 (Predictive Policing) Given
+historical crime incident data for a collection of
+regions, decide how to allocate patrol officers to
+areas to detect crime.
+Once police are deployed based on these pre-
+dictions, data from observations in the neighbor-
+hood is then used to further update the model.
+We will call these observations discovered inci-
+dents, as opposed to reported incidents that are
+crime incidents reported to the police (e.g., via
+911 calls). Since such discovered incidents only
+occur in neighborhoods that police have been
+sent to by the predictive policing algorithm itself,
+there is the potential for this sampling bias to be
+compounded, causing a runaway feedback loop.
+Indeed, Lum and Isaac (2016) have shown that
+this can happen.
+Lum and Isaac’s work focused on PredPol
+(Mohler et al., 2015), a predictive policing sys-
+tem in use by the LAPD and other cities across
+the U.S.. Lum and Isaac (2016) model what
+would happen if PredPol were used in Oakland
+to distribute police to find drug crime by using
+historical crime incident data as the historical
+data and a synthetic population of likely drug
+users based on public health data U.S. DoJ via
+ICPSR (2015); U.S. HHS via ICPSR (2015); they
+find that increasing policing efforts based on dis-
+covered incidents causes PredPol’s prediction to
+substantially diverge from the true crime rate, re-
+peatedly sending back police to the same neigh-
+borhoods.
+In addition to its importance in the criminal
+justice pipeline, predictive policing serves as an
+archetypal problem, through which we can bet-
+ter understand issues which arise out of deploy-
+ing batch-mode machine learning algorithms in
+an online setting, where they essentially see re-
+sults that are influenced by their own predictions.
+Other such algorithms include recidivism predic-
+tion, hiring algorithms, college admissions, and
+distribution of loans. In all of these contexts,
+the outcome of the prediction (e.g., who to hire)
+determines what feedback the algorithm receives
+(e.g., who performs well on the job).
+1.1. Results
+We use the theory of urns (a common frame-
+work in reinforcement learning) to analyze exist-
+ing methods for predictive policing. We show for-
+mally as well as empirically why these methods
+will not work. Subsequently, we provide reme-
+dies that can be used directly with these methods
+in a black-box fashion that improve their behav-
+ior, and provide theoretical justification for these
+remedies.

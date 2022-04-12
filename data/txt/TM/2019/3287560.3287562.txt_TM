@@ -1,0 +1,142 @@
+
+We show through theory and experiment that gradient-based ex-
+planations of a model quickly reveal the model itself. Our results
+speak to a tension between the desire to keep a proprietary model
+secret and the ability to offer model explanations.
+On the theoretical side, we give an algorithm that provably learns
+a two-layer ReLU network in a setting where the algorithm may
+query the gradient of the model with respect to chosen inputs.
+The number of queries is independent of the dimension and nearly
+optimal in its dependence on the model size. Of interest not only
+from a learning-theoretic perspective, this result highlights the
+power of gradients rather than labels as a learning primitive.
+Complementing our theory, we give effective heuristics for re-
+constructing models from gradient explanations that are orders of
+magnitude more query-efficient than reconstruction attacks relying
+on prediction interfaces.
+CCS CONCEPTS
+•Computingmethodologies→Machine learning; • Security
+and privacy;
+KEYWORDS
+Explanations, machine learning, security, privacy
+ACM Reference Format:
+Smitha Milli, Ludwig Schmidt, Anca D. Dragan, and Moritz Hardt. 2019.
+Model Reconstruction from Model Explanations. In FAT* ’19: Conference on
+Fairness, Accountability, and Transparency (FAT* ’19), January 29–31, 2019,
+Atlanta, GA, USA. ACM, New York, NY, USA, 16 pages. https://doi.org/10.
+1 INTRODUCTION
+Commercial machine learning models increasingly support conse-
+quential decisions in numerous domains including medical diagno-
+sis, employment, and criminal justice. In such applications, there is
+now growing demand for methods that explain a model’s decision.
+The secrecy of a model strongly fuels this demand.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+At the same time, there are a number of valid reasons a com-
+pany might wish to keep its machine learning models secret. The
+competitive value of the product is one consideration. Revealed
+models may also be easier to game, resulting in diminished predic-
+tive power [6, 8]. Yet another reason is that the model might leak
+sensitive information about the data it was trained on [5, 12].
+In this work, we point out a tension between keeping a model
+secret and explaining its decisions. We show that a popular class of
+existing methods to explain a model’s decision quickly reveals the
+model itself in what is typically an undesired side effect.
+Numerous explanation methods have been proposed in an on-
+going line of research. Among these methods, saliency maps are
+a widespread technique to highlight characteristics of an input
+deemed relevant for the prediction of a model. The most basic
+saliency map is to compute the gradient of the model with respect
+to a chosen input [2, 13]. Numerous variants add different transfor-
+mations to the raw gradients leading to some disagreement over
+which of these heuristics is preferable in what context [15–17, 20].
+Abstracting away from these implementation details, we focus on
+reconstructing models given the basic underlying primitive, which
+is gradients of the model with respect to its inputs.
+1.1 Our contributions
+Our contributions are twofold, spanning both a theoretical and
+experimental component.
+Learning from input gradients. On the theoretical side, we
+introduce a model of learning from input gradient queries. In this
+model, a learning algorithm can observe gradients of an unknown
+model at chosen query inputs. This model turns out to be rich in
+its mathematical structure and connections to standard learning
+models, such as learning from membership queries, in which the
+learner can request the model’s prediction at a given input.
+In our setting, since the gradient provides more information than
+a single label, there is hope that learning algorithms can get by
+with far fewer queries. We prove that this is indeed the case. To
+build up intuition with a simple example, consider a linear model
+f (x) = ⟨w,x⟩, specified by a weight vectorw ∈ Rd . The gradient
+of the model with respect to any input x is just equal to the model
+parametersw = ∇x f (x). Thus, we can learn a linear model from a
+single input gradient query.
+Going beyond linear models, we analyze two-layer neural net-
+works with ReLU transitions of the form f (x) = ⟨w,ReLU(Ax)⟩
+where A ∈ Rh×d . Here, ReLU(u) = max{u, 0} applies coordinate-
+wise to a vector. The problem of learning such networks has re-
+ceived much renewed interest in the last few years as it poses a
+DOI: 10.1145/3287560.3287562
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA Smitha Milli, Ludwig Schmidt, Anca D. Dragan, and Moritz Hardt
+non-trivial challenge en route to analyzing deeper non-linear mod-
+els [11, 18, 21]. Our main result in this setting is the following
+theorem.
+Theorem 1 (informal). Assuming the rows of the weight ma-
+trix A are linearly independent, our algorithm recovers a functionally
+equivalent model fromO(h logh) input gradient queries and function
+evaluations with high probability.
+TheO(h logh) queries our theorem requires is optimal to within
+a logarithmic factor, since it takes dh + h parameters to specify the
+model, and each query reveals only O(d) numbers. Furthermore,
+compared to membership queries, gradient queries reduce the num-
+ber of queries needed by approximately a factor of d , since it takes
+Ω(dh) membership queries to specify the model.
+Although our algorithm enjoys an intuitive geometric inter-
+pretation, the proof requires a delicate argument, as well as an
+anti-concentration bound that may be useful independently.
+Practical reconstruction methods. In a second step, we ex-
+plore practically effective heuristics to reconstruct a model from
+input gradient queries. Our experiments show that reconstructing
+models from explanations is not just a theoretical concern. If a com-
+pany were to provide an explanation API with standard saliency
+maps, it would effectively give up the underlying model, which it
+may not be willing to do for reasons mentioned above. This situ-
+ation parallels an ongoing investigation on stealing models from
+prediction APIs [19]. However, as our results show, with explanation
+APIs we need far fewer queries, thus greatly exacerbating the threat
+of model leakage.
+Our experiments focus on a heuristic for learning from input
+query gradients. While our theoretical method is specific to two-
+layer networks, our heuristic is agnostic to the shape of the target
+model. We experiment with standard vision benchmarks and archi-
+tectures, since saliency maps have been predominantly evaluated
+on image data sets. At the outset, our heuristic simply queries a
+number of input gradients and fits a model against the observed
+gradients in much the same way we would fit a model against labels.
+We find that this heuristic reduces the number of queries needed to
+learn models on MNIST and CIFAR10 by orders of magnitude, even
+in cases where the model class is unknown or the data distribution
+is unknown.
+Conclusion. Our work demonstrates that establishing usable
+explanation methods for machine learning models faces another
+hurdle in commercial applications. Whatever criteria of explana-
+tion quality we choose must be weighed against the risk of model
+leakage resulting from the method at hand. We see our work as
+only a first step in this new direction that raises many intriguing
+questions.
+Does our theoretical result extend to depth-3 networks? Ignoring
+computational efficiency, what is the optimal query complexity? In
+particular, can we learn a k-layer ReLU network withh units at each
+layer from only Õ(kh) queries? Can we design useful explanation
+methods resilient to model reconstruction attacks? Although a
+natural and important question to ask, there is no currently agreed
+upon measure of explanation quality, which makes it difficult to
+formally study this trade-off.

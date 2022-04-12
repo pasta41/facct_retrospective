@@ -1,0 +1,99 @@
+
+A key problem in information retrieval is understanding the latent
+intention of a user’s under-specified query. Retrieval models that
+are able to correctly uncover the query intent often perform well on
+the document ranking task. In this paper we study the problem of
+interpretability for text based ranking models by trying to unearth
+the query intent as understood by complex retrieval models.
+We propose a model-agnostic approach that attempts to locally
+approximate a complex ranker by using a simple ranking model in
+the term space. Given a query and a blackbox ranking model, we
+propose an approach that systematically exploits preference pairs
+extracted from the target ranking and document perturbations to
+identify a set of intent terms and a simple term based ranker that
+can faithfully and accurately mimic the complex blackbox ranker in
+that locality. Our results indicate that we can indeed interpret more
+complex models with high fidelity. We also present a case study
+on how our approach can be used to interpret recently proposed
+neural rankers.
+ACM Reference Format:
+Jaspreet Singh and Avishek Anand. 2020. Model Agnostic Interpretability
+of Rankers via Intent Modelling. In Conference on Fairness, Accountability,
+and Transparency (FAT* ’20), January 27–30, 2020, Barcelona, Spain. ACM,
+New York, NY, USA, 11 pages. https://doi.org/10.1145/3351095.3375234
+1 INTRODUCTION
+In the context of data-driven models, interpretability can be defined
+as “the ability to explain or to present in understandable terms to
+a human” [14]. Recently, in the machine learning (ML) and NLP
+communities there has been growing interest in the interpretability
+of ML models [5, 24, 27] but there has been limited work on inter-
+preting retrieval/ranking models considered central to information
+retrieval (IR).
+Ranking models are used in a variety of domains. The most
+traditional use is in a variety of search engines for differing or
+mixed modalities: images, video, Web (news, web pages, social
+media posts, patents, scientific papers) and data. In these scenarios,
+the ranking model is responsible for ranking search results given a
+query. Ranking models are now pervasive in recommender systems
+as well where no user generated query is apparent. Instead they are
+used for ranking similar items in application areas like shopping,
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6936-7/20/02. . . $15.00
+https://doi.org/10.1145/3351095.3375234
+movies, music, news and social media or prioritizing information
+for a day like in a news feed. Machine learned ranking models are
+also used in systems where a ranking is not the final output. For
+example, ranking models are used to order candidate answers in
+question answering systems which are then consumed by other
+models to select or generate answers.
+When using machine learning models to rank results, the train-
+ing data (clicks, human annotations) informs how signals/features
+should be combined. Various models have been employed, rang-
+ing from linear regression and decision trees to deep neural net-
+works [19, 26, 30, 31] more recently. Document relevance ranking,
+also known as adhoc retrieval or search[55], is the task of ranking
+documents from a large collection using the query and the text
+of each document only. Ranking based on textual features is par-
+ticularly important in cold-start learning scenarios when there is
+no existence of click-logs and features like link-structure are non-
+informative. Examples include various domains in digital libraries,
+e.g., patents [3] or scientific literature [52]; enterprise search [18];
+and personal search [8].
+In this paper, we tackle the problem of post-hoc interpretability
+of adhoc rankers. Post-hoc here means that we try to explain a
+trained ranking model. There are 2 major challenges when explain-
+ing ranking models in particular that we seek to address in this
+work:
+(1) Ranking models ideally output a single ranked list of docu-
+ments for a given query. In practice however, rankings are
+an aggregation of decisions – (i) individual document rele-
+vance scores are first assigned and then the documents are
+sorted to get a list or (ii) pairwise document preferences are
+combined using approaches such as [1].
+(2) This in turn makes evaluating the explanation of a ranking
+model more difficult. What kind of explanation is best suited
+to a ranked list of documents given a query? How do we
+measure if this explanation is accurate?
+Interpreting intents in rankings. We first ponder on what inter-
+preting a ranking really means. Are we only interested in explaining
+why a document was relevant or ranked above another ? Although
+that is certainly interesting, what we are really interested in is if a
+model is performing in accordance with the information need of the
+user who issues the (usually under-specified) query – a key concept
+in IR. In other words, what is the actual query intent as understood
+by the trained ranking model.
+There are two key benefits to uncovering the learned intent. First,
+users can immediately identify biases induced by the training data
+or learning procedure. For example, consider the query how to find
+the mean and two different rankers:
+Ranker 1 TopDoc. Find what they mean in the following
+songs
+Ranker 

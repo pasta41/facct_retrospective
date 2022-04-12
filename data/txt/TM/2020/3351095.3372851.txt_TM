@@ -1,0 +1,105 @@
+
+Algorithmic risk assessments are increasingly used to help humans
+make decisions in high-stakes settings, such as medicine, criminal
+justice and education. In each of these cases, the purpose of the risk
+assessment tool is to inform actions, such as medical treatments or
+release conditions, often with the aim of reducing the likelihood
+of an adverse event such as hospital readmission or recidivism.
+Problematically, most tools are trained and evaluated on historical
+data in which the outcomes observed depend on the historical
+decision-making policy. These tools thus re￿ect risk under the
+historical policy, rather than under the di￿erent decision options
+that the tool is intended to inform. Even when tools are constructed
+to predict risk under a speci￿c decision, they are often improperly
+evaluated as predictors of the target outcome.
+Focusing on the evaluation task, in this paper we de￿ne coun-
+terfactual analogues of common predictive performance and al-
+gorithmic fairness metrics that we argue are better suited for the
+decision-making context. We introduce a new method for estimat-
+ing the proposed metrics using doubly robust estimation. We pro-
+vide theoretical results that show that only under strong conditions
+can fairness according to the standard metric and the counterfac-
+tual metric simultaneously hold. Consequently, fairness-promoting
+methods that target parity in a standard fairness metric may—and
+as we show empirically, do—induce greater imbalance in the coun-
+terfactual analogue. We provide empirical comparisons on both
+synthetic data and a real world child welfare dataset to demonstrate
+how the proposed method improves upon standard practice.
+ACM Reference Format:
+Amanda Coston, Alan Mishler & Edward H. Kennedy, and Alexandra
+Chouldechova. 2020. Counterfactual Risk Assessments, Evaluation, and Fair-
+ness. In Conference on Fairness, Accountability, and Transparency (FAT* ’20),
+January 27–30, 2020, Barcelona, Spain. ACM, New York, NY, USA, 26 pages.
+https://doi.org/10.1145/3351095.3372851
+1 INTRODUCTION
+Much of the activity in using machine learning to help address
+societal problems focuses on algorithmic decision-making and al-
+gorithmic decision support systems. In settings such as health, edu-
+cation, child welfare and criminal justice, decision support systems
+commonly take the form of risk assessment instruments (RAIs),
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for pro￿t or commercial advantage and that copies bear this notice and the full citation
+on the ￿rst page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior speci￿c permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6936-7/20/02. . . $15.00
+https://doi.org/10.1145/3351095.3372851
+which distill rich case information into risk scores that re￿ect the
+likelihood of the case resulting in one or more adverse outcomes.
+[6, 8, 16, 22, 29, 46, 47]. Prior literature has raised signi￿cant con-
+cerns regarding the fairness, transparency, and e￿ectiveness of
+existing RAIs [3, 4, 9, 10, 13]. Yet RAIs remain very popular in
+practice, and there is a large body of research on fairness and trans-
+parency promoting methods that seek to address some of these
+concerns [e.g 17, 20, 21, 37, 54, 55].
+This paper highlights a di￿erent issue, one that has not received
+su￿cient attention in the discussion of RAIs but that nonetheless
+has signi￿cant implications for fairness: RAIs are typically trained
+and evaluated as though the taskwere predictionwhen in reality the
+associated decision-making tasks are often interventions. Models
+trained and evaluated in this way answer the question: What is
+the likelihood of an adverse outcome under the observed historical
+decision process? Yet the question relevant to the decision maker is:
+What is the likelihood of an adverse outcome under the proposed
+decision? When decisions do not impact outcomes—when we are in
+what [27] call a “pure predition” setting—these are one and the same.
+However, many decisions take the form of interventions speci￿cally
+designed to mitigate risk. RAIs for these settings must be developed
+and evaluated taking into account the e￿ect of historical decisions
+on the observed outcomes. Failure to do so will result in RAIs that,
+despite appearing to perform well according to standard evaluation
+practices, underperform on cases such as those that have been
+historically receptive to intervention.
+In this paper we propose an approach to counterfactual risk
+modeling and evaluation to properly account for these inter-
+vention e￿ects. Counterfactual modeling has been proposed for
+medical RAIs [1, 44, 45], and prior work has used counterfactual
+evaluation for o￿-policy learning in bandit settings [14]. However,
+the question of adapting counterfactual evaluation for risk assess-
+ments and in particular for predictive bias assessments remains
+open. In this paper, we propose a new evaluation method for RAIs
+that uses doubly-robust estimation techniques from causal infer-
+ence [40, 51]. We also argue that fairness metrics that are functions
+of the outcome should be de￿ned counterfactually, and we use
+our evaluation method to estimate these metrics. We theoretically
+and empirically characterize the relationship between the standard
+fairness metrics and their counterfactual analogues. Our results
+suggest that in many cases, achieving parity in the standard metric
+will not achieve parity in the counterfactual metric.
+Our contributions are as follows: 1) We de￿ne counterfactual
+versions of standard predictive performance metrics and propose
+doubly-robust estimators of these metrics (§ 3); 2) We provide em-
+pirical support that this evaluation outperforms existing methods
+using a synthetic dataset and a real-world child welfare hotline
+screening dataset (§ 3); 3) We propose counterfactual formulations
+of standard fairness metrics that are more appropriate for decision-
+making settings (§ 4); 4) We provide theoretical results that only
+under strong conditions, which are unlikely to hold in general, does
+fairness according to standard metrics imply fairness according to
+counterfactual metrics (§ 4); 5) We demonstrate empirically that ap-
+plying existing fairness-corrective methods can increase disparity
+in the counterfactual rede￿nition of the metric they target (§ 4).

@@ -1,0 +1,1146 @@
+Explainable Machine Learning in Deployment
+Umang Bhatt1,2,3,4, Alice Xiang2, Shubham Sharma5, Adrian Weller 3,4,6, Ankur Taly7, Yunhan Jia8,
+Joydeep Ghosh5,9, Ruchir Puri10, José M. F. Moura1, Peter Eckersley2
+1Carnegie Mellon University, 2Partnership on AI, 3University of Cambridge, 4Leverhulme CFI, 5University of Texas at
+Austin, 6The Alan Turing Institute, 7Fiddler Labs, 8Baidu, 9CognitiveScale, 10IBM Research
+ABSTRACT
+Explainable machine learning offers the potential to provide stake-
+holders with insights into model behavior by using various meth-
+ods such as feature importance scores, counterfactual explanations,
+or influential training data. Yet there is little understanding of how
+organizations use these methods in practice. This study explores
+how organizations view and use explainability for stakeholder con-
+sumption. We find that, currently, the majority of deployments are
+not for end users affected by the model but rather for machine
+learning engineers, who use explainability to debug the model it-
+self. There is thus a gap between explainability in practice and the
+goal of transparency, since explanations primarily serve internal
+stakeholders rather than external ones. Our study synthesizes the
+limitations of current explainability techniques that hamper their
+use for end users. To facilitate end user interaction, we develop a
+framework for establishing clear goals for explainability. We end
+by discussing concerns raised regarding explainability.
+CCS CONCEPTS
+• Human-centered computing; • Computing methodologies
+→ Philosophical/theoretical foundations of artificial intel-
+ligence;Machine learning;
+KEYWORDS
+machine learning, explainability, transparency, deployed systems,
+qualitative study
+ACM Reference Format:
+Umang Bhatt1,2,3,4, Alice Xiang2, Shubham Sharma5, Adrian Weller 3,4,6,
+Ankur Taly7, Yunhan Jia8, JoydeepGhosh5,9, Ruchir Puri10, JoséM. F.Moura1,
+Peter Eckersley2. 2020. Explainable Machine Learning in Deployment. In
+Conference on Fairness, Accountability, and Transparency (FAT* ’20), Jan-
+uary 27–30, 2020, Barcelona, Spain. ACM, New York, NY, USA, 10 pages.
+https://doi.org/10.1145/3351095.3375624
+1 INTRODUCTION
+Machine learning (ML) models are being increasingly embedded
+intomany aspects of daily life, such as healthcare [16], finance [26],
+and social media [5]. To build ML models worthy of human trust,
+researchers have proposed a variety of techniques for explaining
+ML models to stakeholders. Deemed “explainability,” this body of
+previous work attempts to illuminate the reasoning used by ML
+Permission to make digital or hard copies of part or all of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for third-party components of thisworkmust be honored.
+For all other uses, contact the owner/author(s).
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Copyright held by the owner/author(s).
+ACM ISBN 978-1-4503-6936-7/20/02.
+https://doi.org/10.1145/3351095.3375624
+models. “Explainability” loosely refers to any technique that helps
+the user or developer of ML models understand why models be-
+have the way they do. Explanations can come in many forms: from
+telling patients which symptoms were indicative of a particular di-
+agnosis [35] to helping factory workers analyze inefficiencies in a
+production pipeline [17].
+Explainability has been touted as away to enhance transparency
+of ML models [33]. Transparency includes a wide variety of efforts
+to provide stakeholders, particularly end users, with relevant infor-
+mation about how a model works [67]. One form of this would be
+to publish an algorithm’s code, though this type of transparency
+would not provide an intelligible explanation to most users. An-
+other form would be to disclose properties of the training pro-
+cedure and datasets used [39]. Users, however, are generally not
+equipped to be able to understand how raw data and code trans-
+late into benefits or harms that might affect them individually. By
+providing an explanation for how the model made a decision, ex-
+plainability techniques seek to provide transparency directly tar-
+geted to human users, often aiming to increase trustworthiness
+[44]. The importance of explainability as a concept has been re-
+flected in legal and ethical guidelines for data andML [53]. In cases
+of automated decision-making, Articles 13-15 of the EuropeanGen-
+eral Data Protection Regulation (GDPR) require that data subjects
+have access to “meaningful information about the logic involved,
+as well as the significance and the envisaged consequences of such
+processing for the data subject” [45]. In addition, technology com-
+panies have released artificial intelligence (AI) principles that in-
+clude transparency as a core value, including notions of explain-
+ability, interpretability, or intelligibility [1, 2].
+With growing interest in “peering under the hood” of ML mod-
+els and in providing explanations to human users, explainability
+has become an important subfield of ML. Despite a burgeoning lit-
+erature, there has been little work characterizing how explanations
+have been deployed by organizations in the real world.
+In this paper, we explore how organizations have deployed local
+explainability techniques so that we can observe which techniques
+work best in practice, report on the shortcomings of existing tech-
+niques, and recommend paths for future research. We focus specif-
+ically on local explainability techniques since these techniques ex-
+plain individual predictions, making them typically the most rele-
+vant form of model transparency for end users.
+Our study synthesizes interviewswith roughly fifty people from
+approximately thirty organizations to understand which explain-
+ability techniques are used and how. We report trends from two
+sets of interviews and provide recommendations to organizations
+deploying explainability. To the best of our knowledge, we are the
+first to conduct a study of how explainability techniques are used
+by organizations that deploy ML models in their workflows. Our
+main contributions are threefold:
+• We interview around twenty data scientists, who are not
+currently using explainability tools, to understand their or-
+ganization’s needs for explainability.
+• We interview around thirty different individuals on how
+their organizations have deployed explainability techniques,
+reporting case studies and takeaways for each technique.
+• We suggest a framework for organizations to clarify their
+goals for deploying explainability.
+The rest of this paper is organized as follows:
+(1) We discuss the methodology of our survey in Section 2.
+(2) We summarize our overall findings in Section 3.
+(3) We detail how local explainability techniques are used at
+various organizations and discuss technique-specific take-
+aways in Section 4.
+(4) We develop a framework for establishing clear goals when
+deploying local explainability in Section 5.1 and discuss con-
+cerns of explainability in Section 5.2.
+2 METHODOLOGY
+In the spirit of Holstein et al. [28], we study how industry practi-
+tioners look at and deploy explainable ML. Specifically, we study
+how particular organizations deploy explainability algorithms, in-
+cluding who consumes the explanation and how it is evaluated
+for the intended stakeholder. We conduct two sets of interviews:
+Group 1 consisted at how data scientists who are not currently us-
+ing explainable machine learning hope to leverage various explain-
+ability tools, while Group 2, the crux of this paper, consisted at how
+explainable machine learning has been deployed in practice.
+For Group 1, Fiddler Labs led a set of around twenty interviews
+to assess explainability needs across various organizations in the
+technology and financial services sectors. We specifically focused
+on teams that do not currently employ explainability tools. These
+semi-structured, hour-long interviews included, but were not lim-
+ited to, the following questions:
+• What are your ML use cases?
+• What is your current model development workflow?
+• What are your pain points in deploying ML models?
+• Would explainability help address those pain points?
+Group 2 spanned roughly thirty people across approximately
+twenty different organizations, both for-profit and non-profit.Most
+of these organizations aremembers of the Partnership onAI, which
+is a global multistakeholder non-profit established to study and for-
+mulate best practices for AI to benefit society.With each individual,
+we held a thirty-minute to two-hour semi-structured interview to
+understand the state of explainability in their organization, their
+motivation for using explanations, and the benefits and shortcom-
+ings of the methods used. Some organizations asked to stay anony-
+mous, not to be referred to explicitly in the prose, or not to be in-
+cluded in the acknowledgements.
+Of the people we spoke with in Group 2, around one-third rep-
+resented non-profit organizations (academics, civil society organi-
+zations, and think tanks), while the rest worked for for-profit or-
+ganizations (corporations, industrial research labs, and start-ups).
+Broken down by organization, around half were for-profit and half
+were academic / non-profit. Around one-third of the interviewees
+were executives at their organization, around half were research
+scientists or engineers, and the remainder were professors at aca-
+demic institutions, who commented on the consulting they had
+done with industry leaders to commercialize their research. The
+questions we asked Group 2 included, but were not limited to, the
+following:
+• Does your organization use ML model explanations?
+• What type of explanations have you used (e.g., feature-based,
+sample-based, counterfactual, or natural language)?
+• Who is the audience for themodel explanation (e.g., research
+scientists, product managers, domain experts, or users)?
+• In what context have you deployed the explanations (e.g., in-
+forming the development process, informing human decision-
+makers about the model, or informing the end user on how
+actions were taken based on the model’s output)?
+• How does your organization decide when and where to use
+model explanations?
+3 SUMMARY OF FINDINGS
+Here we synthesize the results from both interview groups. For
+the sake of clarity, we define various terms based on the context in
+which they appear in the forthcoming prose.
+• Trustworthiness refers to the extent to which stakeholders
+can reasonably trust a model’s outputs.
+• Transparency refers to attempts to provide stakeholders (par-
+ticularly external stakeholders) with relevant information
+about how the model works: this includes documentation
+of the training procedure, analysis of training data distribu-
+tion, code releases, feature-level explanations, etc.
+• Explainability refers to attempts to provide insights into a
+model’s behavior.
+• Stakeholders are the people who either want a model to be
+“explainable,” will consume the model explanation, or are
+affected by decisions made based on model output.
+• Practice refers to the real-world context in which the model
+has been deployed.
+• Local Explainability aims to explain the model’s behavior
+for a specific input.
+• Global Explainability attempts to understand the high-level
+concepts and reasoning used by a model.
+3.1 Explainability Needs
+This subsection provides an overview of explainability needs that
+were uncovered with Group 1, data scientists from organizations
+that do not currently deploy explainability techniques. These data
+scientists were asked to describe their “pain points” in building and
+deploying ML models, and how they hope to use explainability.
+• Model debugging: Most data scientists struggle with de-
+bugging poormodel performance. Theywish to identifywhy
+the model performs poorly on certain inputs, and also to
+identify regions of the input space with below average per-
+formance. In addition, they seek guidance on how to en-
+gineer new features, drop redundant features, and gather
+more data to improve model performance. For instance, one
+data scientist said: “If I have 60 features, maybe it’s equally
+effective if I just have 5 features.” Dealing with feature inter-
+actions was also a concern, as the data scientist continued,
+“Feature A will impact feature B, [since] feature A might
+negatively affect feature B—how do I attribute [importance
+in the presence of] correlations?” Othersmentioned explain-
+ability as a debugging solution, helping to “narrow down
+where things are broken.”
+• Model monitoring: Several individuals worry about drift
+in the feature and prediction distributions after deployment.
+Ideally, they would like to be alerted when there is a signif-
+icant drift relative to the training distribution [6, 47]. One
+organization would like explanations for how drift in fea-
+ture distributions would impact model outcomes and fea-
+ture contribution to the model: “We can compute howmuch
+each feature is drifting, butwewant to cross-reference [this]
+with which features are impacting the model a lot.”
+• Model transparency: Organizations that deploy models to
+make decisions that directly affect end users seek explana-
+tions for model predictions. The explanations are meant to
+increase model transparency and comply with current or
+forthcoming regulations. In general, data scientists believe
+that explanations can also help communicate predictions to
+a broader external audience of other business teams and
+customers. One company stressed the need to “show your
+work” to provide reasons on underwriting decisions to cus-
+tomers, and another company needed explanations to re-
+spond to customer complaints.
+• Model audit: In financial organizations, due to regulatory
+requirements, all deployed ML models must go through an
+internal audit. Data scientists building these models need to
+have them reviewed by internal risk and legal teams. One
+of the goals of the model audit is to conduct various kinds
+of tests provided by regulations like SR 11-7 [43]. An effec-
+tive model validation framework should include: (1) evalua-
+tion of conceptual soundness of themodel, (2) ongoingmon-
+itoring, including benchmarking, and (3) outcomes analy-
+sis, including back-testing. Explainability is viewed as a tool
+for evaluating the soundness of the model on various data
+points. Financial institutions would like to conduct sensitiv-
+ity analyses, checking the impact of small changes to inputs
+on model outputs. Unexpectedly large changes in outputs
+can indicate an unstable model.
+3.2 Explainability Usage
+In Table 1, we aggregate some of the explainability use cases that
+we received from different organizations in Group 2. For each use
+case, we define the domain of use (i.e., the industry in which the
+model is deployed), the purpose of the model, the explainability
+technique used, the stakeholder consuming the explanation, and
+how the explanation is evaluated. Evaluation criteria denote how
+the organization compares the success of various explanation func-
+tions for the chosen technique (e.g., after selecting feature impor-
+tance as the technique, an organization can compare LIME [50] and
+SHAP [34] explanations via the faithfulness criterion [69]).
+In our study, feature importance was the most common explain-
+ability technique, and Shapley values were the most common type
+of feature importance explanation. The most common stakehold-
+ers were ML engineers (or research scientists), followed by domain
+experts (e.g., loan officers and content moderators). Section 4 pro-
+vides definitions for each technique and further details on how
+these techniques were used at Group 2 organizations.
+3.3 Stakeholders
+Most organizations in Group 2 deploy explainability atop their ex-
+isting ML workflow for one of the following stakeholders:
+(1) Executives: These individuals deem explainability neces-
+sary to achieve an organization’s AI principles. One research
+scientist felt that “explainability was strongly advised and
+marketed by higher-ups,” though sometimes explainability
+simply became a checkbox.
+(2) ML Engineers: These individuals (including data scientists
+and researchers) train ML models at their organization and
+use explainability techniques to understand how the trained
+model works: do the most important features, most similar
+samples, and nearest training point(s) in the opposite class
+make sense? Using explainability to debug what the model
+has learned, this group of individuals were the most com-
+mon explanation consumers in our study.
+(3) End Users: This is the most intuitive consumer of an expla-
+nation. The person consuming the output of an ML model
+or making a decision based on the model output is the end
+user. Explainability shows the end user why the model be-
+haved the way it did, which is important for showing that
+the model is trustworthy and also providing greater trans-
+parency.
+(4) Other Stakeholders: There are many other possible stake-
+holders for explainability. One such group is regulators, who
+may mandate that certain algorithmic decision-making sys-
+tems provide explanations to affected populations or the
+regulators themselves. It is important that this group un-
+derstands how explanations are deployed based on existing
+research, what techniques are feasible, and how the tech-
+niques can align with the desired explanation from a model.
+Another group is domain experts, who are often taskedwith
+auditing the model’s behavior and ensuring it aligns with
+expert intuition. For many organizations, minimizing the di-
+vergence between the expert’s intuition and the explanation
+used by the model is key to successfully implementing ex-
+plainability.
+Overwhelmingly, we found that local explainability techniques
+are mostly consumed by ML engineers and data scientists to au-
+dit models before deployment rather than to provide explanations
+to end users. Our interviews reveal factors that prevent organiza-
+tions from showing explanations to end users or those affected by
+decisions made from ML model outputs.
+3.4 Key Takeaways
+This subsection summarizes some key takeaways from Group 2
+that shed light on the reasons for the limited deployment of ex-
+plainability techniques and their use primarily as sanity checks
+for ML engineers. Organizations generally still consider the judg-
+ments of domain experts to be the implicit ground truth for expla-
+nations. Since explanations produced by current techniques often
+Domain Model Purpose Explainability Techniqe Stakeholders Evaluation Criteria
+Finance Loan Repayment Feature Importance Loan Officers Completeness [34]
+Insurance Risk Assessment Feature Importance Risk Analysts Completeness [34]
+Content Moderation Malicious Reviews Feature Importance Content Moderators Completeness [34]
+Finance Cash Distribution Feature Importance ML Engineers Sensitivity [69]
+Facial Recognition Smile Detection Feature Importance ML Engineers Faithfulness [7]
+Content Moderation Sentiment Analysis Feature Importance QA ML Engineers ℓ2 norm
+Healthcare Medicare access Counterfactual Explanations ML Engineers normalized ℓ1 norm
+Content Moderation Object Detection Adversarial Perturbation QA ML Engineers ℓ2 norm
+Table 1: Summary of select deployed local explainability use cases
+deviate from the understanding of domain experts, some organiza-
+tions still use human experts to evaluate the explanation before it
+is presented to users. Part of this deviation stems from the potential
+for ML explanations to reflect spurious correlations, which result
+from models detecting patterns in the data that lack causal under-
+pinnings. As a result, organizations find explainability techniques
+useful for helping their ML engineers identify and reconcile incon-
+sistencies between the model’s explanations and their intuition or
+that of domain experts, rather than for directly providing explana-
+tions to end users.
+In addition, there are technical limitations that make it difficult
+for organizations to show end users explanations in real-time. The
+non-convexity of certain models make certain explanations (e.g.,
+providing the most influential datapoints) hard to compute quickly.
+Moreover, finding plausible counterfactual datapoints (that are fea-
+sible in the real world and on the input data manifold) is nontrivial,
+and many existing techniques currently make crude approxima-
+tions or return the closest datapoint of the other class in the train-
+ing set. Moreover, providing certain explanations can raise privacy
+concerns due to the risk of model inversion.
+More broadly, organizations lack frameworks for deciding why
+they want an explanation, and current research fails to capture the
+objective of an explanation. For example, large gradients, repre-
+senting the direction of maximal variation with respect to the out-
+put manifold, do not necessarily “explain” anything to stakehold-
+ers. At best, gradient-based explanations provide an interpretation
+of how the model behaves upon an infinitesimal perturbation (not
+necessarily a feasible one [29]), but does not “explain” if the model
+captures the underlying causal mechanism from the data.
+4 DEPLOYING LOCAL EXPLAINABILITY
+In this section, we dive into how local explainability techniques are
+used at various organizations (Group 2). After reviewing technical
+notation, we define local explainability techniques, discuss organi-
+zations’ use cases, and then report takeaways for each technique.
+4.1 Preliminaries
+A black box model f maps an input x ∈ X ⊆ Rd to an output
+f (x) ∈ Y, f : Rd 7→ Y. When we assume f has a parametric
+form, we write f θ . L(f (x),y) denotes the loss function used to
+train f on a dataset D of input-output pairs (x (i),y(i)).
+Each organization we spoke with has deployed an ML model f .
+They hope to explain a data point x using an explanation function
+д. Local explainability refers to an explanation for why f predicted
+f (x) for a fixed point x . The local explanation methods we discuss
+come in one of the following forms: Which feature xi of x was
+most important for prediction with f ? Which training datapoint
+z ∈ D was most important to f (x)? What is the minimal change
+to the input x required to change the output f (x)?
+In this paper, we deliberately decide to focus on the more popu-
+larly deployed local explainability techniques instead of global ex-
+plainability techniques. Global explainability refers to techniques
+that attempt to explain the model as a whole. These techniques
+attempt to characterize the concepts learned by the model [31],
+simpler models learned from the representation of complex mod-
+els [17], prototypical samples from a particular model output [10],
+or the topology of the data itself [20]. None of our interviewees
+reported deploying global explainability techniques, though some
+studied these techniques in research settings.
+4.2 Feature Importance
+Feature importance was by far the most popular technique we
+found across our study. It is used across many different domains
+(finance, healthcare, facial recognition, and content moderation).
+Also known as feature-level interpretations, feature attributions,
+or saliency maps, this method is by far the most widely used and
+most well-studied explainability technique [9, 24].
+4.2.1 Formulation. Feature importance methods define an expla-
+nation function д : f × Rd 7→ R
+d that takes in a model f and a
+point of interest x and returns importance scores д(f ,x) ∈ Rd for
+all features. is the importance of (or attribution for) feature xi of x .
+These explanation functions roughly fall into two categories:
+perturbation-based techniques [8, 14, 22, 34, 50, 61] and gradient-
+based techniques [7, 41, 57, 59, 60, 62]. Note that gradient-based
+techniques can be seen as a special case of a perturbation-based
+technique with an infinitesimal perturbation size. Heatmaps are
+also a type of feature-level explanation that denote the importance
+of a region or collection of features [4, 22]. A prominent class of
+perturbation based methods is based on Shapley values from co-
+operative game theory [54]. Shapley values are a way to distrib-
+ute the gains from a cooperative game to its players. In applying
+the method to explaining a model prediction, a cooperative game
+is defined between the features with the model prediction as the
+gain. The highlight of Shapley values is that they enjoy axiomatic
+uniqueness guarantees. Unfortunately, calculating the exact Shap-
+ley value is exponential in d , input dimensionality; however, the
+literature has proposed approximate methods using weighted lin-
+ear regression [34], Monte Carlo approximation [61], centroid ag-
+gregation [11], and graph-structured factorization [14]. When we
+refer to Shapley-related methods hereafter, we mean such approx-
+imate methods.
+4.2.2 Shapley Values in Practice. Organization A works with fi-
+nancial institutions and helps explain models for credit risk anal-
+ysis. To integrate into the existing ML workflow of these institu-
+tions, Organization A proceeds as follows. They let data scientists
+train a model to the desired accuracy. Note that Organization A
+focuses mostly on models trained on tabular data, though they are
+beginning to venture into unstructured data (i.e., language and im-
+ages). During model validation, risk analysts conduct stress tests
+before deploying the model to loan officers and other decision-
+makers. After decision-makers vet the model outputs as a sanity
+check and decide whether or not to override the model output, Or-
+ganization A generates Shapley value explanations.
+Before launching the model, risk analysts are asked to review
+the Shapley value explanations to ensure that the model exhibits
+expected behavior (i.e., the model uses the same features that a hu-
+man would for the same task). Notably, the customer support team
+at these institutions can also use these explanations to provide in-
+dividuals information about what went into the decision-making
+process for their loan approval or cash distribution decision. They
+are shown the percentage contribution to the model output (the
+positive ℓ1 norm of the Shapley value explanation along with the
+sign of contribution). This means that the explanation would be
+along the lines of, “55% of the decision was decided by your age,
+which positively correlated with the predicted outcome.”
+When comparing Shapley value explanations to other popular
+feature importance techniques, Organization A found that in prac-
+tice LIME explanations [50] give unexpected explanations that do
+not align with human intuition. Recent work [71] shows that the
+fragility of LIME explanations can be traced to the sampling vari-
+ance when explaining a singular data point and to the explana-
+tion sensitivity to sample size and sampling proximity. Though
+decision-makers have access to the feature-importance explana-
+tions, end users are still not shown these explanations as reasoning
+formodel output. OrganizationA aspires to eventually provide this
+“explanation” to end users.
+For gradient-based language models, Organization A uses Inte-
+grated Gradients (related to Shapley Values by Sundararajan et al.
+[62]) to flag malicious reviews and moderate content at the afore-
+mentioned institutions. This information can be highlighted to en-
+sure the trustworthiness and transparency of the model to the de-
+cision maker (the hired content moderator here), since they can
+now see which word was most important to flag the content.
+Going forward, Organization A intends to use a global variant
+of the Shapley value explanations by exposing how Shapley value
+explanations work on average for datapoints of a particular pre-
+dicted class (e.g., on average someone who was denied a loan had
+their age matter most for the prediction). This global explanation
+would help risk analysts get a birds-eye view of how a model be-
+haves and whether it aligns with their expectations.
+4.2.3 Heatmaps in Transportation. Organization B looks to detect
+facial expressions from video feeds of users driving. They hope to
+use explainability to identify the actions a user is performing while
+the user drives. Organization B has tried feature visualization and
+activation visualization techniques that get attributions by back-
+propagating gradients to regions of interest [4, 70]. Specifically,
+they use these probabilistic Winner-Take-All techniques (variants
+of existing gradient-based feature importance techniques [57, 62])
+to localize the region of importance in the input space for a partic-
+ular classification task. For example, when detecting a smile, they
+expect the mouth of the driver to be important.
+Though none of these desired techniques have been deployed
+for the end user (the driver in this case), ML engineers at Organi-
+zation B found these techniques useful for qualitative review. On
+tiny datasets, engineers can figure out which scenarios have false
+positives (videos falsely detected to contain smiles) and why. They
+can also identify if true positives are paying attention to the right
+place or if there is a problem with spurious artifacts.
+However, while trying to understand why the model erred by
+analyzing similarities in false positives, they have struggled to scale
+this local technique across heatmaps in aggregate across multi-
+ple videos. They are able to qualitatively evaluate a sequence of
+heatmaps for one video, but doing so across 100M frames simulta-
+neously is far more difficult. Paraphrasing the VP of AI at Organi-
+zation B, aggregating saliency maps across videos is moot and con-
+tains little information. Note that an individual heatmap is an ex-
+ample of a local explainability technique, but an aggregate heatmap
+for 100M frames would be a global technique. Unlike aggregating
+Shapley values for tabular data as done at Organization A, taking
+an expectation over heatmaps (in the statistical sense) does not
+work, since aggregating pixel attributions is meaningless. One op-
+tion Organization B discussed would be to clustering low dimen-
+sional representations of the heatmaps and then tagging each clus-
+ter based on what the model is focusing on; unfortunately, humans
+would still have tomanually label the clusters of important regions.
+4.2.4 Spurious Correlations. Related to model monitoring for fea-
+ture drift detection discussed in Section 3.1, Organization B has
+encountered issues with spurious correlations in their smile detec-
+tion models. Their Vice President of AI noted that “[ML engineers]
+must know to what extent you want ML to leverage highly corre-
+lated data to make classifications.” Explainability can help identify
+models that focus on that correlation and can find ways to have
+models ignore it. For example, there may be a side effect of a corre-
+lated facial expression or co-occurrence: cheek raising, for exam-
+ple, co-occurs with smiling. In a cheek-raise detector trained on
+the same dataset as a smile detector but with different labels, the
+model still focused on the mouth instead of the cheeks. Both mod-
+els were fixated on a prevalent co-occurrence. Attending to the
+mouth was undesirable in the cheek-raise detector but allowed in
+the smile detector.
+One way Organization B combats this is by using simpler mod-
+els on top of complex feature engineering. For example, they use
+black box deep learning models for building good descriptors that
+are robust across camera viewpoints and will detect different fea-
+tures that subject matter experts deem important for drowsiness.
+There is one model per important descriptor (i.e., one model for
+eyes closed, one for yawns, etc.). Then, they fit a simple model on
+the extracted descriptors such that the important descriptors are
+obvious for the final prediction of drowsiness. Ideally, if Organi-
+zation B had guarantees about the disentanglement of data gener-
+ating factors [3], they would be able to understand which factors
+(descriptors) play a role in downstream classification.
+4.2.5 Feature Importance - Takeaways.
+(1) Shapley values are rigorously motivated, and approximate
+methods are simple to deploy for decision makers to sanity
+check the models they have built.
+(2) Feature importance is not shown to end users, but is used
+by machine learning engineers as a sanity check. Looping
+other stakeholders (whomake decisions based onmodel out-
+puts) into the model development process is essential to un-
+derstanding what type of explanations the model delivers.
+(3) Heatmaps (and feature importance scores, in general) are
+hard to aggregate, which makes it hard to do false positive
+detection at scale.
+(4) Spurious correlations can be detected with simple gradient-
+based techniques.
+4.3 Counterfactual Explanations
+Counterfactual explanations are techniques that explain individ-
+ual predictions by providing a means for recourse. Contrastive ex-
+planations that highlight contextually relevant information to the
+model output are most similar to human explanations[40]; how-
+ever, in their current form, finding the relevant set of plausible
+counterfactual point is no clear. Moreover, while some existing
+open source implementations for counterfactual explanations ex-
+ist [65, 68], they either work for specific model-types or are not
+black-box in nature. In this section, we discuss the formulation for
+counterfactual explanations and describe one solution for each de-
+ployed technique.
+4.3.1 Formulation. Counterfactual explanations are points close
+to the input for which the decision of the classifier changes. For
+example, for a person who was rejected for a loan by a ML model,
+a counterfactual explanation would possibly suggest: "Had your
+income been greater by $5000, the loan would have been granted."
+Given an inputx , a classifier f , and a distancemetricd , we find a
+counterfactual explanation c by solving the optimization problem:
+min
+c
+d(x,c)
+s.t.f (x) , f (c)
+(1)
+The method can be tailored to allow only certain relevant fea-
+tures to be changed. Note that the term counterfactual has a differ-
+ent meaning in the causality literature [27, 46]. Counterfactual ex-
+planations for ML were introduced by Wachter et al. [66]. Sharma
+et al. [55] provide details on existing techniques.
+4.3.2 Counterfactual Explanations in Healthcare. Organization C
+uses a faster version of the formulation in Sharma et al. [55] to find
+counterfactual explanations for projects in healthcare. When peo-
+ple apply for Medicare, Organization C hopes to flag if a user’s ap-
+plication has errors and to provide explanations on how to correct
+the errors. Moreover, ML engineers can use the robustness score to
+compare different models trained using this data: this robustness
+score is effectively a suitably normalized and averaged distance
+between the counterfactual and original point in Euclidean space.
+The original formulation makes use of a slower genetic algorithm,
+so they optimized the counterfactual explanation generation pro-
+cess. They are currently developing a first-of-its-kind application
+that can directly take in any black-box model and data and return
+a robustness score, fairness measure, and counterfactual explana-
+tions, all from a single underlying algorithm.
+The use of this approach has several advantages: it can be ap-
+plied to black-box models, works for any input data type, and gen-
+erates multiple explanations in a single run of the algorithm. How-
+ever, there are some shortcomings that Organization C is address-
+ing. One challenge of counterfactual models is that the counterfac-
+tual might not be feasible. Organization C addresses this by using
+the training data to guide the counterfactual generation process
+and by providing a user interface that allows domain experts to
+specify constraints. In addition, the flexibility of the counterfactual
+approach comes with a drawback that is common among explana-
+tions for black-box models: there is no guarantee of the optimality
+of the explanation since black-box techniques cannot guarantee
+optimality.
+Through the creation of a deployed solution for this method, the
+organization realized that clients would ideally want an explain-
+ability score, along with a measure of fairness and robustness; as
+such, they have developed an explainability score that can be used
+to compare the explainability of different models.
+4.3.3 Counterfactual Explanations - Takeaways.
+(1) Organizations are interested in counterfactual explanation
+solutions since the underlying method is flexible and such
+explanations are easy for end users to understand.
+(2) It is not clear exactly what should be optimized for when
+generating a counterfactual or how to do it efficiently. Still,
+approximate solutions may suffice in practical applications.
+4.4 Adversarial Training
+In order to ensure the model being deployed is robust to adver-
+saries and behaves as intended,many organizationswe interviewed
+use adversarial training to improve performance. It has recently
+been shown that in fact, this also can lead to more human inter-
+pretable features [30].
+4.4.1 Formulation. Other works have also explored the intersec-
+tion between adversarial robustness and model interpretations [18,
+21, 23, 59, 69]. The claim of one of these works is that the closest
+adversarial example should perturb ‘fragile’ features, enabling the
+model to fit to robust features (indicative of a particular class) [30].
+The setup of feature importance in the adversarial training setting
+from Singla et al. [59] is as follows:
+д(f ,x) = max
+x̃
+L (fθ ∗ (x̃),y)
+‖x̃ − x ‖0 ≤ k
+‖x̃ − x ‖2 ≤ ρ
+We let |x̃−x | be the top-k feature importance scores of the input,
+x . This is similar to the adversarial example setup which is usually
+written in the same manner as the above (without the ℓ0 norm to
+limit the number of features that changed). It is also interesting
+to note that the formulation to find counterfactual explanations
+above matches the formulation for finding adversarial examples.
+Sharma et al. [55] use this connection to generate adversarial ex-
+amples and define a black-box model robustness score.
+4.4.2 Image Content Moderation. Organization Dmoderates user-
+generated content (UGC) on several public platforms. Specifically,
+the R&D team at Organization D developed several models to de-
+tect adult and violent content from users’ uploaded images. Their
+quality assurance (QA) team measures model robustness to im-
+prove content detection accuracy under the threat of adversarial
+examples.
+The robustness of a content moderation model is measured by
+the minimum perturbations required for an image to evade detec-
+tion. Given a gradient-based image classification model f : Rd →
+{1, . . . ,K}, and we assume f (x) = argmaxi (Z (x)i ) where Z (x) ∈
+R
+K is the final (logit) layer output, andZ (x)i is the prediction score
+for the i-th class. The objective can be formulated as the following
+optimization problem to find the minimum perturbation:
+argmin
+x
+{d (x,x0) + cL(f (x),y)} (2)
+d(·, ·) is some distance measure that Organization D chooses to be
+the ℓ2 distance in Euclidean space; L(·) is the cross-entropy loss
+function and c is a balancing factor.
+As is common in the adversarial literature, Organization D ap-
+plies Projected Gradient Descent (PGD) to search for the minimum
+perturbation from the set of allowable perturbations S ⊆ Rd [36].
+The search process can be formulated as
+xt+1 = Πx+S
+(
+xt + α sgn (∇xL (fθ ∗ (x),y))
+)
+until xt is misclassified by the detection model. ML engineers on
+the QA team are shown a ℓ2-norm perturbation distance averaged
+over n test images randomly sampled from the test dataset. The
+larger the average perturbation, the more robust the model is, as it
+takes greater effort for an attacker to evade detection. The average
+perturbation required is also widely used as a metric when com-
+paring different candidate models and different versions of a given
+model.
+Organization D finds that more robust models have more con-
+vincing gradient-based explanations, i.e., the gradient of the output
+with respect to the input shows that the model is focusing on rele-
+vant portions of the images, confirming recent research [21, 30, 64].
+4.4.3 Text Content Moderation. Organization E uses text content
+moderation algorithms on its UGC platforms, such as forums. Its
+QA team is responsible for the reliability and robustness of a sen-
+timent analysis model, which labels posts as positive or negative,
+trained on UGC. The QA team seeks to find the minimum pertur-
+bation required to change the classification of a post. In particular,
+they want to know how to take misclassified posts (e.g., negative
+ones classified as positive) and change them to the correct class.
+Given a sentiment analysis model f : X → Y, which maps
+from feature space X to a set of classY, an adversary aims to gen-
+erate an adversarial post xadv from the original post x ∈ X whose
+ground truth label is f (x) = y ∈ Y so that f
+(
+xadv
+)
+, y. The QA
+team tries to minimize d(x,xadv ) for a domain-specific distance
+function. Organization E uses the ℓ2 distance in the embedding
+space, but it is equally valid to use the editing distance [42]. Note
+that perturbation technique changes accordingly.
+In practice, to find the minimum distance in embedding space,
+Organization E chooses to iteratively modify the words in the orig-
+inal post, starting from the words with the highest importance.
+Here importance is defined as the gradient of the model output
+with respect to a particular word. ML engineers compute the Jaco-
+bian matrix of the given posts x = (x1, x2, · · · , xN ) where xi is the
+i-th word. The Jacobian matrix is as follows:
+Jf (x) =
+∂ f (x)
+∂x
+=
+[
+∂ f j (x)
+∂xi
+]
+i ∈1...N , j ∈1...K
+(3)
+where K represents the number of classes (in this case K = 2), and
+f j (·) represents the confidence value of the jth class. The impor-
+tance of word xi is defined as
+Cxi = Jf ,i ,y =
+∂ f y (x)
+∂xi
+(4)
+i.e., the partial derivative of the confidence value based on the pre-
+dicted classy regarding to the input word xi . This procedure ranks
+the words by their impact on the sentiment analysis results. The
+QA team then applies a set of transformations/perturbations to the
+most important words to find the minimum number of important
+words that must be perturbed in order to flip an sentiment analysis
+API result.
+4.4.4 Adversarial Training - Takeaways.
+(1) There is a relation between model robustness and explain-
+ability. Model robustness improves the quality of feature im-
+portances (specifically saliency maps), confirming recent re-
+search findings [21].
+(2) Feature importance helps find minimal adversarial pertur-
+bations for language models in practice.
+4.5 Influential Samples
+This technique asks the question: Which data point in the training
+dataset x ∈ Dx is most influential to the model’s output f (x test)
+for a test point x test? Statisticians have used measures like Cook’s
+distance [15] which measure the effect of deleting a data point on
+the model output. However, such measures require an exhaustive
+search and hence do not scale well for larger datasets.
+4.5.1 Formulation. For over half of the organizations, influence
+functions has been the tool of choice for explaining which train-
+ing points are influential to the model’s output for a point x [32]
+(though only one organization actually deployed the technique).
+We let L(f θ ,x) be the model’s loss for point x . The empirical
+risk minimizer is given by f̂ θ = argminθ ∈Θ
+∑N
+i=1 L(f θ ,yx (i ) ).
+Note that yx = f̂ θ (x) is the predicted output at x with the trained
+risk minimizer. Koh and Liang [32] define the most influential data
+point z to a fixed point x as that which maximizes the following:
+Iup,loss (z,x) = −∇θL
+(
+f̂ θ (x),yx
+)⊤
+H−1
+f̂
+θ
+∇θL
+(
+f̂ θ (z),yx
+)
+This quantity measures the effect of upweighting on datapoint (z)
+on the loss atx . The goal of sample importance is to uncover which
+training examples, when perturbed, would have the largest effect
+(positive or negative) on the loss of a test point.
+4.5.2 Influence Functions in Insurance. Organization F uses influ-
+ence functions to explain risk models in the insurance industry.
+They hope to identify which customers might see an increase in
+their premiums based on their driving history in the past. The or-
+ganization hopes to divulge to the end user how the premiums
+for drivers similar to them are priced. In other words, they hope
+to identify the influential training data points [32] to understand
+which past drivers had the greatest influence on the prediction for
+the observed driver. Unfortunately, Organization F has struggled
+to provide this information to end users since the Hessian compu-
+tation has made doing so impractical since the latency is high.
+More pressingly, even when Organization F lets the influence
+function procedure run, they find that many influential data points
+are simply outliers that are important for all drivers since those
+anomalous drivers are far out of distribution. As a result, instead
+of identifying which drivers are most similar to a given driver, the
+influential sample explanation identifies drivers that are very dif-
+ferent from any driver (i.e., outliers). While this is could in theory
+be useful for outlier detection, it prevents the explanations from
+being used in practice.
+4.5.3 Influential Samples - Takeaways.
+(1) Influence functions can be intractable for large datasets; as
+such, a significant effort is needed to improve thesemethods
+to make them easy to deploy in practice.
+(2) Influence functions can be sensitive to outliers in the data,
+such that they might be more useful for outlier detection
+than for providing end users explanations.
+5 RECOMMENDATIONS
+This section provides recommendations for organizations based on
+the key takeaways in Section 3.4 and the technique-specific take-
+aways in Section 4. In order to address the challenges organizations
+face when striving to provide explanations to end users, we recom-
+mend a framework for establishing clear desiderata in explainabil-
+ity and then include concerns associated with explainability.
+5.1 Establish Clear Desiderata
+Most organizations we spoke to solely deploy explainability tech-
+niques for internal engineers and scientists, as a debugging mech-
+anism or as a sanity check. At the same time, these organizations
+also affirmed the importance of understanding the stakeholder, and
+hope to be able to explain a model prediction to the end user. Once
+the target population of the explanation is understood, organiza-
+tions can attempt to devise and deploy explainability techniques
+accordingly. We propose the following three steps for establishing
+clear desiderata and improving decision making around explain-
+ability. These include: clearly identifying the target population, un-
+derstanding their needs, and clarifying the intention of the expla-
+nation.
+(1) Identify stakeholders.Who are your desired explanation
+consumers? Typically thiswill be those affected by or shown
+model outputs. Preece et al. [49] describe how stakeholders
+have different needs for explainability. Distinctions between
+these groups can help design better explanation techniques.
+(2) Engagewith each stakeholder.Ask the stakeholder some
+variant of “What would you need the model to explain to
+you in order to understand, trust, or contest the model pre-
+diction?” and “What type of explanation do you want from
+your model?” Doshi-Velez and Kim [19] highlight how the
+task being modeled dictates what type of explanation the
+human will need from the model.
+(3) Understand the purpose of the explanation. Once the
+context and helpfulness of the explanation are established,
+understand what the stakeholder wants to do with the ex-
+planation [24].
+• Static Consumption: Will the explanation be used as a one-
+off sanity check for some stakeholders or shown to other
+stakeholders as reasoning for a particular prediction [48]?
+• Dynamic Model Updates: Will the explanation be used to
+garner feedback from the stakeholder as to how themodel
+ought to be updated to better align with their intuition?
+That is, how does the stakeholder interact with the model
+after viewing the explanation? Ross et al. [51] attempt to
+develop a technique for dynamic explanations, wherein
+the human can guide the model towards learning the cor-
+rect explanation.
+Once the desiderata are clarified, stakeholders should be con-
+sulted again.
+5.2 Concerns of Explainability
+While there are many positive reasons to encourage explainability
+of machine learning models, we note come concerns which were
+raised in our interviews.
+5.2.1 On Causality. One chief scientist told us that “Figuring out
+causal factors is the holy grail of explainability.” However, causal
+explanations are largely lacking in the literature, with a few excep-
+tions [13]. Though non-causal explanations can still provide valid
+and useful interpretations of how the model works [37], many or-
+ganizations said that theywould be keen to use causal explanations
+if they were available.
+5.2.2 On Privacy. Three organizations mentioned data privacy in
+the context of explainability, since in some cases explanations can
+be used to learn about the model [38, 63] or the training data [56].
+Methods to counter these concerns have been developed. For exam-
+ple, Harder et al. [25] develop a methodology for training a differ-
+entially private model that generates local and global explanations
+using locally linear maps.
+5.2.3 On Improving Performance. One purpose of explanations is
+to improve ML engineers’ understanding of their models, in order
+to help them refine and improve performance. Sincemachine learn-
+ing models are “dual use” [12], we should be aware that in some
+settings, explanations or other tools could enable malicious users
+to increase capabilities and performance of undesirable systems.
+For example, several organizations we talked with use explanation
+methods to improve their natural language processing and image
+recognition models for content moderation in ways that may con-
+cern some stakeholders.
+5.2.4 Beyond Deep Learning. Though deep learning has gained
+popularity in recent years, many organizations still use classical
+ML techniques (e.g., logistic regression, support vector machines),
+likely due to a need for simpler, more interpretable models [52].
+Many in the explainability community have focused on inter-
+preting black-box deep learning models, even though practitioners
+feel that there is a dearth of model-specific techniques to under-
+stand traditional ML models. For example, one research scientist
+noted that, “Many [financial institutions] use kernel-based meth-
+ods on tabular data.” As a result, there is a desire to translate ex-
+plainability techniques for kernel support vector machines in ge-
+nomics [58] to models trained on tabular data.
+Model agnostic techniques like Lundberg and Lee [34] can be
+used for traditional models, but are “likely overkill” for explain-
+ing kernel-based ML models, according to one research scientist,
+since model-agnostic methods can be computationally expensive
+and lead to poorly approximated explanations.
+6 CONCLUSION
+In this study, we critically examine how explanation techniques
+are used in practice. We are the first, to our knowledge, to inter-
+view various organizations on how they deploy explainability in
+their ML workflows, concluding with salient directions for future
+research.We found that while ML engineers are increasingly using
+explainability techniques as sanity checks during the development
+process, there are still significant limitations to current techniques
+that prevent their use to directly inform end users. These limita-
+tions include the need for domain experts to evaluate explanations,
+the risk of spurious correlations reflected in model explanations,
+the lack of causal intuition, and the latency in computing and show-
+ing explanations in real-time. Future research should seek to ad-
+dress these limitations. We also highlighted the need for organiza-
+tions to establish clear desiderata for their explanation techniques
+and to be cognizant of the concerns associated with explainability.
+Through this analysis, we take a step towards describing explain-
+ability deployment and hope that future research builds trustwor-
+thy explainability solutions.
+7 ACKNOWLEDGMENTS
+The authors would like to thank the following individuals for their
+advice, contributions, and/or support: Karina Alexanyan (Partner-
+ship on AI), Gagan Bansal (University of Washington), Rich Caru-
+ana (Microsoft), Amit Dhurandhar (IBM), Krishna Gade (Fiddler
+Labs), Konstantinos Georgatzis (QuantumBlack), Jette Henderson
+(CognitiveScale), Bahador Kaleghi (Element AI), Hima Lakkaraju
+(Harvard University), Katherine Lewis (Partnership on AI), Peter
+Lo (Partnership on AI), Terah Lyons (Partnership on AI), Saayeli
+Mukherji (Partnership onAI), Erik Pazos (QuantumBlack), Inioluwa
+Deborah Raji (Partnership on AI + AI Now), Nicole Rigillo (Elemen-
+tAI), Francesca Rossi (IBM), Jay Turcot (Affectiva), Kush Varshney
+(IBM), Dennis Wei (IBM), Edward Zhong (Baidu), Gabi Zijderveld
+(Affectiva), and ten other anonymous individuals.
+UB acknowledges support from DeepMind via the Leverhulme
+Centre for the Future of Intelligence (CFI) and the Partnership on
+AI research fellowship. AW acknowledges support from the David
+MacKay Newton research fellowship at Darwin College, The Alan
+Turing Institute under EPSRC grant EP/N510129/1 & TU/B/000074,
+and the Leverhulme Trust via CFI.
+REFERENCES
+[1] 2019. IBM’S Principles for Data Trust and Transparency.
+https://www.ibm.com/blogs/policy/trust-principles/
+[2] 2019. Our approach: Microsoft AI principles.
+https://www.microsoft.com/en-us/ai/our-approach-to-ai
+[3] Tameem Adel, Zoubin Ghahramani, and Adrian Weller. 2018. Discovering inter-
+pretable representations for both deep generative and discriminative models. In
+International Conference on Machine Learning. 50–59.
+[4] Sarah Adel Bargal, Andrea Zunino, Donghyun Kim, Jianming Zhang, Vittorio
+Murino, and Stan Sclaroff. 2018. Excitation backprop for RNNs. In Proceedings
+of the IEEE Conference on Computer Vision and Pattern Recognition. 1440–1449.
+[5] Oscar Alvarado and Annika Waern. 2018. Towards algorithmic experience: Ini-
+tial efforts for social media contexts. In Proceedings of the 2018 CHI Conference
+on Human Factors in Computing Systems. ACM, 286.
+[6] Dario Amodei, Chris Olah, Jacob Steinhardt, Paul Christiano, John Schul-
+man, and Dan Mané. 2016. Concrete problems in AI safety. arXiv preprint
+arXiv:1606.06565 (2016).
+[7] Marco Ancona, Enea Ceolini, Cengiz Oztireli, and Markus Gross. 2018. To-
+wards better understanding of gradient-based attributionmethods for DeepNeu-
+ral Networks. In 6th International Conference on Learning Representations (ICLR
+2018).
+[8] Marco Ancona, Cengiz Oztireli, and Markus Gross. 2019. Explaining Deep Neu-
+ral Networks with a Polynomial Time Algorithm for Shapley Value Approxi-
+mation. In Proceedings of the 36th International Conference on Machine Learn-
+ing (Proceedings of Machine Learning Research), Kamalika Chaudhuri and Ruslan
+Salakhutdinov (Eds.), Vol. 97. PMLR, Long Beach, California, USA, 272–281.
+[9] David Baehrens, Timon Schroeter, Stefan Harmeling, Motoaki Kawanabe, Katja
+Hansen, and Klaus-Robert MÃžller. 2010. How to explain individual classifica-
+tion decisions. Journal of Machine Learning Research 11, Jun (2010), 1803–1831.
+[10] Rajiv Khanna Been Kim and Sanmi Koyejo. 2016. Examples are not Enough,
+Learn to Criticize! Criticism for Interpretability. In Advances in Neural Informa-
+tion Processing Systems.
+[11] Umang Bhatt, Pradeep Ravikumar, and José M. F. Moura. 2019. Towards Aggre-
+gating Weighted Feature Attributions. abs/1901.10040 (2019).
+[12] Miles Brundage, Shahar Avin, Jack Clark, Helen Toner, Peter Eckersley, Ben
+Garfinkel, Allan Dafoe, Paul Scharre, Thomas Zeitzoff, Bobby Filar, et al. 2018.
+The malicious use of artificial intelligence: Forecasting, prevention, and mitiga-
+tion. arXiv preprint arXiv:1802.07228 (2018).
+[13] Aditya Chattopadhyay, Piyushi Manupriya, Anirban Sarkar, and Vineeth N Bala-
+subramanian. 2019. Neural Network Attributions: A Causal Perspective. In Pro-
+ceedings of the 36th International Conference on Machine Learning (Proceedings
+of Machine Learning Research), Kamalika Chaudhuri and Ruslan Salakhutdinov
+(Eds.), Vol. 97. PMLR, Long Beach, California, USA, 981–990.
+[14] Jianbo Chen, Le Song, Martin J Wainwright, and Michael I Jordan. [n. d.]. L-
+shapley and c-shapley: Efficient model interpretation for structured data. 7th
+International Conference on Learning Representations (ICLR 2019) ([n. d.]).
+[15] R Dennis Cook. 1977. Detection of influential observation in linear regression.
+Technometrics 19, 1 (1977), 15–18.
+[16] Jeffrey De Fauw, Joseph R Ledsam, Bernardino Romera-Paredes, Stanislav
+Nikolov, Nenad Tomasev, Sam Blackwell, Harry Askham, Xavier Glorot, Bren-
+danO’Donoghue, Daniel Visentin, et al. 2018. Clinically applicable deep learning
+for diagnosis and referral in retinal disease. Nature medicine 24, 9 (2018), 1342.
+[17] Amit Dhurandhar, Karthikeyan Shanmugam, Ronny Luss, and Peder A Olsen.
+2018. Improving simple models with confidence profiles. In Advances in Neural
+Information Processing Systems. 10296–10306.
+[18] Ann-Kathrin Dombrowski, Maximilian Alber, Christopher J Anders, Marcel Ack-
+ermann, Klaus-Robert Müller, and Pan Kessel. 2019. Explanations can be manip-
+ulated and geometry is to blame. arXiv preprint arXiv:1906.07983 (2019).
+[19] Finale Doshi-Velez and Been Kim. 2017. Towards A Rigorous Science of Inter-
+pretable Machine Learning. (2017).
+[20] William DuMouchel. 2002. Data squashing: constructing summary data sets. In
+Handbook of Massive Data Sets. Springer, 579–591.
+[21] Christian Etmann, Sebastian Lunz, Peter Maass, and Carola Schoenlieb. 2019.
+On the Connection Between Adversarial Robustness and Saliency Map Inter-
+pretability. In Proceedings of the 36th International Conference on Machine Learn-
+ing (Proceedings of Machine Learning Research), Kamalika Chaudhuri and Ruslan
+Salakhutdinov (Eds.), Vol. 97. PMLR, Long Beach, California, USA, 1823–1832.
+[22] Ruth Fong and Andrea Vedaldi. 2017. Interpretable Explanations of Black Boxes
+by Meaningful Perturbation. Proceedings of the 2017 IEEE International Confer-
+ence on Computer Vision (ICCV). (2017). https://doi.org/10.1109/ICCV.2017.371
+arXiv:arXiv:1704.03296
+[23] Amirata Ghorbani, Abubakar Abid, and James Zou. 2019. Interpretation of neu-
+ral networks is fragile. AAAI (2019).
+[24] Leilani H Gilpin, David Bau, Ben Z Yuan, Ayesha Bajwa, Michael Specter, and
+Lalana Kagal. 2018. Explaining explanations: An overview of interpretability of
+machine learning. In 2018 IEEE 5th International Conference on data science and
+advanced analytics (DSAA). IEEE, 80–89.
+[25] Frederik Harder, Matthias Bauer, and Mijung Park. 2019. Interpretable and Dif-
+ferentially Private Predictions. arXiv preprint arXiv:1906.02004 (2019).
+[26] JB Heaton, Nicholas G Polson, and Jan Hendrik Witte. 2016. Deep learning in
+finance. arXiv preprint arXiv:1602.06561 (2016).
+[27] Paul W. Holland. 1986. Statistics and Causal Inference. J. Amer. Statist. Assoc. 81,
+396 (1986), 945–960.
+[28] Kenneth Holstein, Jennifer Wortman Vaughan, Hal Daumé III, Miro Dudik, and
+Hanna Wallach. 2019. Improving fairness in machine learning systems: What
+do industry practitioners need?. In Proceedings of the 2019 CHI Conference on
+Human Factors in Computing Systems. ACM, 600.
+[29] Giles Hooker and Lucas Mentch. 2019. Please Stop Permuting Features: An Ex-
+planation and Alternatives. arXiv preprint arXiv:1905.03151 (2019).
+[30] Andrew Ilyas, Shibani Santurkar, Dimitris Tsipras, Logan Engstrom, Brandon
+Tran, and Aleksander Madry. 2019. Adversarial Examples Are Not Bugs, They
+Are Features. http://arxiv.org/abs/1905.02175 cite arxiv:1905.02175.
+[31] Been Kim, Martin Wattenberg, Justin Gilmer, Carrie Cai, James Wexler, Fer-
+nanda Viegas, and Rory Sayres. 2017. Interpretability beyond feature attribu-
+tion: Quantitative testing with concept activation vectors (tcav). arXiv preprint
+arXiv:1711.11279 (2017).
+[32] Pang Wei Koh and Percy Liang. 2017. Understanding black-box predictions via
+influence functions. In Proceedings of the 34th International Conference on Ma-
+chine Learning-Volume 70 (ICML 2017). Journal of Machine Learning Research,
+1885–1894.
+[33] Bruno Lepri, Nuria Oliver, Emmanuel Letouzé, Alex Pentland, and Patrick Vinck.
+2018. Fair, transparent, and accountable algorithmic decision-making processes.
+Philosophy & Technology 31, 4 (2018), 611–627.
+[34] Scott M Lundberg and Su-In Lee. 2017. A Unified Approach to Interpreting
+Model Predictions. In Advances in Neural Information Processing Systems 30
+(NeurIPS 2017), I. Guyon, U. V. Luxburg, S. Bengio, H. Wallach, R. Fergus, S. Vish-
+wanathan, and R. Garnett (Eds.). Curran Associates, Inc., 4765–4774.
+[35] Scott M Lundberg, Bala Nair, Monica S Vavilala, Mayumi Horibe, Michael J
+Eisses, Trevor Adams, David E Liston, Daniel King-Wai Low, Shu-Fang New-
+man, Jerry Kim, et al. 2018. Explainable machine-learning predictions for the
+prevention of hypoxaemia during surgery. Nature biomedical engineering 2, 10
+(2018), 749.
+[36] Aleksander Madry, Aleksandar Makelov, Ludwig Schmidt, Dimitris Tsipras, and
+Adrian Vladu. 2017. Towards deep learning models resistant to adversarial at-
+tacks. arXiv preprint arXiv:1706.06083 (2017).
+[37] Tim Miller. 2018. Explanation in artificial intelligence: Insights from the social
+sciences. Artificial Intelligence (2018).
+[38] Smitha Milli, Ludwig Schmidt, Anca Dragan, and Moritz Hardt. 2019. Model Re-
+construction fromModel Explanations. In Proceedings of ACM FAT* 2019 (2019).
+[39] Margaret Mitchell, Simone Wu, Andrew Zaldivar, Parker Barnes, Lucy Vasser-
+man, Ben Hutchinson, Elena Spitzer, Inioluwa Deborah Raji, and Timnit Gebru.
+2019. Model cards for model reporting. In Proceedings of the Conference on Fair-
+ness, Accountability, and Transparency. ACM, 220–229.
+[40] Brent Mittelstadt, Chris Russell, and Sandra Wachter. 2019. Explaining expla-
+nations in AI. In Proceedings of the conference on fairness, accountability, and
+transparency. ACM, 279–288.
+[41] Grégoire Montavon, Sebastian Lapuschkin, Alexander Binder, Wojciech Samek,
+and Klaus-Robert Müller. 2017. Explaining nonlinear classification decisions
+with deep taylor decomposition. Pattern Recognition 65 (2017), 211–222.
+[42] Yilin Niu, Chao Qiao, Hang Li, and Minlie Huang. 2018. Word Embedding based
+Edit Distance. arXiv preprint arXiv:1810.10752 (2018).
+[43] Board of Governors of the Federal Reserve System.
+2011. Supervisory Guidance on Model Risk Management.
+https://www.federalreserve.gov/supervisionreg/srletters/sr1107a1.pdf (2011).
+[44] Onora O’Neill. 2018. Linking trust to trustworthiness. International Journal of
+Philosophical Studies 26, 2 (2018), 293–300.
+[45] European Parliament and Council of European Union. 2018. European
+Union General Data Protection Regulation, Articles 13-15. http://www.privacy-
+regulation.eu/en/13.htm (2018).
+[46] Judea Pearl. 2000. Causality: models, reasoning and inference. Vol. 29. Springer.
+[47] Fábio Pinto, Marco OP Sampaio, and Pedro Bizarro. 2019. Automatic Model
+Monitoring for Data Streams. arXiv preprint arXiv:1908.04240 (2019).
+[48] Forough Poursabzi-Sangdeh, Daniel G Goldstein, JakeMHofman, JenniferWort-
+man Vaughan, and Hanna Wallach. 2018. Manipulating and measuring model
+interpretability. arXiv preprint arXiv:1802.07810 (2018).
+[49] Alun Preece, Dan Harborne, Dave Braines, Richard Tomsett, and Supriyo
+Chakraborty. 2018. Stakeholders in explainable AI. arXiv preprint
+arXiv:1810.00184 (2018).
+[50] Marco Tulio Ribeiro, Sameer Singh, and Carlos Guestrin. 2016. Why should
+i trust you?: Explaining the predictions of any classifier. In Proceedings of the
+22nd ACM SIGKDD International Conference on Knowledge Discovery and Data
+Mining. ACM, 1135–1144.
+[51] Andrew Slavin Ross, Michael C Hughes, and Finale Doshi-Velez. 2017. Right
+for the right reasons: training differentiable models by constraining their ex-
+planations. In Proceedings of the 26th International Joint Conference on Artificial
+Intelligence. AAAI Press, 2662–2670.
+[52] Cynthia Rudin. 2019. Stop explaining black box machine learning models for
+high stakes decisions and use interpretable models instead. Nature Machine
+Intelligence 1, 5 (2019), 206.
+[53] Andrew D Selbst and Solon Barocas. 2018. The intuitive appeal of explainable
+machines. Fordham L. Rev. 87 (2018), 1085.
+[54] Lloyd S Shapley. 1953. A Value for n-Person Games. In Contributions to the
+Theory of Games II. 307–317.
+[55] Shubham Sharma, Jette Henderson, and Joydeep Ghosh. 2019. CERTIFAI: Coun-
+terfactual Explanations for Robustness, Transparency, Interpretability, and Fair-
+ness of Artificial Intelligence models. arXiv preprint arXiv:1905.07857 (2019).
+[56] Reza Shokri, Martin Strobel, and Yair Zick. 2019. Privacy Risks of Explaining
+Machine Learning Models. arXiv preprint arXiv:1907.00164 (2019).
+[57] Avanti Shrikumar, Peyton Greenside, and Anshul Kundaje. 2017. Learning im-
+portant features through propagating activation differences. In Proceedings of
+the 34th International Conference on Machine Learning-Volume 70 (ICML 2017).
+Journal of Machine Learning Research, 3145–3153.
+[58] Avanti Shrikumar, Eva Prakash, and Anshul Kundaje. 2018. Gkmexplain: Fast
+and Accurate Interpretation of Nonlinear Gapped k-mer Support Vector Ma-
+chines Using Integrated Gradients. BioRxiv (2018), 457606.
+[59] Sahil Singla, Eric Wallace, Shi Feng, and Soheil Feizi. 2019. Understanding Im-
+pacts of High-Order Loss Approximations and Features in Deep Learning Inter-
+pretation. In Proceedings of the 36th International Conference on Machine Learn-
+ing (Proceedings of Machine Learning Research), Kamalika Chaudhuri and Ruslan
+Salakhutdinov (Eds.), Vol. 97. PMLR, Long Beach, California, USA, 5848–5856.
+[60] Daniel Smilkov, Nikhil Thorat, Been Kim, Fernanda Viégas, and Martin Wat-
+tenberg. 2017. Smoothgrad: removing noise by adding noise. arXiv preprint
+arXiv:1706.03825 (2017).
+[61] Erik Štrumbelj and Igor Kononenko. 2014. Explaining prediction models and
+individual predictions with feature contributions. Knowledge and Information
+Systems 41, 3 (2014), 647–665.
+[62] Mukund Sundararajan, Ankur Taly, and Qiqi Yan. 2017. Axiomatic attribution
+for deep networks. In Proceedings of the 34th International Conference onMachine
+Learning-Volume 70 (ICML 2017). Journal of Machine Learning Research, 3319–
+3328.
+[63] Florian Tramèr, Fan Zhang, Ari Juels, Michael K Reiter, and Thomas Ristenpart.
+2016. Stealing machine learning models via prediction apis. In 25th {USENIX}
+Security Symposium ({USENIX} Security 16). 601–618.
+[64] Dimitris Tsipras, Shibani Santurkar, Logan Engstrom, Alexander
+Turner, and Aleksander Madry. 2019. Robustness May Be at Odds
+with Accuracy. In International Conference on Learning Representations.
+https://openreview.net/forum?id=SyxAb30cY7
+[65] Berk Ustun, Alexander Spangher, and Yang Liu. 2019. Actionable recourse in
+linear classification. In Proceedings of the Conference on Fairness, Accountability,
+and Transparency. ACM, 10–19.
+[66] Sandra Wachter, Brent Mittelstadt, and Chris Russell. 2017. Counterfactual Ex-
+planations without Opening the Black Box: Automated Decisions and the GPDR.
+Harv. JL & Tech. 31 (2017), 841.
+[67] Adrian Weller. 2019. Transparency: motivations and challenges. In Explainable
+AI: Interpreting, Explaining and Visualizing Deep Learning. Springer, 23–40.
+[68] James Wexler, Mahima Pushkarna, Tolga Bolukbasi, Martin Wattenberg, Fer-
+nanda Viegas, and Jimbo Wilson. 2019. The What-If Tool: Interactive Probing
+of Machine Learning Models. arXiv preprint arXiv:1907.04135 (2019).
+[69] Chih-Kuan Yeh, Cheng-Yu Hsieh, Arun Sai Suggala, David Inouye, and Pradeep
+Ravikumar. 2019. How Sensitive are Sensitivity-Based Explanations? arXiv
+preprint arXiv:1901.09392 (2019).
+[70] Jianming Zhang, Sarah Adel Bargal, Zhe Lin, Jonathan Brandt, Xiaohui Shen,
+and Stan Sclaroff. 2018. Top-down neural attention by excitation backprop. In-
+ternational Journal of Computer Vision 126, 10 (2018), 1084–1102.
+[71] Yujia Zhang, Kuangyan Song, Yiming Sun, Sarah Tan, andMadeleine Udell. 2019.
+"Why Should You Trust My Explanation?" Understanding Uncertainty in LIME
+Explanations. arXiv:arXiv:1904.12991

@@ -1,0 +1,1684 @@
+Classification with Fairness Constraints: A Meta-Algorithm with Provable Guarantees
+L. Elisa Celis
+†
+, Lingxiao Huang
+‡
+, Vijay Keswani
+‡
+and Nisheeth K. Vishnoi
+†
+† Yale University ‡ EPFL
+ABSTRACT
+Developing classification algorithms that are fair with respect to
+sensitive attributes of the data is an important problem due to the
+increased deployment of classification algorithms in societal con-
+texts. Several recent works have focused on studying classification
+with respect to specific fairness metrics, modeled the corresponding
+fair classification problem as constrained optimization problems,
+and developed tailored algorithms to solve them. Despite this, there
+still remain important metrics for which there are no fair classi-
+fiers with theoretical guarantees; primarily because the resulting
+optimization problem is non-convex. The main contribution of this
+paper is a meta-algorithm for classification that can take as input a
+general class of fairness constraints with respect to multiple non-
+disjoint and multi-valued sensitive attributes, and which comes
+with provable guarantees. In particular, our algorithm can handle
+non-convex “linear fractional” constraints (which includes fairness
+constraints such as predictive parity) for which no prior algorithm
+was known. Key to our results is an algorithm for a family of clas-
+sification problems with convex constraints along with a reduction
+from classification problems with linear fractional constraints to
+this family. Empirically, we observe that our algorithm is fast, can
+achieve near-perfect fairness with respect to various fairness met-
+rics, and the loss in accuracy due to the imposed fairness constraints
+is often small.
+CCS CONCEPTS
+• Computing methodologies→ Supervised learning by clas-
+sification;
+KEYWORDS
+Classification, Algorithmic Fairness
+ACM Reference Format:
+L. Elisa Celis
+†
+, LingxiaoHuang
+‡
+, Vijay Keswani
+‡
+andNisheeth K. Vishnoi
+†
+, †
+Yale University ‡ EPFL. 2019.Classificationwith Fair-
+ness Constraints:, A Meta-Algorithm with Provable Guarantees. In
+FAT* ’19: Conference on Fairness, Accountability, and Transparency
+(FAT* ’19), January 29–31, 2019, Atlanta, GA, USA. ACM, New York,
+NY, USA, 10 pages. https://doi.org/10.1145/3287560.3287586
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+https://doi.org/10.1145/3287560.3287586
+1 INTRODUCTION
+Classification algorithms are increasingly being used in many so-
+cietal contexts such as criminal recidivism [51], predictive polic-
+ing [35], and job screening [47]. There are growing concerns that
+these algorithms may introduce significant bias with respect to cer-
+tain sensitive attributes, e.g., against African-Americans while pre-
+dicting future criminals [5, 7, 26], granting loans [17] or NYPD stop-
+and-frisk [30], and against women while recommending jobs [16].
+The US Executive Office [52] also voiced concerns about discrimina-
+tion in automated decision making, including health care delivery
+and education. Further, introducing bias may be illegal due to anti-
+discrimination laws [2, 6, 45], and can create social imbalance [1, 56].
+Thus, developing classification algorithms that are fair with respect
+to sensitive attributes has become an important problem.
+In classification, one is given a data vector and the goal is to de-
+cide whether it satisfies a certain property. The algorithm is allowed
+to learn from a set of labeled data vectors that may be assumed to
+come from an unknown distribution. The accuracy of a classifier is
+measured as the probability that the classifier correctly predicts the
+label of a data vector drawn from the same distribution. Each data
+vector, however, may also have a small number of multi-valued sen-
+sitive attributes such as race, gender, and political opinion, and each
+setting of a sensitive attribute gives rise to potentially non-disjoint
+groups of data points. Since fairness could mean different things in
+different contexts, a number of different metrics have been used to
+determine how fair a classifier is with respect to a sensitive group
+when compared to another, e.g., statistical parity [21], equalized
+odds [34], and predictive parity [20]. In fact, there are currently at
+least 21 well-accepted fairness metrics and counting; see [50].
+Several recent works use the sensitive attributes and the desired
+notion of group fairness to place constraints on the classifier –
+formulating it as a constrained optimization problem that max-
+imizes accuracy – and develop tailored algorithms to find such
+classifiers, e.g., constrained to statistical parity [29, 46, 60] or equal-
+ized odds [34, 46, 59]. However, these algorithms do not always
+come with provable guarantee, because often the resulting opti-
+mization problem turns out to be non-convex; e.g., for statistical
+parity [42, 60] and equalized odds [59]. Further, it is open whether
+such approaches would work for other important measures of dis-
+parate mistreatment such as predictive parity. Predictive parity,
+that measures whether the fractions over the class distribution
+for the predicted labels are close between different group that are
+important in predicting criminal recidivism [20, 26], stopping-and-
+frisking pedestrians [30], and predicting heart condition [54]. [59]
+left as an open problem to find algorithms to solve the fair classifi-
+cation problem with false discovery or false omission parity; two
+types of predictive parity.
+Our contributions. We present a new classification algorithm
+that takes as input any one of a large class of fairness metrics which
+can be phrased as “linear-fractional constraints”, and produces an
+(approximately) fair solution. Technically, we achieve this by
+• identifying a family of classification problems with linear con-
+straints (see Section 2),
+• developing an algorithm to solve this constrained classification
+problem (see Section 4.2), and
+• reducing classification with linear-fractional constraints to solv-
+ing a small number of linear classification problems above for
+carefully chosen parameters (see Section 4.3).
+Our approach is very flexible – it allows us to provide classifiers
+that are fair with respect to a host of fairness metrics corresponding
+to both of linear and non-linear constraints (see Table 1); exam-
+ples include several prevalent fairness metrics. In particular, we
+obtain classifiers with predictive parity-type constraints for which
+there was no previous result with provable guarantees. Additionally,
+our algorithmic framework can handle multiple fairness metrics
+simultaneously, and the metrics can be defined with respect to
+complex sensitive attributes (e.g., multiple attributes, non-disjoint
+attributes, and/or multi-valued attributes). Further, we conduct
+an empirical evaluation of our algorithm on the Adult, German
+credit and COMPAS datasets and compare it against state-of-the
+art approaches in fair classification (see Section 5). The results
+show that our algorithm can often achieve higher fairness than
+prior work, and that the loss in accuracy due to imposing fairness
+constraints is often small. Thus, we provide a meta-algorithm for
+fair classification, which makes it flexible and easy to use in a vari-
+ety of applications, is approximately optimal for whichever fairness
+metric is selected, and performs well in practice.
+2 OUR MODEL
+We consider the Bayesian model for classification. Let ℑ denote a
+joint distribution over the domainD = X×[p1]× · · ·× [pn ]× {0, 1}
+where X is the feature space. Each sample (X ,Z1, . . . ,Zn ,Y ) is
+drawn from ℑ where each Zi ∈ [pi ] (i ∈ [n]) represents a sensitive
+attribute, and Y ∈ {0, 1} is the label of (X ,Z1, . . . ,Zn ) that we
+want to predict. For the sake of readability, we discuss the case
+where there is only one sensitive attribute Z ∈ {1, 2, . . . ,p} in the
+main text. This can be generalized to multiple sensitive attributes,
+by adding fairness constraints for all sensitive attributes, and is
+discussed in Appendix E.
+Fixing different values of Z partitions the domain D into p
+groups Gi := {(x , i,y) ∈ D}. Let F denote the collection of all
+possible classifiers. Given a loss function L(· ; ·) that takes a classi-
+fier f and a distribution ℑ as arguments, there are two models for
+fair binary classification which have been studied in the literature
+and we consider:
+(1) IfZ is not used for prediction, then the goal is to learn a classifier
+f : X → {0, 1} that minimizes L(f ;ℑ). In this model, F =
+{0, 1}X .
+(2) If Z is used for prediction, then the goal is to learn a classifier
+f : X × [p] → {0, 1} that minimizes L(f ;ℑ). In this model,
+F = {0, 1}X×[p].
+Denote by Prℑ[·] the probability with respect toℑ. Ifℑ is clear from
+context, we simply denote Prℑ[·] by Pr[·]. A commonly used loss
+function is the prediction error, i.e., L(f ;ℑ) = Prℑ [f , Y ]. Here,
+with some abuse of notation, we use f to represent f (X ) for the
+first model and f (X ,Z ) for the second model.
+Apart from minimizing the loss function as usual, in fair classi-
+fication problems the goal is also to achieve similar performance
+across all groupsGi . There are many metrics to measure this group
+performance, including statistical rate, true positive rate, accuracy
+rate or false discovery rates; see Table 1. For example, the statistical
+rate of Gi is of the form Prℑ [f = 1 | Gi ], i.e., the probability of an
+event (f = 1) conditioned on another event (Gi ). Group perfor-
+mance can be defined in a general form as follows.
+Definition 2.1 (Group performance & group perfor-
+mance function). Given a classifier f ∈ F and i ∈ [p], we call
+qℑi (f ) the group performance of Gi if
+qℑi (f ) = Pr
+ℑ
+[
+E | Gi , E
+′
+]
+for some events E, E ′ that might depend on the choice of f . Define
+a group performance function qℑ : F → [0, 1]p for any classifier
+f ∈ F as
+qℑ(f ) =
+(
+qℑ
+)
+.
+When ℑ is clear from context, we denote qℑ by q. At a high level, a
+classifier f is considered to be fair w.r.t. to q if qi (f ) ≈ qj (f ) for all
+i, j.
+Consider the following examples of q.
+(1) Accuracy Rate: Here E := (f = Y ) and E ′ := ∅, i.e., qi (f ) is
+the accuracy of the classifier on groupGi , we can rewrite qi (f )
+as follows (see Lemma A.1 in Appendix A):
+qi (f ) = Pr [Y = 0 | Gi ] + Pr [Y = 1 | Gi ] · Pr [f = 1 | Y = 1,Gi ]
+− Pr [Y = 0 | Gi ] · Pr [f = 1 | Y = 0,Gi ] ,
+i.e., a linear combination of conditional probabilities
+Pr [f = 1 | Gi ,Y = 0] and Pr [f = 1 | Gi ,Y = 1].
+(2) False Discovery Rate: Here E := (Y = 0) and E ′ := (f = 1),
+i.e., qi (f ) is the prediction error on the sub-group of Gi with
+positive predicted labels, we can rewrite qi (f ) as follows (see
+Lemma A.2 in Appendix A):
+qi (f ) =
+Pr [Y = 0,Gi ] · Pr [f = 1 | Gi ,Y = 0]
+Pr [Gi ] · Pr [f = 1 | Gi ]
+,
+i.e., the fraction of two conditional probabilities
+Pr [f = 1 | Gi ,Y = 0] and Pr [f = 1 | Gi ].
+In both these examples,qi (f ) can bewritten in terms of probabilities
+Pr [f = 1 | Gi , ·] as either a linear combination, or as a quotient
+of linear combinations. Below we define two general classes of
+group performance functions that generalize these two examples
+respectively.
+Definition 2.2 (Linear-fractional/linear group per-
+formance functions). A group performance function q is called
+linear-fractional if for any f ∈ F and i ∈ [p], qi (f ) can be written
+as
+qi (f ) =
+α
+(i)
+∑k
+j=1 α
+(i)
+j · Prℑ
+[
+f = 1 | Gi ,A
+(i)
+j
+]
+β
+(i)
+∑l
+j=1 β
+(i)
+j · Prℑ
+[
+f = 1 | Gi ,B
+(i)
+j
+] (1)
+A Meta-Algorithm with Provable Guarantees L. Elisa Celis, Lingxiao Huang, Vijay Keswani and Nisheeth K. Vishnoi
+Table 1: Summary of prior work. The symbol ✓ (or ⋆) represents that the corresponding framework works for (or can be
+extended to handle) the corresponding fairnessmetric. The events E and E ′ determine the group performance functionqi (f ) of
+the fairnessmetric (seeDefn. 2.1), while L/LF representswhether this groupperformance function is linear or linear-fractional.
+qi (f )
+Q
+lin
+/Q
+linf
+This paper [34] [57] [60] [59] [46] [29] [42]
+E E ′
+f
+a
+i
+r
+n
+e
+s
+s
+m
+e
+t
+r
+i
+c
+s
+statistical f = 1 ∅ Q
+lin
+✓ ✓ ✓ ✓ ✓
+conditional statistical f = 1 X ∈ S Q
+lin
+✓ ✓ ⋆ ⋆
+false positive f = 1 Y = 0 Q
+lin
+✓ ✓ ✓ ✓ ⋆ ✓
+false negative f = 0 Y = 1 Q
+lin
+✓ ⋆ ⋆ ✓ ⋆ ✓
+true positive f = 1 Y = 1 Q
+lin
+✓ ✓ ✓ ⋆ ✓
+true negative f = 0 Y = 0 Q
+lin
+✓ ⋆ ⋆ ⋆ ⋆
+accuracy f = Y ∅ Q
+lin
+✓ ✓ ⋆
+false discovery Y = 0 f = 1 Q
+linf
+✓
+false omission Y = 1 f = 0 Q
+linf
+✓
+positive predictive Y = 1 f = 1 Q
+linf
+✓
+negative predictive Y = 0 f = 0 Q
+linf
+✓
+for two integers k, l ≥ 0, events A(i)
+(i)
+k ,B
+(i)
+(i)
+l that
+are independent of the choice of f , and parameters α (i)
+(i)
+k ,
+β
+(i)
+(i)
+l ∈ R that may depend on ℑ but are independent of the
+choice of f . Denote Q
+linf
+to be the collection of all linear-fractional
+group performance functions. Specifically, if l = 0 and β (i)
+i ∈ [p], q is said to be linear. Denote Q
+lin
+⊆ Q
+linf
+to be the collection
+of all linear group performance functions.
+In Appendix A, we show that all q in Table 1 are linear-fractional,
+and, in fact, many are linear (see the Q
+lin
+/Q
+linf
+column).
+A classifier f is said to satisfy τ -rule w.r.t. to a given group perfor-
+mance function q if ρq (f ) := mini ∈[p] qi (f )/maxi ∈[p] qi (f ) ≥ τ ;
+see [24, 46, 59, 60]. The closer τ is close to 1, the fairer f is with
+respect to q. Assume there are m fractional group performance
+functions q(1), . . . ,q(m) ∈ Q
+linf
+and L(f ;ℑ) = Prℑ [f , Y ]. Given
+τ1, . . . ,τm ∈ [0, 1], our main objective is to solve the following fair
+classification program induced by ρq that we refer to as ρ-Fair.
+min
+f ∈F
+Pr
+ℑ
+[f , Y ] s .t .
+ρq(i ) (f ) = min
+j ∈[p]
+q
+(i)
+j (f )/max
+j ∈[p]
+q
+(i)
+j (f ) ≥ τi , ∀i ∈ [m].
+(ρ-Fair)
+It follows that by setting q appropriately, ρ-Fair captures several
+existing constrained classification problems as special cases, e.g., sta-
+tistical rate [3, 46], true positive rate [3, 46], or predictive rate [55].
+Remark 2.3. If τi = 1, the program above computes a classifier f
+with perfect fairness w.r.t. to q(i). This setting is well studied in the
+literature [9, 21, 24, 34, 59, 60, 62]. However, perfect fairness is known
+to have deficiencies [27, 34, 41] and, hence, prior work considers the
+relaxed fairness metric τ -rule where τi < 1. Another relaxed fair-
+ness metric is defined by δq (f ) := mini ∈[p] qi (f ) −maxi ∈[p] qi (f ).
+Computing a classifier f such that δq (f ) ≥ τ (τ ∈ [−1, 0]) has also
+been investigated in the literature [9, 46]. We refer the reader to a sur-
+vey [63] for other relaxed fairness metrics, e.g., AUC and correlation.
+Computationally, the constraints of ρ-Fair are non-convex mak-
+ing the problem of solving it (even approximately) intractable in
+general. To bypass this, we introduce a fair classification problem
+with linear constraints, which we call Group-Fair, that has addi-
+tional parameters corresponding to lower and upper bounds and
+corresponding fairness constraints.
+Definition 2.4 (Group-Fair). Given ℓ(i)j ,u
+(i)
+j ≥ 0 for all i ∈
+[m] and j ∈ [p], we consider the following classification problem with
+fairness constraints:
+min
+f ∈F
+Pr
+ℑ
+[f , Y ]
+s .t ., ℓ
+(i)
+j ≤ q
+(i)
+j (f ) ≤ u
+(i)
+j , ∀i ∈ [m], j ∈ [p].
+(Group-Fair)
+On the positive side, these constraints are linear, resulting in a
+convex programming problem and give us a finer control over
+the group performance function. In particular, by selecting non-
+uniform parameters ℓ
+(i)
+j ,u
+(i)
+j , Group-Fair can treat different groups
+differently while all groups are symmetrically regarded in ρ-Fair.
+Moreover, it is easy to see that for any feasible classifier f of Group-
+Fair and any i ∈ [m], f satisfies
+minj∈[p] ℓ
+(i )
+j
+maxj∈[p] u
+(i )
+j
+-rule w.r.t. to q(i).
+While being tractable, ρ-Fair raises the problem of finding the
+appropriate values of the lower and upper bounds that are not part
+of the input to Group-Fair. In Section 4.1, we show how to solve
+Group-Fair by a small number of calls to ρ-Fair where we set the
+lower and upper bound parameters in each call to ρ-Fair carefully.
+Remark 2.5. We remark that our algorithms assume the exis-
+tence of an oracle that evaluates qℑi (f ) sufficiently well for any given
+classifier f . To overcome this issue, we note that we can estimate
+qℑi (f ) = Prℑ [E | Gi , E
+′] by the empirical probability of samples
+drawn from ℑ, i.e., the ratio between the number of samples satisfy-
+ing E ∩Gi ∩ E
+′ and the number of samples satisfying Gi ∩ E
+′.
+3 RELATEDWORK
+From a technical perspective, the most relevant prior work in-
+cludes [15, 39, 46], which considered the Bayesian classification
+model for statistical parity or equalized odds. [46] reduce their
+constrained classification problems to unconstrained optimization
+problem by the Lagrangian principle, while [15, 39] aim to find
+optimal threshold rules or use regularizers to find a fair classifier.
+Our framework also uses the Lagrangian principle, but works for a
+much wider class than these works, i.e., any linear-fractional group
+performance function.
+Some very recent work has also taken steps towards providing a
+unifying approach to fair classification. [55] encode fairness con-
+straints, including statistical parity, equalized odds, and predictive
+parity, as a distance between the distributions for different values of
+a single binary sensitive attribute, and then use the privileged learn-
+ing framework to optimize loss with respect to fairness constraints.
+While this results in an interesting heuristic, they do not provide
+theoretical guarantees for their approach. [3] give a method to com-
+pute a nearly optimal fair classifier with respect to statistical parity
+or equalized odds by the Lagrangian principle. In particular, their
+framework supports fairness constraints that are linearly depen-
+dent on the conditional moments of the form E[д(·, f ) | E], where
+д is a function that depends on the classifier f along with features
+of the element while E is an event that does not depend on f . How-
+ever linear-fractional constraints cannot be directly represented in
+this form, since here the event we condition on, E, depends on the
+classifier f , which is why their framework does not support con-
+straints like predictive parity. [54] use post-processing techniques
+to achieve calibration
+as false-positive or false-negative parity, but do not provide any
+provably guarantee with respect to predictive parity. We also note
+that our linear fairness constraints are inspired by works on other
+fundamental algorithmic problems such as data summarization [11],
+ranking [12, 58], elections [10], and personalization [13].
+There are increasingly many works on fairness in machine learn-
+ing with provable guarantees, including [25, 34, 54, 57], that provide
+different classification algorithms with constraints on statistical
+parity or equalized odds, and [36, 40] for fairness in multi-armed
+bandit settings or ranking problems respectively. To the best of our
+knowledge, our algorithm is the first unifying framework for all
+current [50] fairness metrics, with provable guarantees.
+Many alternate approaches to improve the fairness of classifica-
+tion have also been studied. One approach is to make predictions
+without the information of sensitive attributes, which avoids dis-
+parate treatment [2]. However, since the learning data may contain
+historical biases, classifiers trained on such data may still have
+indirect discrimination for certain sensitive groups [53]. Another
+approach is to modify the classification problem to incorporate con-
+straints of some kind. For example, one approach proposes other
+fairness metrics as a proxy of statistical parity or equalized odds,
+e.g., [29, 59, 60]. [59, 60] propose a covariance-type constraint for
+statistical parity and equalized odds. Their model does not require
+the sensitive attribute Z to be explicitly provided during prediction,
+thereby preventing disparate treatment. Yet another approach post-
+processes a baseline classifier by shifting the decision boundary (can
+be different for different groups), e.g., [22, 25, 31, 34, 54, 57]. [34]
+use the sensitive attribute Z during prediction. Their goal can be
+regarded as learning a different classifier for eachGi . Alternatively,
+another line of research is to pre-process on the training data and
+achieve an unbiased dataset for learning, e.g., [24, 37, 38, 42, 44, 62].
+This approach is quite different from ours since we focus on learn-
+ing classifiers and investigating the accuracy-fairness tradeoff from
+the feeding dataset.
+Beyond group fairness, recent works also proposed other notions
+of fairness in classification. [21] and [62] discussed a notion of indi-
+vidual fairness that similar individuals should be treated similarly.
+[61] defined preference fairness based on the concepts of fair divi-
+sion and envy-freeness in economics. Moreover, [32, 33] discussed
+procedural fairness that investigates which input features are fair
+to use in the decision process and how including or excluding the
+features would affect outcomes. Finally, [14] and [41] investigated
+the inherent tradeoff between equalized odds and predictive parity
+(called well-calibrated in their papers).
+4 THEORETICAL RESULTS
+In this section, we present an efficient algorithm to approximately
+solve ρ-Fair (Theorem 4.4, Section 4.3). Towards this goal, we first
+show that ρ-Fair can be efficiently reduced to a family of programs
+with linear fairness constraints (Group-Fair - Section 4.1). Subse-
+quently, we show that there exists a polynomial time algorithm
+that computes an approximately optimal classifier for Group-Fair
+(Section 4.2). For convenience, we only considerm = 1 in this sec-
+tion, i.e., there is only one group performance function q and we
+require ρq (f ) ≥ τ for some τ ∈ [0, 1]. This can be generalized to
+multiple group performance functions as discussed in Appendix E.
+4.1 Reduction from ρ-Fair to Group-Fair
+We first show the generality of Group-Fair, i.e., approximately solv-
+ing ρ-Fair can be reduced to solving a family of Group-Fair. A
+β-approximate algorithm for Group-Fair (β ≥ 1) is an efficient
+algorithm that computes a feasible classifier with prediction error
+at most β times the optimal prediction error of Group-Fair.
+Theorem 4.1 (Reductionfrom ρ-Fair toGroup-Fair). Given
+τ ∈ [0, 1], let f ⋆τ denote an optimal fair classifier for ρ-Fair. Given a β-
+approximate algorithmA for Group-Fair (β ≥ 1) and any ε > 0, there
+exists an algorithm that calls A at most ⌈τ/ε⌉ times and computes a
+classifier f ∈ F such that
+(1) Pr [f , Y ] ≤ β · Pr
+[
+f ⋆τ , Y
+]
+;
+(2) mini ∈[p] qi (f ) ≥ τ ·maxi ∈[p] qi (f ) − ε .
+Theorem 4.1 asserts that the ρ-Fair program can be solved effi-
+ciently by solving at most ⌈τ/ε⌉ different Group-Fair programs.
+The resulting classifier f slightly violates the τ -rule since there is
+an additive error term ε in the right side of (2). As the error ε goes to
+0, the violation becomes small and hence the resulting classifier is
+guaranteed to be more fair with respect to q. However, the running
+time becomes longer since it depends on the term ⌈τ/ε⌉.
+Proof of Theorem 4.1. LetT := ⌈τ/ε⌉. For each t ∈ [T ], denote
+at := (t − 1) · ε and bt := t · ε/τ . For each t ∈ [T ], we construct
+a Group-Fair program Pt with ℓj = at and uj = bt for all j ∈ [p].
+Then we apply A to compute ft ∈ F as a solution of Pt . Among all
+ft , we output f such that Pr [f , Y ] is minimized. Next, we verify
+that f satisfies the conditions in the theorem.
+Note that at ≥ τ · bt − ε for each t ∈ [T ]. We have
+min
+i ∈[p]
+qi (f ) ≥ τ · max
+i ∈[p]
+qi (f ) − ε .
+A Meta-Algorithm with Provable Guarantees L. Elisa Celis, Lingxiao Huang, Vijay Keswani and Nisheeth K. Vishnoi
+On the other hand, assume that (t ′−1) ·ε ≤ mini ∈[p] qi (f
+⋆
+τ ) < t ′ ·ε
+for some t ′ ∈ [T ]. Since f ⋆τ is a feasible solution of ρ-Fair,
+max
+i ∈[p]
+qi (f
+⋆
+τ ) ≤
+mini ∈[p] qi (f
+⋆
+τ )
+τ
+< t ′ · ε/τ .
+Hence, f ⋆τ is a feasible solution of Program Pj . By the definitions
+of A and f , we have
+Pr [f , Y ] ≤ Pr [ft ′ , Y ] ≤ β · Pr
+[
+f ⋆τ , Y
+]
+.
+□
+The above theorem can be generalized to any loss function instead
+of the prediction error. The reduction also holds for them > 1 case.
+The only difference is that we need to call algorithmA roughly ε−m
+times. This enables us to simultaneously handle multiple fairness
+requirements; see Appendix E for details. The reduction is efficient
+with respect to running time as well and so to efficiently solve
+a ρ-Fair program we just need to construct an algorithm for the
+Group-Fair program.
+4.2 Algorithm for Group-Fair
+In this section, we propose an algorithm for Group-Fair. Due to
+space limitations, we omit many details (see Appendix B). For con-
+creteness, we first consider the setting where F = {0, 1}X and
+q ∈ Q
+lin
+and subsequently discuss the q ∈ Q
+linf
+case.
+By Definition 2.2, assume that
+qi (f ) = α
+(i)
+k∑
+j=1
+α
+(i)
+j · Pr
+[
+f = 1 | Gi ,A
+(i)
+j
+]
+for f ∈ F and i ∈ [p]. Without fairness constraints, it can be shown
+that
+f ⋆ := I [Pr [Y = 1 | X = x] − 0.5 > 0]
+is an optimal classifier minimizing the prediction error Pr [f , Y ],
+where I [·] is the indicator function. But such a classifier f ⋆ might
+not satisfy all the fairness constraints. Hence, we introduce a regu-
+larization parameter λ ∈ Rp and study the following problem
+f ⋆λ := arg min
+f ∈F
+Pr [f , Y ] −
+∑
+i ∈[p]
+λi · qi (f ). (2)
+Now we can “control” qi (f
+⋆
+λ ) by adjusting λ. Intuitively, increasing
+λi leads to an increase in qi (f
+⋆
+λ ). By selecting suitable λ, we can
+expect that f ⋆λ satisfies all fairness constraints. We will show that
+there exists some λ ∈ Rp such that Group-Fair is equivalent to (2),
+by the Lagrangian principle. Moreover, f ⋆λ can be shown to be an
+instance-dependent threshold function with the threshold
+sλ(x) := Pr [Y = 1 | X = x] − 0.5 +
+∑
+i ∈[p]
+λi ·ψi (x),
+(3)
+where ψi (x) =
+∑k
+j=1
+α (i )j
+Pr
+[
+Gi ,A
+(i )
+j
+] · Pr [Gi ,A
+(i)
+j | X = x
+]
+is the scal-
+ing factor of λi that is determined by the form of qi (f ). Observe
+that the term Pr [Y = 1 | X = x] − 0.5 is exactly the threshold for
+the unconstrained optimal classifier f ⋆, and the remaining term∑
+i ∈[p] λi ·ψi (x) can be regarded as a threshold correction induced
+by λ.
+Theorem 4.2 (Solution characterization and computa-
+tion for q ∈ Q
+lin
+). Given any parameters ℓ,u ∈ [0, 1]p , there exist
+optimal Lagrangian parameters λ⋆ ∈ Rp such that I[sλ⋆ (X ) > 0] is
+an optimal fair classifier for Group-Fair. Moreover, λ⋆ can be com-
+puted in polynomial time as a solution to the following convex pro-
+gram:
+λ⋆ = arg min
+λ∈Rp
+д(λ) = arg min
+λ∈Rp
+EX∼ℑ [|sλ(X )|]
++
+∑
+i ∈[p]
+(
+α
+(i)
+)
+λi +
+∑
+i ∈[p]
+(ui − ℓi ) ·max {0, λi } .
+(4)
+This theorem asserts that Group-Fair can be solved efficiently (up
+to an arbitrary accuracy): first compute the optimal Lagrangian
+parameters λ⋆ via (4) and then output the fair classifier I[sλ⋆ (X ) >
+0]. The running time depends on how fast we can solve Program (4).
+Since ui − ℓi ≥ 0, Program (4) is convex and we can apply standard
+convex optimization algorithms, e.g., the stochastic subgradient
+method [8] to compute an ε-approximate λ such thatд(λ) ≤ д(λ⋆)+
+ε in Õ(k2p/ε2) time.
+The proof of this theorem reduces Group-Fair to an uncon-
+strained optimization problem by the Lagrangian principle (Ap-
+pendix B.1). We then derive (4) as the dual program to Group-Fair
+and show that λ⋆ is an optimal solution to (4) (Appendix B.2). Conse-
+quently, Theorem 4.2 leads to an algorithm Group-Fair
+(
+ℑ,qℑ, ℓ,u
+)
+that computes an optimal fair classifier for the Group-Fair program.
+Theorem 4.2 can also be directly extended to F = {0, 1}X×[p] by
+replacing X to (X ,Z ) everywhere.
+Menon and Williamson [46, Algorithm 1] also propose an algo-
+rithmic framework for fair classification with respect to statistical
+rate and true positive rate using the Lagrangian principle. However,
+they only analyzed the characterization but did not show how to
+compute the optimal Lagrangian parameters. Our approach can
+be naturally applied to their setting for computing the optimal
+Lagrangian parameters; see Appendix F for details.
+Theorem 4.2 can be generalized toq ∈ Q
+linf
+. The key observation
+is that we can rewrite the fairness constraint ℓi ≤ qi (f ) as
+α
+(i)
+k∑
+j=1
+α
+(i)
+j · Pr
+ℑ
+[
+f = 1 | Gi ,A
+(i)
+j
+]
+≥ℓi ·
+©­«β (i)0 +
+l∑
+j=1
+β
+(i)
+j · Pr
+ℑ
+[
+f = 1 | Gi ,B
+(i)
+j
+]ª®¬ .
+By rearranging, the above inequality is expressible as a linear con-
+straint a⊤ f + b ≤ 0. This also holds for qi (f ) ≤ ui , which implies
+that Group-Fair is a linear program of f . Hence, introducing fairness
+constraints can handle predictive parity withq ∈ Q
+linf
+, but the prior
+work can not – due to the fact that the constraint qi (f ) ≥ τ · qj (f )
+may not be convex in general.
+lin
+, we also apply the Lagrangian principle. The
+only difference is that we need to introduce two regularization
+parameters νi and ζi respectively for constraints ℓi ≤ qi (f ) and
+However, the objective function of linear-fractional programming is a ratio of linear
+functions and this results in a simple reduction from it to linear programming (see
+https://en.wikipedia.org/wiki/Linear-fractional_programming). In our reduction, the
+constraints are linear-fractional and it does not seem easy to reduce to a single linear
+program.
+qi (f ) ≤ ui . Then similar to (3), for any regularization parameters
+ν , ζ ∈ R
+p
+≥0
+, we define an instance-dependent threshold function
+sν,ζ (x) := Pr [Y = 1 | X = x] − 0.5
++
+∑
+i ∈[p]
+νi ·
+©­«
+∑
+j ∈[k ]
+α
+(i)
+j
+π
+(i)
+j
+· η
+(i)
+j (x) − ℓi
+∑
+j ∈[l ]
+β
+(i)
+j
+ω
+(i)
+j
+· ξ
+(i)
+j (x)
+ª®¬
++ ζi ·
+©­«−
+∑
+j ∈[k ]
+α
+(i)
+j
+π
+(i)
+j
+· η
+(i)
+j (x) + ui
+∑
+j ∈[l ]
+β
+(i)
+j
+ω
+(i)
+j
+· ξ
+(i)
+j (x)
+ª®¬ ,
+which consists of the term Pr [Y = 1 | X = x]−0.5 that is the thresh-
+old for the unconstrained optimal classifier f ⋆, and threshold cor-
+rection terms induced by ν and ζ . Then we prove the following
+theorem which indicates that q ∈ Q
+linf
+can also be solved efficiently
+by first computing the optimal Lagrangian parameters ν⋆, ζ⋆ and
+then outputting the fair classifier I[sν⋆,ζ ⋆ (X ) > 0].
+Theorem 4.3 (Solution characterization and computa-
+tion for q ∈ Q
+linf
+). Suppose F = {0, 1}X and q ∈ Q
+linf
+. Given
+any parameters ℓi ,ui ∈ [0, 1] (i ∈ [p]), there exists ν⋆, ζ⋆ ∈ R
+p
+≥0
+such that I[sν⋆,ζ ⋆ (x) > 0] is an optimal fair classifier for Group-Fair.
+Moreover, we can compute the optimal Lagrangian parameters ν⋆ and
+ζ⋆ in polynomial time as a solution of the following convex program:
+(ν⋆, ζ⋆) = arg min
+ν,ζ ∈Rp
+≥0
+EX
+[
+|sν,ζ (X )|
+]
++
+∑
+i ∈[p]
+νi ·
+(
+α
+(i)
+(i)
++
+∑
+i ∈[p]
+ζi ·
+(
+−α
+(i)
+(i)
+.
+4.3 Algorithm for ρ-Fair
+We proceed to designing an algorithm that handles the fairness
+metric ρq . In real-world settings, instead of knowing ℑ, we only
+haveN samples {(xi , zi ,yi )}i ∈[N ] drawn fromℑ. To handle this, we
+use the idea inspired by [46, 49]: estimate ℑ by ℑ̂, e.g., via Gaussian
+Naive Bayes or logistic regression on samples, and then compute a
+classifier based on ℑ̂ by solving a family of Group-Fair programs as
+stated in Theorem 4.1 ; see Algorithm 1. By Theorems 4.1 and 4.2,
+the running time of Algorithm 1 is polynomial in N .
+Analyzing Algorithm 1. Intuitively, if ℑ̂ is close to ℑ, then the
+quality of f in both accuracy and fairness should be comparable to
+an optimal fair classifier for ρ-Fair under ℑ. Define
+κ := 2 max
+i ∈[p],f ∈F
+qℑ̂i (f ) − qℑi (f )
+as the error introduced in qℑ when replacingℑ by ℑ̂. Let dTV (ℑ, ℑ̂)
+denote the total variation distance between ℑ̂ and ℑ.
+Theorem 4.4 (Quantificationoftheoutput classifier).
+Let f ⋆ be a fair classifier minimizing the prediction error Prℑ [f , Y ]
+subject to the relaxed τ -rule:
+min
+i ∈[p]
+qℑi (f ) ≥ τ · max
+i ∈[p]
+qℑi (f ) + κ .
+Then Algorithm 1 outputs a classifier f such that
+(1) Prℑ [f , Y ] ≤ Prℑ
+[
+f ⋆ , Y
+]
++ 2 · dTV (ℑ̂,ℑ);
+(2) mini ∈[p] q
+ℑ
+i (f ) ≥ τ ·maxi ∈[p] q
+ℑ
+i (f ) − ε − κ.
+Algorithm 1: An algorithm for ρ-Fair
+Input :Samples {(xi , zi ,yi )}i ∈[N ] from distribution ℑ, a
+linear-fractional group performance function
+qℑ ∈ Q
+linf
+, a fairness parameter τ ∈ [0, 1] and an
+error parameter ε ∈ [0, 1].
+Output :A classifier f ∈ F .
+1 Compute an estimated distribution ℑ̂ (e.g., via Gaussian Naive
+Bayes) on {(xi , zi ,yi )}i ∈[N ].
+2 T ← ⌈τ/ε⌉. For each t ∈ [T ], at ← (t − 1) · ε and bt ← t · ε/τ .
+3 For each t ∈ [T ], let ft ←
+Group-Fair
+(
+ℑ̂,qℑ̂,
+{
+ℓj = at
+}
+j ∈[p] ,
+{
+uj = bt
+}
+j ∈[p]
+)
+.
+4 Return f ← argminft Prℑ̂
+[ft , Y ].
+We defer the proof to Appendix C.1. The key is to show f ⋆ is
+feasible for ρ-Fair under ℑ̂. This can be inferred by the assumption
+that mini ∈[p] q
+ℑ
+i (f
+⋆) ≥ τ ·maxi ∈[p] q
+ℑ
+i (f
+⋆) + κ and the definition
+of κ. Then we prove by Theorem 4.1 that
+(1) Pr
+ℑ̂
+[f , Y ] ≤ Pr
+ℑ̂
+[
+f ⋆ , Y
+]
+and
+(2) mini ∈[p] q
+ℑ̂
+i (f ) ≥ τ ·maxi ∈[p] q
+ℑ
+i (f ) − ε .
+To account for the error when going from ℑ̂ to ℑ, the terms 2 ·
+dTV (ℑ̂,ℑ) and κ are introduced.
+Note that f ⋆ is only an approximately optimal fair classifier
+for ρ-Fair due to the additional error κ. Assume the optimal fair
+classifier for ρ-Fair is f 0. Since we do not have access to ℑ (only
+to ℑ̂), it is unknown whether f 0 satisfies the τ -rule with respect
+to ℑ̂. Hence, we can only compare the performance of the output
+f to f ⋆, instead of the optimal classifier f 0. If the number of
+samples N is large, we can expect that ℑ̂ and ℑ are close, and
+hence κ,dTV (ℑ̂,ℑ) are small. Then the performance of f is close
+to f ⋆ over ℑ. Specifically, if ℑ̂ = ℑ, we have κ = dTV (ℑ̂,ℑ) = 0.
+The output classifier f then satisfies the properties of Theorem 4.1
+with β = 1, which implies that f is an approximately optimal fair
+classifier for ρ-Fair.
+Remark 4.5. For the fairness metric δq (introduced in Remark 2.3),
+we can also design an algorithm similar to Algorithm 1. We only need
+to modify Line 2 by L := ⌈ 1+τε ⌉ (recall τ ∈ [−1, 0]), ai := (i − 1) · ε
+and bi := i · ε − τ . The quantification of the output cf is similar to
+Theorem 4.4. The main differences are
+f ⋆ := arg min
+f ∈F:δq (f )≥τ+κ
+Pr
+ℑ
+[f , Y ] ,
+and the output f satisfies that 1) Prℑ [f , Y ] ≤ Prℑ
+[
+f ⋆ , Y
+]
++
+2 · dTV (ℑ, ℑ̂); 2) δq (f ) ≥ τ − ε − κ. The details are discussed in
+Appendix D.
+Remark 4.6. Since the distribution ℑ̂ is constructed via samples
+from ℑ, we can study the number of samples required such that ℑ̂
+and ℑ are close enough, i.e.,
+dTV (ℑ, ℑ̂) ≤ ε/2, κ = 2 max
+i ∈[p],f ∈F
+qℑ̂i (f ) − qℑi (f ) ≤ ε . (5)
+A Meta-Algorithm with Provable Guarantees L. Elisa Celis, Lingxiao Huang, Vijay Keswani and Nisheeth K. Vishnoi
+Note that given the inequality dTV (ℑ, ℑ̂) ≤ ε/2, learning ℑ̂ is exactly
+a classic distribution learning problem in which the sample complexity
+is bounded under a certain assumption model of ℑ, e.g., mixtures of a
+constant number of Gaussian distributions [48]. We refer interested
+readers to the survey [19] for distribution estimation techniques.
+For the second inequality, when the constraint qℑi (f ) is linear, we
+can use Chernoff bound to show that givenO(N lnp/α) samples from
+the underlying distributionℑ, there exists an algorithm that computes
+an estimated distribution ℑ̂ such that
+κ = 2 max
+i ∈[p],f ∈F
+qℑ̂i (f ) − qℑi (f ) ≤ ε,
+where α := mini ∈[p] Prℑ [Gi , E
+′]. The formal statement and discus-
+sion on sample complexity are presented in Appendix C.2.
+5 EMPIRICAL EVALUATION
+5.1 Experimental Setup
+We compare the empirical performance of our algorithm against the
+state-of-the-art techniques for fair classification on three datasets
+that are commonly used to evaluate the fairness of algorithms.
+5.1.1 Algorithms and Benchmarks. We compare three versions of
+Algorithm 1, which provide fair classification results with respect
+to different fairness metrics:
+• Subject to τsr-fair (Algo 1-SR), i.e., fairness constraint with re-
+spect to the statistical rate;
+• Subject to τ
+fdr
+-fair (Algo 1-FDR), i.e., fairness constraint with
+respect to the false discovery rate (which is a kind of predictive
+parity constraint);
+• Subject to τsr-fair and τfdr-fair (Algo 1-SR+FDR), i.e., fairness
+constraints with respect to both the statistical rate and the false
+discovery rate.
+We benchmark our approach against four state-of-the-art algo-
+rithms:
+• COV developed in [60] aims to constrain statistical rate (τsr);
+• SHIFT developed in [34] designed to ensure equalized odds (con-
+strain τ
+fpr
+and τtpr);
+• FPR-COV and FNR-COV presented in [59], aim to eliminate
+disparate mistreatment (control the ratios τ
+fpr
+and τ
+fnr
+).
+• REDUCTION developed in [3], designed to constrain statistical
+parity and equalized odds (constrain τsr, τfpr, τtpr).
+against because they are state-of-the-art algorithms for their re-
+spective fairness metrics. We also select REDUCTION to compare
+against because it provides a different meta-algorithm which works
+for a subset of the fairness metrics we consider.
+5.1.2 Measurements. Let D denote the empirical distribution over
+the testing set. Given a group performance function q, we denote
+γq to be the fairness metric ρq under the empirical distribution D.
+For instance, given a classifier f ,
+γsr(f ) := min
+i ∈[p]
+Pr
+D
+[f = 1 | Z = i] /max
+i ∈[p]
+Pr
+D
+[f = 1 | Z = i] .
+γq represents the fairness of the output classifier over the testing
+set, while τq represent the input fairness constraint desired with
+which uses the Least squares classifier as the base classifier.
+respect to the underlying distribution. Ideallyγq ≥ τq . However this
+may not always be satisfied in practice if the estimated distribution
+ℑ̂ is not a good fit for the underlying distribution ℑ. Hence we
+report γq as this is the output fairness obtained by the classifier.
+For completeness, we also report the correspondence between the
+output fairness γq and the input constraint τq .
+5.1.3 Datasets. We conduct our experiments on the following
+three datasets, which are commonly used for benchmarking in
+the fairness literature:
+• Adult: This is an income dataset [18], which records the demo-
+graphics of 45222 individuals, along with a binary label indicating
+whether the income of an individual is greater than 50k USD. We
+use the pre-processed dataset
+[60]. We take gender to be the sensitive attribute, which is binary
+in the dataset.
+• German: This dataset [18], records the attributes corresponding
+to around 1000 individuals with a label indicating positive or
+negative credit risk. We use the pre-processed dataset
+by Friedler et al [28]. We take gender to be the sensitive attribute,
+which is binary in the dataset.
+• COMPAS: This dataset [4], compiled by Propublica, is a list of
+demographic data of criminal offenders along with a risk score.
+We refer the reader to [43] for more details on how the data was
+analysed and compiled. For our experiment, we use the follow-
+ing features for classification : ‘sex’, ‘age’, ‘race’, ‘juvenile felony
+count’, ‘decile score’, ‘juvenile misdemeanor count’, ‘other juve-
+nile charges count’, ‘priors count’, ‘days in jail’, ‘charge degree’,
+and try to predict the ‘is recid’ label, which represents whether
+individuals recidivated within two years or not. We take race as
+the sensitive attribute, and consider the subset of the data cor-
+responding to individuals for which the race attribute is either
+black or white.
+5.1.4 ImplementationDetails. Weperformfive repetitions, inwhich
+we divide the dataset uniformly at random into training (70%) and
+testing (30%) sets and report the average statistics of the above al-
+gorithms. In Algorithm 1, we set the error parameter ε to 0.01, and
+fit the estimated distribution ℑ̂ using Gaussian Naive Bayes using
+SciPy [23]. For each dataset we runAlgo 1-SR andAlgo 1-FDR for
+τ ∈ {0.1, 0.2, . . . , 1.0}, and plot the resulting γsr and accuracy. We
+solve the optimization problem using Gradient Descent methods.
+5.2 Results
+5.2.1 Accuracy vs Output Fairness on the Adult Datset. Fig. 1 sum-
+marizes the tradeoff between the accuracy and the observed fairness
+γsr with respect to the statistical rate. The red points represents the
+mean value of γsr and accuracy of Algo 1 for different input val-
+ues of τsr, with the error bars representing the standard deviations
+respectively. For other algorithms, we report only the point with
+largest mean γsr value and the axes of the ellipse around the point
+are the standard deviations of the fairness and accuracy respec-
+tively. We observe thatAlgo 1-SR can achieve higher γsr than than
+other methods. However, this gain in fairness comes at a loss; accu-
+racy is decreasing in γsr for Algo 1-SR (albeit always above 75%).
+Even for lower values of γsr (corresponding to weaker constraints
+Figure 1: Acc. vs. γsr for Adult dataset. For Algo 1-SR, we
+plot themean value of accuracy and observed fairnessγsr
+for different values of input τsr. For other methods, we
+plot the datapoint with largest mean γsr and the ellipse
+around it represents the standard deviation. Algo 1-SR
+can achieve better fairness with respect to SR than any
+other method, albeit at a loss to accuracy.
+Figure 2: Acc. vs. γ
+fdr
+for Adult dataset. For Algo 1-FDR,
+we plot themean value of accuracy and observed fairness
+γ
+fdr
+for different values of input τ
+fdr
+. For other methods,
+we plot the datapoint with largest mean γ
+fdr
+and the el-
+lipse around it represents the standard deviation. Algo 1-
+FDR achieves better fairness with respect to FDR than
+any other method and the loss in accuracy is small.
+Figure 3: Acc. vs. γsr. Algo 1-SR for different values of in-
+put τsr on Adult dataset.
+Figure 4: Acc. vs. γ
+fdr
+. Algo 1-FDR for different values of
+input τ
+fdr
+on Adult dataset.
+τsr), the accuracy is worse than that of COV and SHIFT. This is
+likely due to the fact that we use a simple model for estimating the
+empirical distribution ℑ, which will affect the overall accuracy of
+the algorithm (see Theorem 4.4); we expect that the performance
+would improve if we were to tune the fit (see also Section H.2).
+and the observed fairness γ
+fdr
+with respect to the false discovery
+rate. The red points represents the mean value of γ
+fdr
+and accuracy
+of Algo 1 for different input values of τ
+fdr
+, while we report only
+the point with largest mean γ
+fdr
+for the other algorithms. Here we
+observe that Algo 1-FDR can attain the highest observed fairness
+γ
+fdr
+(for appropriate input values τ
+fdr
+. Furthermore its accuracy,
+even for the highest fairness values, is comparable to that of other
+methods. Note that the overall fairness γ
+fdr
+for all methods is higher
+than γsr; this is likely because the unconstrained optimal classifier
+for Algorithm 1 achieves γ
+fdr
+= 0.84 (see Table 2), i.e., the Adult
+dataset is already relatively fair across genders with respect to FDR.
+Quadrianto and Sharmanska [55] also provide a heuristic meta-
+algorithm for multiple fairness metrics. However, we were unable
+the average results for all five training-test splits of the dataset. Within each partition,
+they are monotone.
+to compare against their approach directly due to the unavailability
+of their code online and our inability to replicate their results via
+our own implementation. Comparing against the raw numbers
+reported in their paper, they achieve 0.81 accuracy overall while the
+accuacy-difference (their metric of fairness) across groups is ∼ 0.05
+on the Adult dataset. Algo 1-SR can achieve a similar accuracy-
+difference (∼ 0.05) for an overall accuracy of 0.80 and can achieve
+a smaller accuracy-difference (∼ 0.02) for overall accuracy ∼ 0.78.
+5.2.2 Relationship Between τ and γ on the Adult Dataset. Empiri-
+cally, we find that the observed fairness (γ ) is almost always close
+to the target constraint. The output fairness and accuracy of the
+classifier against the input measure τ is depicted in Fig. 3 and Fig. 4.
+We plot all points from all the training/test splits in these figures.
+5.2.3 Results on COMPAS and German datasets. A similar evalua-
+tion on the COMPAS [4] and German dataset [18] are presented in
+Appendix H, and we simply summarize the primary observations
+here. The performance of Algo 1-FDR with respect to other algo-
+rithms on German dataset is depicted in Figures 2 and 4 . From Fig 4,
+we observe that the classifier is able to satisfy the input fairness
+constraint almost every time, i.e., for almost all values of input τ
+fdr
+,
+the observed fairness of the classifier, γ
+fdr
+, is greater than or almost
+equal to τ
+fdr
+. Furthermore, as shown in Fig 2, the maximum γ
+fdr
+A Meta-Algorithm with Provable Guarantees L. Elisa Celis, Lingxiao Huang, Vijay Keswani and Nisheeth K. Vishnoi
+Table 2: The performance (mean and standard deviation in parens), of different fair classification alorithms with respect to accuracy and the
+fairness metrics from γq in Table 1 on the Adult dataset. We present the performance of an unconstrained optimal classifier for Algorithm 1
+for comparison.
+Fairness Metrics
+Acc. γsr γ
+fpr γ
+fnr
+γtpr γtnr γar γ
+fdr
+γ
+for
+γppr γnpr
+Unconstrained
+0.83
+(0.00)
+0.33
+(0.03)
+0.30
+(0.02)
+0.87
+(0.05)
+0.86
+(0.06)
+0.94
+(0.00)
+0.86
+(0.01)
+0.84
+(0.07)
+0.34
+(0.03)
+0.93
+(0.03)
+0.87
+(0.01)
+T
+h
+i
+s
+p
+a
+p
+e
+r
+Algo 1-SR
+0.77
+(0.01)
+0.89
+(0.05)
+0.51
+(0.04)
+0.55
+(0.10)
+0.81
+(0.03)
+0.82
+(0.02)
+0.90
+(0.02)
+0.46
+(0.03)
+0.21
+(0.04)
+0.39
+(0.04)
+0.88
+(0.00)
+Algo 1-FDR
+0.83
+(0.00)
+0.32
+(0.04)
+0.27
+(0.05)
+0.78
+(0.07)
+0.86
+(0.06)
+0.88
+(0.01)
+0.89
+(0.05)
+0.85
+(0.03)
+0.36
+(0.03)
+0.93
+(0.04)
+0.89
+(0.00)
+Algo 1-SR+FDR
+0.44
+(0.13)
+0.84
+(0.04)
+0.83
+(0.09)
+0.21
+(0.27)
+0.96
+(0.01)
+0.36
+(0.37)
+0.48
+(0.26)
+0.70
+(0.04)
+0.15
+(0.16)
+0.34
+(0.06)
+0.95
+(0.03)
+B
+a
+s
+e
+l
+i
+n
+e
+s
+COV [60]
+0.79
+(0.28)
+0.83
+(0.01)
+0.63
+(0.06)
+0.27
+(0.19)
+0.76
+(0.07)
+0.79
+(0.10)
+0.81
+(0.06)
+0.55
+(0.12)
+0.10
+(0.05)
+0.44
+(0.11)
+0.86
+(0.02)
+FPR-COV [59]
+0.85
+(0.01)
+0.41
+(0.07)
+0.39
+(0.08)
+0.87
+(0.10)
+0.91
+(0.07)
+0.94
+(0.01)
+0.88
+(0.01)
+0.80
+(0.08)
+0.29
+(0.05)
+0.91
+(0.04)
+0.87
+(0.02)
+FNR-COV [59]
+0.85
+(0.01)
+0.22
+(0.05)
+0.14
+(0.04)
+0.61
+(0.09)
+0.67
+(0.10)
+0.89
+(0.01)
+0.88
+(0.04)
+0.80
+(0.05)
+0.50
+(0.05)
+0.92
+(0.02)
+0.91
+(0.01)
+SHIFT [34]
+0.81
+(0.01)
+0.50
+(0.11)
+0.40
+(0.16)
+0.90
+(0.06)
+0.84
+(0.09)
+0.98
+(0.00)
+0.83
+(0.01)
+0.84
+(0.06)
+0.31
+(0.02)
+0.96
+(0.02)
+0.82
+(0.01)
+REDUCTION [3]
+0.79
+(0.00)
+0.86
+(0.06)
+0.69
+(0.10)
+0.74
+(0.02)
+0.43
+(0.03)
+0.99
+(0.00)
+0.80
+(0.01)
+0.59
+(0.11)
+0.27
+(0.03)
+0.91
+(0.03)
+0.79
+(0.01)
+value achieved byAlgo 1-FDR is around 0.99, while amongst other
+algorithms, the maximum achieved is around 0.85. Similarly for
+Algo 1-SR, whose results are presented in Figures 1 and 3, we see
+that for almost all values of input τsr, we satisfy the input fairness
+constraint (except when τsr ∼ 1, in which case observed γsr ∼ 0.98).
+Figures 6 and 8 depict the performance of Algo 1-FDR with
+respect to other algorithms on the COMPAS dataset. Algo 1-FDR
+achieves a maximum γ
+fdr
+of around 0.99, while other algorithms
+are able to achieve γ
+fdr
+value around 0.9. For lower values of input
+τ
+fdr
+, we achieve similar accuracy as other methods (∼0.70), however
+for higher values of input τ
+fdr
+, we incur a loss in accuracy (∼ 0.68).
+Similarly the performance of Algo 1-SR is presented in Figures 5
+and 7. Once again, the input fairness constraint is almost always
+satisfied, and we achieve higher γ
+fdr
+values than other algorithms.
+5.2.4 Effect of Constraints on Other Fairness Metrics. We also exam-
+ine the performance of our methods and the baselines with respect
+to other fairness metrics γq and report their mean and standard de-
+viation. ForAlgo 1-SR,Algo 1-SR+FDR,COV andREDUCTION,
+we consider only classifiers corresponding to γsr ≥ 0.8, while for
+Algo 1-FDR, FPR-COV, FNR-COV and SHIFT, we choose the
+classifier corresponding to γ
+fdr
+≥ 0.8. Different methods are bet-
+ter at optimizing different fairness metrics – the key difference is
+that Algo 1 can optimize different metrics depending on the given
+parameters, whereas other methods do not have this flexibility;
+e.g., here we constrain fairness with respect to SR and FDR (for
+which the maximal values of γsr and γfdr are attained), but we could
+instead constrain with respect to any other q if desired. Interest-
+ingly, although Algo 1-SR and Algo 1-FDR do not achieve the
+highest accuracy overall, both have significantly higher accuracy
+parity than other methods (γar ≈ 0.9). Furthermore, we can consider
+multiple fairness constraints simultaneously; Algo 1-SR+FDR can
+achieve both γsr > 0.7 and γ
+fdr
+> 0.7, while remaining methods
+can not (γsr < 0.45 or γ
+fdr
+< 0.55). Unfortunately, this does come
+at a loss of accuracy, likely due to the difficulty of simultaneously
+achieving accuracy and multiple fairness metrics [14, 41].
+6 CONCLUSION
+We present an efficient meta-algorithm for classification with (non-
+convex) linear-fractional constraints. Linear-fractional constraints
+capture many existing fairness definitions in the literature, and thus
+our algorithm can be used to derive several old and new results for
+classification with fairness constraints. In particular, to the best of
+our knowledge, our framework is the first that works for predictive
+parity with provable guarantees, which addresses an open problem
+proposed in [60]. Empirical evaluation of our algorithm on real-
+world datasets shows that our algorithm almost always satisfies
+the fairness constraints and the loss in accuracy is small.
+This paper opens several possible directions for future work. As
+observed in the empirical results (and predicted by Theorem 4.4),
+the performance of our framework depends on the quality of the
+estimated distribution ℑ̂. It would be interesting to optimize the
+approach in this regard, either empirically or theoretically. We also
+believe it would be valuable to extend this framework to other com-
+monly used loss functions (e.g., l2-loss or AUC) and other classifiers
+(e.g., margin-based classifiers or score-based classifiers). It would
+be interesting to get bounds on sample complexity for classification
+with linear fractional constraints. Finally, while in this paper we
+consider fairness constraints introduced by the τ -rule, other fair-
+ness constraints such as AUC and correlation (see the survey [63])
+might also be worth considering.
+REFERENCES
+[1] ACM. 2017. Statement on Algorithmic Transparency and Accountabil-
+ity. https://www.acm.org/binaries/content/assets/public-policy/2017_usacm_
+statement_algorithms.pdf.
+[2] An Act. 1964. Civil Rights Act. Title VII, Equal Employment Opportunities (1964).
+[3] Alekh Agarwal, Alina Beygelzimer, Miroslav Dudík, John Langford, and HannaM.
+Wallach. 2018. A Reductions Approach to Fair Classification. In Proceedings of
+the 35th International Conference on Machine Learning, ICML 2018. 60–69.
+[4] Julia Angwin, Jeff Larson, Surya Mattu, and Lauren Kirchner. 2016. https://github.
+com/propublica/compas-analysis.
+[5] Julia Angwin, Jeff Larson, Surya Mattu, and Lauren Kirchner. 2016. Machine
+bias: There’s software used across the country to predict future criminals. and
+it’s biased against blacks. ProPublica, May (2016).
+[6] Solon Barocas and Andrew D Selbst. 2016. Big data’s disparate impact. California
+Law Review (2016).
+[7] Richard Berk. 2009. The role of race in forecasts of violent crime. Race and social
+problems (2009).
+[8] Stephen Boyd and Almir Mutapcic. 2008. Stochastic subgradient methods. Lecture
+Notes for EE364b, Stanford University (2008).
+[9] Toon Calders and Sicco Verwer. 2010. Three naive Bayes approaches for
+discrimination-free classification. Data Min. Knowl. Discov. 21, 2 (2010), 277–292.
+[10] L Elisa Celis, Lingxiao Huang, and Nisheeth K Vishnoi. 2018. Multiwinner voting
+with fairness constraints. In Proceedings of the Twenty-seventh International Joint
+Conference on Artificial Intelligence and the Twenty-third European Conference on
+Artificial Intelligence, IJCAI-ECAI.
+[11] L. Elisa Celis, Vijay Keswani, Amit Deshpande, Tarun Kathuria, Damian Straszak,
+and Nisheeth K. Vishnoi. 2018. Fair and Diverse DPP-based Data Summarization.
+In Proceedings of the 35th International Conference on Machine Learning, ICML
+2018.
+[12] L. Elisa Celis, Damian Straszak, and Nisheeth K. Vishnoi. 2018. Ranking with
+Fairness Constraints. In Proceedings of the fourty-fifth International Colloquium
+on Automata, Languages, and Programming ICALP.
+[13] L. Elisa Celis and Nisheeth K Vishnoi. 2017. Fair Personalization. In Fairness,
+Accountability, and Transparency in Machine Learning.
+[14] Alexandra Chouldechova. 2017. Fair prediction with disparate impact: A study
+of bias in recidivism prediction instruments. Big data 5, 2 (2017), 153–163.
+[15] Sam Corbett-Davies, Emma Pierson, Avi Feller, Sharad Goel, and Aziz Huq. 2017.
+Algorithmic Decision Making and the Cost of Fairness. In Proceedings of the 23rd
+ACM SIGKDD International Conference on Knowledge Discovery and Data Mining,
+2017. 797–806.
+[16] Amit Datta, Michael Carl Tschantz, and Anupam Datta. 2015. Automated Experi-
+ments on Ad Privacy Settings. Proceedings on Privacy Enhancing Technologies
+(2015).
+[17] Bill Dedman et al. 1988. The Color of Money. Atlanta Journal-Constitution (1988).
+[18] Dua Dheeru and Efi Karra Taniskidou. 2017. UCI Machine Learning Repository.
+http://archive.ics.uci.edu/ml.
+[19] Ilias Diakonikolas. 2016. Learning Structured Distributions. Handbook of Big
+Data 267 (2016).
+[20] William Dieterich, Christina Mendoza, and Tim Brennan. 2016. COMPAS risk
+scales: Demonstrating accuracy equity and predictive parity. Northpoint Inc
+(2016).
+[21] Cynthia Dwork, Moritz Hardt, Toniann Pitassi, Omer Reingold, and Richard
+Zemel. 2012. Fairness through awareness. In Innovations in Theoretical Computer
+Science 2012. ACM, 214–226.
+[22] Cynthia Dwork, Nicole Immorlica, AdamTaumanKalai, andMarkD.M. Leiserson.
+2018. Decoupled Classifiers for Group-Fair and Efficient Machine Learning. In
+Fairness, Accountability, and Transparency in Machine Learning. 119–133.
+[23] ENTHOUGHT. 2018. SciPy. https://www.scipy.org/.
+[24] Michael Feldman, Sorelle A Friedler, JohnMoeller, Carlos Scheidegger, and Suresh
+Venkatasubramanian. 2015. Certifying and removing disparate impact. In Proceed-
+ings of the 21th ACM SIGKDD International Conference on Knowledge Discovery
+and Data Mining, 2015. ACM, 259–268.
+[25] Benjamin Fish, Jeremy Kun, and Ádám D Lelkes. 2016. A confidence-based
+approach for balancing fairness and accuracy. In Proceedings of the 2016 SIAM
+International Conference on Data Mining. SIAM, 144–152.
+[26] Anthony W Flores, Kristin Bechtel, and Christopher T Lowenkamp. 2016. False
+Positives, False Negatives, and False Analyses: A Rejoinder to Machine Bias:
+There’s Software Used across the Country to Predict Future Criminals. And It’s
+Biased against Blacks. Fed. Probation 80 (2016), 38.
+[27] Sorelle A Friedler, Carlos Scheidegger, and Suresh Venkatasubramanian. 2016.
+On the (Im) Possibility of Fairness. arXiv preprint arXiv:1609.07236 (2016).
+[28] Sorelle A Friedler, Carlos Scheidegger, Suresh Venkatasubramanian, Sonam
+Choudhary, Evan P Hamilton, and Derek Roth. 2018. A Comparative Study
+of Fairness-Enhancing Interventions in Machine Learning. arXiv preprint
+arXiv:1802.04422 (2018).
+[29] Naman Goel, Mohammad Yaghini, and Boi Faltings. 2018. Non-Discriminatory
+Machine Learning through Convex Fairness Criteria. In Proceedings of the Thirty-
+Second AAAI Conference on Artificial Intelligence, 2018.
+[30] Sharad Goel, Justin M Rao, Ravi Shroff, et al. 2016. Precinct or prejudice? Under-
+standing racial disparities in New York City’s stop-and-frisk policy. The Annals
+of Applied Statistics 10, 1 (2016), 365–394.
+[31] Gabriel Goh, Andrew Cotter, Maya R. Gupta, and Michael P. Friedlander. 2016.
+Satisfying Real-world Goals with Dataset Constraints. In Advances in Neural
+Information Processing Systems 29: Annual Conference on Neural Information
+Processing Systems 2016. 2415–2423.
+[32] Nina Grgić-Hlača, Elissa M Redmiles, Krishna P Gummadi, and Adrian Weller.
+2018. Human Perceptions of Fairness in Algorithmic Decision Making: A Case
+Study of Criminal Risk Prediction. In Proceedings of the 2018 World Wide Web
+Conference on World Wide Web, WWW 2018. 903–912.
+[33] Nina Grgić-Hlača, Muhammad Bilal Zafar, Krishna P Gummadi, and Adrian
+Weller. 2018. Beyond Distributive Fairness in Algorithmic Decision Making:
+Feature Selection for Procedurally Fair Learning. In Proceedings of the Thirty-
+Second AAAI Conference on Artificial Intelligence, 2018.
+[34] Moritz Hardt, Eric Price, and Nati Srebro. 2016. Equality of Opportunity in
+Supervised Learning. In Advances in Neural Information Processing Systems 29:
+Annual Conference on Neural Information Processing Systems 2016. 3315–3323.
+[35] Mara Hvistendahl. 2016. Can “predictive policing” prevent crime before it hap-
+pens. Science Magazine 28 (2016).
+[36] Matthew Joseph, Michael Kearns, Jamie H Morgenstern, and Aaron Roth. 2016.
+Fairness in learning: Classic and contextual bandits. In Advances in Neural Infor-
+mation Processing Systems. 325–333.
+[37] Faisal Kamiran and Toon Calders. 2009. Classifying without discriminating. In
+Computer, Control and Communication, 2009. IC4 2009. 2nd International Confer-
+ence on. IEEE, 1–6.
+[38] Faisal Kamiran and Toon Calders. 2012. Data preprocessing techniques for
+classification without discrimination. Knowledge and Information Systems 33, 1
+(2012), 1–33.
+[39] Toshihiro Kamishima, Shotaro Akaho, Hideki Asoh, and Jun Sakuma. 2012.
+Fairness-Aware Classifier with Prejudice Remover Regularizer. In In Proceedings
+of Machine Learning and Knowledge Discovery in Databases - European Conference,
+ECML PKDD 2012. 35–50.
+[40] Michael Kearns, Aaron Roth, and Zhiwei Steven Wu. 2017. Meritocratic fairness
+for cross-population selection. In International Conference on Machine Learning.
+[41] Jon M. Kleinberg, Sendhil Mullainathan, and Manish Raghavan. 2017. Inher-
+ent Trade-Offs in the Fair Determination of Risk Scores. In 8th Innovations in
+Theoretical Computer Science Conference, ITCS, 2017. 43:1–43:23.
+[42] Emmanouil Krasanakis, Eleftherios Spyromitros-Xioufis, Symeon Papadopoulos,
+and Yiannis Kompatsiaris. 2018. Adaptive Sensitive Reweighting to Mitigate
+Bias in Fairness-aware Classification. In Proceedings of the 2018 World Wide Web
+Conference on World Wide Web, WWW 2018. International World Wide Web
+Conferences Steering Committee.
+[43] Jeff Larson, Surya Mattu, Lauren Kirchner, and Julia Angwin. 2016. How we
+analyzed the COMPAS recidivism algorithm. ProPublica (5 2016) 9 (2016).
+[44] Binh Thanh Luong, Salvatore Ruggieri, and Franco Turini. 2011. k-NN as an
+implementation of situation testing for discrimination discovery and prevention.
+In Proceedings of the 17th ACM SIGKDD International Conference on Knowledge
+Discovery and Data Mining 2011. ACM, 502–510.
+[45] Susan Magarey. 2004. The sex discrimination act 1984. Australian Feminist Law
+Journal (2004).
+[46] Aditya Krishna Menon and Robert C. Williamson. 2018. The cost of fairness in
+binary classification. In Conference on Fairness, Accountability and Transparency,
+FAT 2018. 107–118.
+[47] Claire Cain Miller. 2015. Can an algorithm hire better than a human. The New
+York Times 25 (2015).
+[48] Ankur Moitra and Gregory Valiant. 2010. Settling the polynomial learnability
+of mixtures of gaussians. In Foundations of Computer Science (FOCS), 2010 51st
+Annual IEEE Symposium on. IEEE, 93–102.
+[49] Harikrishna Narasimhan, Rohit Vaish, and Shivani Agarwal. 2014. On the Sta-
+tistical Consistency of Plug-in Classifiers for Non-decomposable Performance
+Measures. In Advances in Neural Information Processing Systems 27: Annual Con-
+ference on Neural Information Processing Systems 2014. 1493–1501.
+[50] Arvind Narayanan. 2018. Tutorial: 21 Fairness Definitions and Their Politics.
+https://www.youtube.com/watch?v=jIXIuYdnyyk.
+[51] Northpointe. 2012. Compas risk and need assessment systems. http://www.
+northpointeinc.com/files/downloads/FAQ_Document.pdf.
+[52] United States. Executive Office of the President and John Podesta. 2014. Big data:
+Seizing opportunities, preserving values. White House, Executive Office of the
+President.
+[53] Dino Pedreshi, Salvatore Ruggieri, and Franco Turini. 2008. Discrimination-aware
+data mining. In Proceedings of the 14th ACM SIGKDD International Conference on
+Knowledge Discovery and Data Mining, 2008. ACM, 560–568.
+[54] Geoff Pleiss, Manish Raghavan, Felix Wu, Jon M. Kleinberg, and Kilian Q. Wein-
+berger. 2017. On Fairness and Calibration. In Advances in Neural Information
+Processing Systems 30: Annual Conference on Neural Information Processing Systems
+2017. 5684–5693.
+[55] Novi Quadrianto and Viktoriia Sharmanska. 2017. Recycling Privileged Learn-
+ing and Distribution Matching for Fairness. In Advances in Neural Information
+Processing Systems. 677–688.
+[56] WhiteHouse. 2016. Big data: A report on algorithmic systems, opportunity, and
+civil rights. Executive Office of the President.
+[57] Blake E. Woodworth, Suriya Gunasekar, Mesrob I. Ohannessian, and Nathan
+Srebro. 2017. Learning Non-Discriminatory Predictors. In Proceedings of the 30th
+Conference on Learning Theory, COLT 2017. 1920–1953.
+[58] Ke Yang and Julia Stoyanovich. 2017. Measuring Fairness in Ranked Outputs. In
+SSDBM.
+[59] Muhammad Bilal Zafar, Isabel Valera, Manuel Gomez-Rodriguez, and Krishna P.
+Gummadi. 2017. Fairness Beyond Disparate Treatment & Disparate Impact:
+Learning Classification without Disparate Mistreatment. In Proceedings of the
+26th International Conference on World Wide Web, WWW 2017. 1171–1180.
+[60] Muhammad Bilal Zafar, Isabel Valera, Manuel Gomez-Rodriguez, and Krishna P.
+Gummadi. 2017. Fairness Constraints: Mechanisms for Fair Classification. In
+Proceedings of the 20th International Conference on Artificial Intelligence and
+Statistics, AISTATS 2017. 962–970.
+[61] Muhammad Bilal Zafar, Isabel Valera, Manuel Gomez-Rodriguez, Krishna P.
+Gummadi, and Adrian Weller. 2017. From Parity to Preference-based Notions of
+Fairness in Classification. In Advances in Neural Information Processing Systems
+30: Annual Conference on Neural Information Processing Systems 2017. 228–238.
+[62] Rich Zemel, Yu Wu, Kevin Swersky, Toni Pitassi, and Cynthia Dwork. 2013.
+Learning fair representations. In Proceedings of the 30th International Conference
+on Machine Learning, ICML 2013. 325–333.
+[63] Indre Zliobaite. 2017. Measuring discrimination in algorithmic decision making.
+Data Min. Knowl. Discov. (2017).

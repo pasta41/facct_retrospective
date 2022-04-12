@@ -1,0 +1,936 @@
+Fairness Is Not Static: Deeper Understanding of Long Term Fairness
+via Simulation Studies
+Alexander D’Amour∗
+Google Research
+alexdamour@google.com
+Hansa Srinivasan∗
+Google Research
+hansas@google.com
+James Atwood
+Google Research
+atwoodj@google.com
+Pallavi Baljekar
+Google Research
+pbaljeka@google.com
+D. Sculley
+Google Research
+dsculley@google.com
+Yoni Halpern
+Google Research
+yhalpern@google.com
+ABSTRACT
+As machine learning becomes increasingly incorporated within
+high impact decision ecosystems, there is a growing need to un-
+derstand the long-term behaviors of deployed ML-based decision
+systems and their potential consequences. Most approaches to un-
+derstanding or improving the fairness of these systems have focused
+on static settings without considering long-term dynamics. This
+is understandable; long term dynamics are hard to assess, partic-
+ularly because they do not align with the traditional supervised
+ML research framework that uses ￿xed data sets. To address this
+structural di￿culty in the ￿eld, we advocate for the use of sim-
+ulation as a key tool in studying the fairness of algorithms. We
+explore three toy examples of dynamical systems that have been
+previously studied in the context of fair decision making for bank
+loans, college admissions, and allocation of attention. By analyz-
+ing how learning agents interact with these systems in simula-
+tion, we are able to extend previous work, showing that static or
+single-step analyses do not give a complete picture of the long-
+term consequences of an ML-based decision system. We provide
+an extensible open-source software framework for implementing
+fairness-focused simulation studies and further reproducible re-
+search, available at https://github.com/google/ml-fairness-gym.
+CCS CONCEPTS
+• Computing methodologies → Simulation environments;
+Supervised learning by classi￿cation.
+ACM Reference Format:
+Alexander D’Amour, Hansa Srinivasan, James Atwood, Pallavi Baljekar, D.
+Sculley, and Yoni Halpern. 2020. Fairness Is Not Static: Deeper Understand-
+ing of Long Term Fairness via Simulation Studies. In Conference on Fairness,
+Accountability, and Transparency (FAT* ’20), January 27–30, 2020, Barcelona,
+Spain. ACM, New York, NY, USA, 10 pages. https://doi.org/10.1145/3351095.
+Permission to make digital or hard copies of part or all of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for pro￿t or commercial advantage and that copies bear this notice and the full citation
+on the ￿rst page. Copyrights for third-party components of this work must be honored.
+For all other uses, contact the owner/author(s).
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Copyright held by the owner/author(s).
+ACM ISBN 978-1-4503-6936-7/20/02.
+https://doi.org/10.1145/3351095.3372878
+1 INTRO: BEYOND STATIC FAIRNESS
+Much of the literature on fairness in machine learning is motivated
+by the concern that high impact decisions made bymachine-learned
+systems may have negative consequences for vulnerable popula-
+tions [23, e.g., reviewed in]. However, much of this prior work has
+focused on the fairness implications of decisions made in a static
+or one-shot context in which long-term e￿ects and system level
+dynamics are not considered. Despite recent work that has shown
+that long-term implications can be at odds with fairness objectives
+optimized in the static setting [16, 21, 22], long-term implications
+remain relatively under-studied.
+In this work, we propose that simulation studies can serve as a
+framework for systematically exploring the long-term implications
+of deploying a machine learning based decision system (hence-
+forth, a learning agent). Simulation studies address a gap between
+currently-favored evaluation of fairness policies on static, real-
+world datasets, and more recent forays into simple, analytically
+tractable models of dynamics [16, 20–22]. Simulations allow access
+to counterfactual information about how the data would have varied
+if a di￿erent data collection or decision-making policy had been in
+place, a dimension that is missing from static datasets. For example,
+the COMPAS [25] and German Credit [5] datasets do not provide
+counterfactual information about how the data would have looked
+if a di￿erent data collection or decision-making policy had been
+in place. In addition, simulations allow for concrete exploration of
+system level dynamics, feedback loops, and other long-term e￿ects
+that may be intractable to analyze in closed form or to demonstrate
+empirically in static settings.
+To demonstrate the utility of simulations, we perform expanded
+analyses of three canonical scenarios that have been treated in
+previous fairness papers. In the ￿rst demonstration, we consider
+the dynamic lending scenario studied in Liu et al. [21], where the
+credit score of loan applicants can change in response to the agent’s
+decision to lend or reject. Here, we perform a long-term analysis
+of a dynamic scenario where only short-term analyses had been
+performed before.
+In the second demonstration, we consider the attention allocation
+problem presented in Ensign et al. [7] and Elzayn et al. [6], where
+an agent is tasked with allocating ￿nite units of attention across
+di￿erent sites with the goal of discovering harmful incidents. Here,
+we add dynamics to this scenario, which was previously treated
+under an assumption of stationary rates.
+Finally, we consider a college admissions scenario studied in Hu
+et al. [16] and Milli et al. [22], where applicants are able to manipu-
+late their scores (at a cost) to obtain a desirable decision from the
+agent. Here, we examine equilibria that are realized from repeated
+play of a two-player game where previous work only considered
+the one-shot setting. In each of these scenarios, we ￿nd that the
+concrete, long-term view o￿ered by simulation supports qualita-
+tively di￿erent (though not incompatible) fairness conclusions from
+those obtained before.
+1.1 Contributions
+This work makes several contributions, with the goal of raising the
+pro￿le of simulation studies in the ML fairness community.
+Our primary contribution is to demonstrate in several settings
+how feedback dynamics complicate the analysis of long term fair-
+ness consequences. We show that, in each of these settings, the
+long-run dynamics depart substantially from those that are mea-
+sured in one-shot contexts. Although these simulations may be
+too stylized to draw substantive conclusions about each of the de-
+cision problems that they model, they nonetheless demonstrate
+key complications in framing and measuring fairness in dynamic
+environments.
+Along theway, we show that fairness-oriented simulations can ￿t
+into the standard framework of Markov Decision Processes (MDPs),
+which are commonly used in a number of sub￿elds, including ro-
+botics and reinforcement learning. This framing is ￿exible, and puts
+dynamical analyses of fairness into a language that is more familiar
+to many ML researchers than the economic concepts highlighted
+in previous work.
+Finally, along with code to reproduce the results in this paper,
+we provide a general library ml-fairness-gym for specifying new
+simulation environments and agents with a uni￿ed interface for
+easy extensibility and development at https://github.com/google/
+ml-fairness-gym.
+1.2 Related Work
+The simulation approach that we advocate for in this paper is meant
+to complement several lines of work in fair machine learning. First,
+simulation complements the bulk of the fairness literature that fo-
+cuses on classi￿cation in static settings [e.g., 8, 14, 19, 29]. These
+static approaches to fairness are often evaluated on real datasets.
+This approach has a number of virtues, chief among them being
+a relevance to real problems, as opposed to the “toy” nature of
+simulated environments. However, as discussed above, the scope
+of fairness questions that can be addressed in the static setting is
+limited, so we believe that both sorts of investigations are valuable.
+Secondly, simulation can be used to expand analytical investiga-
+tions into fairness with dynamics that have recently appeared in
+papers on lending [21], resource allocation [6, 7], and college ad-
+missions [16, 20, 22]. Finally, the simulation approach that we use
+here complements work in fair reinforcement learning [e.g., 17, 18].
+In particular, the simulation framework that we propose would
+constitute an ideal testbed for these methods.
+More broadly, this work is meant to take a small step toward
+incorporating greater social context in fairness analyses of machine
+learning systems. Social scientists have long drawn attention to
+Agent
+Environment
+Metrics
+Action at
+t + 1
+Observation
+at t
+State
+at t
+Figure 1: Schematic of agent-environment interaction loop
+used in simulations. The agent-environment loop is anMDP.
+The observation at t is a function of the environment’s state
+at t . The environment’s transition to the next state depends
+on its current state and the agent’s action. The environment
+exposes its state to metrics for evaluation. In our implemen-
+tation, metrics examine the history of environment states
+o￿line.
+the fact that decision-making technologies, and the concepts that
+underpin them, not only react to, but actively shape the social
+environment in which they are deployed. For example, in a long
+line of work, Ian Hacking identi￿es the “looping e￿ects” [11] that
+result from categorizing people into “kinds” as an act of “making up
+people” [10, 12]. More recently, a number of critical evaluations of
+the algorithmic fairness literature draw attention to the ways that
+machine learning systems interact with, and often reinforce, the
+power structures that generate the inequities that this literature is
+meant to address [3, 15, 28]. By these accounts, notions of fairness
+and justice can only be addressed if this constructivist feedback
+is taken into account. Approaches such as systems dynamics [9,
+30] have been proposed before to model and simulate some of
+these social dynamics. Aspirationally, despite the simplicity of the
+examples we present here, we hope our framework can extend
+these approaches in a way that allows practitioners to integrate
+their machine learning procedures and draw broad lessons about
+how they might interact with a social environment.
+Our open-source library ml-fairness-gym is built on the Ope-
+nAI Gym framework [1] which simulates a Markov Decision Pro-
+cess (MDP) between agents and environments. Our choice of this
+framing is discussed in more detail in the next section.
+2 A FRAMEWORK FOR SIMULATIONS:
+ENVIRONMENT, METRICS, AGENTS
+To implement all of our simulations, we developed an open-source
+library ml-fairness-gym that extends OpenAI’s Gym [1]. In the
+Gym framework, agents interact with simulated environments in an
+alternating loop. At each step, the agent chooses an action which
+a￿ects the environment’s state. The environment then reveals an
+observation and the agent, which then uses that observation to
+inform its next choice of action. This loop repeats inde￿nitely (Fig-
+ure 1), or until the environment reaches an end state. In contrast
+to the traditional supervised machine learning framing that uses
+a training set of i.i.d. labeled examples and a test set drawn from
+the same distribution, in the agent-environment framework, every
+action by the agent a￿ects the environment state. In this way, train-
+ing and testing are interleaved, decisions can cause the population
+to shift, and decisions at time T a￿ect the decision to be made by
+the agent at time T + 1.
+The agent-environment framing modeled as a Markov Decision
+Process (MDP) is common in robotics [e.g., 32] and reinforcement
+learning [31]. We choose to adopt it here because it naturally en-
+codes the idea that the decisions (classi￿cations) of the learner have
+consequences beyond those that can be summarized in terms of
+prediction error. In addition, the MDP framework expands the role
+of the learning algorithm to include choices made in data collec-
+tion as well (the “dataset“ of observations available to the agent
+depend on the agent’s sequence of actions). This corresponds to
+a common setting in machine learning where a perfectly sampled
+dataset is not simply available for training, but the data is often
+accumulated through experience applying a particular policy (e.g.,
+a bank learns how to identify good loan applicants through the
+process of lending).
+We evaluate long-term fairness questions in our framework with
+metrics that characterize the realized consequences of an agent’s
+policy for di￿erent subpopulations by summarizing the the envi-
+ronment’s state over time. 1 This does not always paint a uniform
+picture (a policy can be good for a group in one way and bad in
+another), but gives a nuanced understanding of how policies play
+out. In general, the metrics for a given policy are most interpretable
+when compared to a baseline.
+In one signi￿cant departure from the OpenAI Gym framework
+and the standard formulation of reinforcement learning, our en-
+vironments do not encode a particular goal for the agent (this is
+often indicated by a “reward signal”). Instead, the designer of the
+agent is responsible for de￿ning their own objective in relation to
+the observations from the environment. This decision re￿ects our
+belief that fair machine learning encompasses all parts of the design
+process including choosing appropriate goals in the ￿rst place.
+3 LONG-TERM CONSEQUENCES IN BINARY
+DECISION MAKING: LENDING
+For our ￿rst demonstration, we examine a setting where an agent
+makes binary decisions that cause the underlying population of
+individuals to evolve. In particular, we consider the lending scenario
+introduced in Liu et al. [21], where an agent representing a bank
+makes decisions about whether to approve or reject applications for
+loans from a stream of individuals. Liu et al. [21] explicate some one-
+step implications of policies that maximize pro￿t for the bank, as
+well as policies that are subject to so-called equality of opportunity
+constraints [14]. 2 Here, we extend this analysis over many steps
+via simulation.
+We highlight two main takeaways from this demonstration.
+First, despite being theoretically compatible, simulation and tightly-
+scoped analytical exploration can yield qualitatively di￿erent sto-
+ries about the relative strengths and weaknesses of agent policies.
+1We choose to focus on the realized consequences for evaluation because simulation
+adds the most value for these assessments. In the language of Hardt et al. [14], these
+are “oblivious” or “black-box” evaluations. For a more complete picture of fairness,
+other evaluations, such as process-based evaluations that probe the agent’s internal
+state, may be desirable.
+2Throughout this section we use the term “equality of opportunity” as in Hardt et al.
+[14] to narrowly refer to the constraint that a binary classi￿er should have equal true
+positive rates (TPR) across groups.
+Figure 2: Initial credit score distributions of the two groups
+(far left) and ￿nal states after 20K steps of the environ-
+ment using a max-util agent (center) and EO agent (right).
+The credit distributions start with group 2 slightly disadvan-
+taged, but the groups converge to the similar distributions
+under the max-util agent, while the EO agent maintain un-
+equal credit distributions between groups.
+Figure 3: (Top) Group-conditional decision thresholds of the
+EO agent changewith each step of the simulation. Fractional
+decision thresholds are achieved by sampling adjacent inte-
+gral thresholds with appropriate probabilities (e.g., a thresh-
+old of 3.1 means sampling from 3, 4 with probabilities 0.9,
+0.1 respectively). Large ￿uctuations in the learned thresh-
+old occur on steps where there are no applicants with score
+4, allowing the threshold tomove arbitrarily between 3 and 4
+with no consequence. (Bottom) The recall values associated
+with the thresholds at each step.
+In particular, the qualitative stories about the consequences of max-
+util and EO policies that emerge from our simulations are quite
+di￿erent from the stories that one might take from the results in
+Liu et al. [21]. Second, the simulation reveals that, when dynamics
+are introduced, agent policies and standard metrics can become
+misaligned. Here, we show that even when the EO agent equalizes
+true positive rates between groups at each time step, it will not, in
+general, equalize the standard true positive rate metric computed
+across the entire simulation, even in expectation. Although these
+insights could have been achieved through analytical approaches
+alone, they occurred initially as surprising (to us) simulation results
+that we were later able to characterize more formally.
+3.1 Environment
+We use the same lending environment speci￿cation as Liu et al. [21].
+In this environment, each loan applicant has an observable group
+membership variableA and a discrete credit scoreC 2 1, · · · ,Cmax .
+There is a ￿nite pool of loan applicants from each group with C
+values distributed according to an initial group-speci￿c distribution
+pA0 (C). Applicants are sampled uniformly with replacement from
+the pool of applicants and the agent chooses to approve or decline
+the loan. If the applicant defaults, the agent’s pro￿t decreases by
+r  and the applicant’s C value is decreased by c . If the applicant
+pays back, the agent’s pro￿t is increased by r+ and the applicant’s
+C value is increased by c+.
+In this simulation, probability of repaying is a deterministic
+function of credit score   (C); when an applicant’s score increases
+or decreases, so, too, does their probability of repaying. Adding
+noise to this relationship could create a more nuanced simulation.
+If the noise were applied to all groups equivalently, it would not
+erase the underlying dynamics discussed here. However, other
+noise models, such as di￿erential measurement error, could induce
+di￿erent interesting dynamics (see Section 4.2 of Liu et al. [21] for
+discussion of a model where disadvantaged group credit scores are
+systematically underestimated).
+3.2 Metrics
+To evaluate the consequences of deploying an agent we look at
+how it a￿ects the average credit of each group, as measured by the
+overall change in credit score distributions, as well as changes in
+the group conditional probability of repayment, and the cumulative
+number of loans. We also evaluate the agent’s aggregated true
+positive rate by computing the ratio of successful loans given to
+the number of applicants who would have repaid a loan over the
+course of the simulation.
+3.3 Agents
+We consider two agents. First, we consider an agent whose policy
+maximizes pro￿ts (without any future discounting) for the bank
+(max-util agent). Liu et al. [21] prove that such an agent will employ
+a threshold classi￿er that chooses some threshold   , then deter-
+ministically accepts any applicant with   (C)     and rejects all
+others. The threshold depends only on the conditional probability
+of repayment given C , which is constant over time, and thus the
+max-util agent’s decision policy remains ￿xed over the course of
+the simulation.
+Second, we consider an agent that myopically maximizes utility
+subject to equality of opportunity [14] constraints at every step
+(EO agent). Speci￿cally, the agent’s decision rule is constrained
+to equalize the true positive rate (TPR) between the two groups.
+Because of the discrete scores in this setting, equalizing TPR be-
+tween groups is not always feasible with a deterministic decision
+policy. Thus, we consider randomized policies that probabilistically
+interpolate between thresholds that represent adjacent points on
+the convex hull of the ROC curve. As discussed in Hardt et al. [14],
+while the max-util agent has a single threshold across all groups,
+the EO agent generally employs a di￿erent policy for each group.
+Because it is constrained to equalize TPR, the EO agent’s policy
+at each time step depends on the population distributions of the
+Figure 4: (Top) Cumulative loans granted by the max-
+util and EO agents strati￿ed by the group identity of
+the applicant. (Bottom) Group credit (quanti￿ed by group-
+conditional probability of repayment) as the simulation pro-
+gresses. The EO agent increases access to loans for group 2,
+but also widens the credit gap between the groups.
+two groups (illustrated in appendix A.3). Thus, unlike the max-util
+agent, the EO agent’s policy can change over the course of the
+simulation in response to the changing credit score distributions in
+each group of applicants.
+3.4 Experiments and results
+We now describe a set of simulations in this environment that com-
+pare maximum utility agents to equality of opportunity agents.
+Some aspects of deploying a maximum utility agent are straight-
+forward to understand analytically (Appendix A). However, the
+consequences of deploying an EO agent, as well as the long-term
+population-level e￿ects of max-util and opportunity equalizing poli-
+cies, are considerably more complex, and bene￿t from analysis via
+simulation. Our results tell a qualitatively di￿erent story from Liu
+et al. [21], and highlight a mismatch between the EO agent and
+the agent’s aggregate true positive rate that does not arise in static
+settings.
+We simulate a population with two groups with shifted credit
+score distributions such that group 2 starts out disadvantaged com-
+pared to group 1 (Figure 2). We simplify the EO agent’s task and
+grant it oracle access to the population distribution and exact val-
+ues of repayment probabilities   . This removes any di￿culty of
+estimation allowing us to focus solely on the problem of making
+fair decisions.
+Diverging narratives from one-step analysis. Figure 4 shows the
+primary outcomes from our experiment. Some of these results
+are surprising in light of the results in Liu et al. [21]. First, we
+arrive at similar conclusions about the impact of EO policies on
+group-wise credit scores, but ￿nd the welfare implications for the
+disadvantaged group to be more ambiguous than was originally
+suggested. Consistent with results in Liu et al. [21], Figure 4 shows
+that the EO agent “over-lends” to the disadvantaged group by, at
+times, applying a lower decision threshold than the max-util agent
+(Figure 3). This results in a lower average credit trajectory for the
+disadvantaged group, andwidens the credit-gap between the groups
+compared to the max-util agent. However, it is not clear that the EO
+agent leaves the disadvantaged group worse-o￿. As the top panel
+of Figure 4 shows, despite the poor credit score trajectory, the EO
+agent grants a larger number of loans to the disadvantaged group.
+Depending on context, one might take a group’s overall credit, or
+the number of loans the group receives, to be the better indicator
+of the group’s welfare. In any case, the simulation highlights the
+importance of considering this trade-o￿.
+Second, we arrive at qualitatively di￿erent conclusions about
+the impact of the max-util agent. Speci￿cally, in the bottom panel
+of Figure 4, the average credit of both groups is decreasing under
+the max-util agent, which seems to disagree with the result in Liu
+et al. [21] stating that, under max-util policies, group average credit
+scores are non-decreasing. In fact, these results are compatible, and
+this surface disagreemnt points to the fact that the analytical results
+do not cover all of the cases necessary to specify a full simulation.
+In particular, the anlaytical theory only covers circumstances where
+the institution’s individual utility function is more stringent than
+the expected score changes [Assumption 1 in Section 3 of 21], and
+so the conclusions do not apply to cases where individuals already
+have maximum credit Cmax and are unable to increase their score
+further. When such edge e￿ects are present, applicants’ scores
+must eventually drop below the agent’s lending threshold, where
+they remain for the remainder of the simulation (see Appendix A).
+Here, the simulation highlights the fact that edge cases can ￿ip
+the qualitative implications of theoretical results when they are
+transferred to real settings, even though the simulation itself is
+highly stylized.
+EO agents and aggregated TPR. Interestingly, enforcing equal
+TPRs between groups at every step does not succeed at equalizing
+TPR when aggregating over the course of the full simulation (!).
+Figure 5 shows how the TPR-gap between the two groups does not
+converge to zero in the same way that it would in a static population
+where credit score does not change as a function of loan repayment.
+This counter-intuitive property can be thought of as an instance
+of the well-studied Simpson’s paradox (See e.g., Ross [27] for an
+example of this phenomenon in calculating batting averages in
+baseball). In Appendix A.4, we show analytically why we would
+not expect equality of opportunity to be preserved in aggregate
+doing a simple two-step analysis. This ￿nding suggests that, in
+dynamics environments where populations are shifting, estimates
+of aggregate TPR may not be useful for auditing agents that apply
+EO policies at each point in time.
+4 DYNAMIC INCIDENT RATES IN
+ATTENTION ALLOCATION
+Next, we consider the problem of attention allocation, in which an
+agent is tasked with spot checking or monitoring several sites for
+incidents, but does not have su￿cient resources to do so exhaus-
+tively at every time step. Real world examples of this setting may
+Figure 5: TPR gap between the two groups for the equal-
+ity of opportunity agent, averaged over 100 simulations. For
+comparison, we show how the TPR gap is reduced over the
+course of a simulation without any dynamics (static line).
+The TPR gap in the dynamic environment does not converge
+in the same way.
+include food inspection, child services, and pest control.3 Our anal-
+ysis extends the dynamic attention allocation settings considered
+in Ensign et al. [7] and Elzayn et al. [6]. In both of these papers,
+authors derive unbiased estimates of incident rates despite missing
+observations. Elzayn et al. [6] additionally propose an algorithm to
+allocate in a way that equalizes discovery probability from these
+rate estimates.
+Our demonstration in this section is more exploratory—rather
+than comparing directly to previous results, we consider how adding
+dynamics to this problem changes the implications of deployed
+policies, and their corresponding fairness considerations. This sim-
+ulation highlights some failure modes that can occur when an agent
+fails to model the dynamics of the environment. Speci￿cally, we
+examine how adding feedback between the allocation scheme and
+incident rates a￿ects long-term outcomes.4 Considering the sce-
+narios of pest control or food inspections, it seems realistic that
+the rate of incidents could change in response to interventions that
+result from allocating attention of inspectors. We ￿nd that these
+dynamics break certain equivalences and trade-o￿s that are present
+in the setting with stationary rates.
+4.1 Environment
+In the allocation environment, the agent distributes N discrete units
+of attention acrossK sites at each time step. Each unit of attention is
+able to discover a single incident. Letak,t be the amount of attention
+allocated to sitek at time t . At each time step, for each sitek , the total
+number of incidents is sampled  kt ⇠ Poisson(rk,t )). The agent
+then discovers  ̂kt := min{akt , kt } incidents (precision discovery
+model of Elzayn et al. [6]). The rates rk,t change in response to
+attention
+rk,t+1 =
+(
+rk,t + d if ak,t = 0
+rk,t   dak,t else
+, (1)
+where d is a parameter that controls how dynamic the environment
+is.
+3We explicitly do not consider the problem of predictive policing in this paper, due in
+part to concerns such as those raised by [26].
+4Elzayn et al. [6] noted this extension as a potential area of future work.
+Discovered Missed
+Figure 6: Incidents discovered (left) and missed (right) for di￿erent agents. The dynamic factor, d , controls the amount that
+allocation a￿ects future incident generation. While the greedy agent seems to be the very successful based on number of
+discovered incidents under dynamics, it is also one of the agents missing the most incidents.
+4.2 Metrics
+We track several metrics to quantify the welfare of individuals at
+di￿erent sites, and the fairness of agent actions. Because incidents
+are considered harmful, we track both total discovered incidents
+and total missed incidents to measure population welfare. We note
+that the simulation provides a unique opportunity to track missed
+incidents, which are often not measured in real-world settings,
+where administrative data only record discovered incidents.
+To assess fairness, we implement a metric that empirically mea-
+sures departures from a criterion that Elzayn et al. [6] call “equality
+of discovery probability.” Equality of discovery probability implies
+that incidents that occurred at each site have equal probability of
+being discovered by the allocation policy. We measure the gap in
+empirical discovery probabilities as the maximum discrepancy in
+caught to occurred incidents between sites:
+  = max
+k,k 0
+    
+Õ
+t  ̂ktÕ
+t  kt
+ 
+Õ
+t  ̂k 0tÕ
+t  k 0t
+     . (2)
+This is easily calculated in terms of discovered and missed incident
+counts. We calculate this gap as an aggregate over the history of
+the actions and environment’s state because we want to assess how
+the agent performed and a￿ected the environment overall.
+4.3 Agents
+We evaluate several agents in this simulation study. As a baseline,
+we consider a uniform agent that allocates attention uniformly at
+random across sites.
+In addition, we consider proportional agents, motivated by En-
+sign et al. [7]’s notion of proportional allocation as a fair allocation
+strategy, which allocate units of attention with probabilities pro-
+portional to their estimates of incident rates r̂ . Finally, we consider
+fairness-constrained greedy agents proposed by Elzayn et al. [6].
+These agents allocate attention sequentially, maximizing the proba-
+bility that the next unit of attention will result in a discovery subject
+to the constraint that the maximum gap in discovery probabilities
+between sites is less than   . When   = 1, the agent is purely greedy,
+with e￿ectively no fairness constraints, while   = 0 requires exact
+equality of likelihood of incident discovery across all locations.
+Both the greedy and proportional agents rely on estimates r̂ .
+Following Elzayn et al. [6], each agent estimates the rates that
+maximize the likelihood of the observed incident counts  ̂ at each
+site under the censored Poisson model (maximum likelihood esti-
+mation). Importantly, this internal agent model assumes that the
+incident rates at each site are ￿xed in time (the model is misspeci-
+￿ed under dynamics). To e￿ectively estimate the rates at each site,
+the agents must employ some form of exploration. We consider
+several epsilon-greedy versions of these agents parameterized by
+exploration parameter   . These allocate attention uniformly with
+probability   and follow their ordinary policy with probability 1   .
+4.4 Experiments and results
+With the environment, agent and metrics speci￿ed, we can explore
+how the dynamics in the incident rates in response to attention
+(parameterized by d in (1)) a￿ects the long-term outcomes when
+the agents are deployed. In particular, we examine how the e￿ec-
+tiveness and fairness properties of misspeci￿ed agents change at
+the dynamics are made more intense.
+To evaluate the performance of agents under the simple dynam-
+ics of the environment we run experiments with 5 di￿erent dynamic
+factor values: d = [0.0, 0.0025, 0.01, 0.05], using 5 agents: uniform,
+proportional   = 0.1, proportional   = 0.5, greedy   = 0.75 (fair-
+ness constrained), and greedy   = 1.0 (unconstrained). Each ex-
+periment consists of 50 runs of the 1000 step simulation averaged
+together. The simulations are run on an environment with 5 lo-
+cations having rate of [8, 6, 4, 3, 1.5] and 6 units of attention. The
+fairness parameter   = 0.75 for the fairness-constrained greedy
+agent is relatively high as a consequence of the  -fairness con-
+straint being unsatis￿able for certain combinations of low numbers
+of the rates and attention units.
+Figure 7: The largest delta across locations of incidents dis-
+covered over incidents occurred for each agent and each dy-
+namic factor, as described in Equation 2. Higher deltas cor-
+respond to larger disparities in treatment between locations.
+The purely greedy agent is one of the least fair in the static
+(d = 0.0) scenario but is one of the most fair in dynamic
+(d > 0) scenarios. The proportional (epsilon=0.1) agent per-
+forms fairly throughout.
+Figure 8: Attention allocations and incident occurrences
+over time for the purely greedy agent with d = 0.05, with
+each color representing a di￿erent site. The agent’s alloca-
+tions lag slightly behind the true rates.
+E￿ectiveness under dynamics. First, we examine the agents’ ef-
+fectiveness at discovering and controlling incidents. Figure 6 sum-
+marizes the incidents that are discovered and missed by each agent
+type. Without dynamics (d = 0.0), all agents perform relatively sim-
+ilarly, catching and missing similar numbers of incidents. However,
+when dynamics are introduced with d , 0.0, for larger values of d ,
+the unconstrained greedy agent stands out in that it both catches
+and misses more incidents than any other agent. Because uncaught
+incidents are considered harmful in this scenario, this corresponds
+to the worst outcomes among all agents.
+We illustrate how these poor outcomes play out in Figure 8,
+which illustrates the behavior of the greedy agent alongside the
+incident dynamics that its policy induces. By trying to maximize
+incidents discovered the agent over-allocates to sites where inci-
+dents were observed recently, resulting in increasing incident rates
+in other sites that are under-allocated. By contrast, the other agents
+are able to cause overall incident rates to decrease, thus avoiding
+the run-away increase of incidents the greedy agent causes. Here,
+by optimizing the wrong objective too aggressively, the greedy
+agent causes more incidents to occur.
+As Figure 6 makes clear, one of the key di￿erence between the
+settings with and without dynamics is the relationship between
+discovered and missed incidents. With static incident rates, max-
+imizing discovered incidents is equivalent to minimizing missed
+incidents, so to minimize harm from uncaught incidents, it su￿ces
+to maximize discovered incidents. However, when incident rates
+respond dynamically to allocations, this equivalency breaks, and
+discovering more incidents is no longer an indicator of an agent
+performing as expected. This has a number of implications for how
+agents are evaluated, and how we expect agent performance to
+transfer from static to dynamic settings.
+Most importantly, the non-equivalence between high caught
+incidents and low missed incidents is that, under many realistic
+data collection mechanisms, the failure of the greedy agent would
+not be detected by an auditor. As noted above, in many real settings,
+only discovered incidents are recorded by the agent and available to
+auditors. If the agents in this simulation were evaluated on discov-
+ered incidents alone, the agents inducing poor all-around outcomes
+would be deemed the most successful. This calls for great care when
+transferring policies and evaluation strategies from stationary to
+dynamic settings.
+In addition, this non-equivalence suggests that we should not
+expect policies that are optimized in the static setting to remain
+optimal or near-optimal, even when small dynamics are introduced.
+This is because maximizing caught incidents corresponds to the
+wrong objective under dynamics. Indeed, in examining Figure 6, we
+see that, under dynamics, fairness constrained policies generally
+outperform unconstrained policies in terms of missed incidents the
+long run.
+Fairness under dynamics. In addition to agent e￿ectiveness, we
+also measure the fairness of each agent in this simulation using
+the discovery probability discrepancy metric de￿ned in (2). Here,
+we ￿nd that strategies that achieve similar e￿ectiveness under
+dynamics can have widely varying fairness properties. These results
+are summarized in Figure 7. Most strikingly, allocation schemes
+that incorporate substantial uniform randomness (uniform and
+proportional   = 0.5) perform starkly worse in terms of   as the
+dynamic factor d increases. On the other hand, the greedy   = 0.75
+agent ensures fairer outcomes the larger the dynamic factor d ,
+despite being misspeci￿ed. The divergent fairness properties of
+these agents is somewhat surprising given their largely comparable
+performance in controlling missed incidents. In fact, among these
+three strategies, greedy   = 0.75 is both the most e￿ective and the
+fairest. Finally, the pure greedy and proportional   = 0.1 strategies
+also appear to become fairer as d increases, but this is somewhat
+less interesting, given that this comes, in part, from a trade-o￿ with
+e￿ectiveness, which is particularly stark in the case of the pure
+greedy strategy.
+Extensions. This work can be extended to evaluate the perfor-
+mance of agents under a variety of environment changes. Any
+parameter of the environment can be iterated upon across simu-
+lations to explore how resulting metrics change. An interesting
+avenue of future work for the attention allocation environment is
+to vary aspects of the environment that the agents make modeling
+assumptions about. The agents presented involve two key model-
+ing decisions in the likelihood functions, assuming the incidents
+follow a Poisson distribution and incidents are discovered under a
+precision discovery model. This is an ideal scenario in our experi-
+ments because the environment does indeed operate under these
+models. Real world environments, however, may have harder to
+model discovery functions and incident distributions that can only
+ever be approximately modeled. A future extension of this work
+could explore the vulnerability of these modeling decisions in these
+agents when the environment operates with a di￿erent distribution
+or discovery model.
+5 REALIZED EQUILIBRIA IN A STRATEGIC
+MANIPULATION SETTING: COLLEGE
+ADMISSIONS
+For our ￿nal demonstration, we consider a strategic classi￿cation
+scenario [13], in which individuals are able to pay a cost to manip-
+ulate their features in order to obtain a desired decision from the
+agent. We implement this scenarios as a stylized model of college
+admissions, where applicants are aware of the agent’s decision
+rule, and can pay to manipulate or “game” their observable features
+to obtain their preferred decision (e.g., by investing in test prep
+courses). This setting is a special case of a sequential two-player
+game called the Stackleberg game [2].
+In a strategic classi￿cation setting, the agent can anticipate fea-
+ture manipulation, and employ a robust decision rule. Hardt et al.
+[13] showed that if the agent has knowledge of the cost functions so
+that it can determine how much applicants must pay to manipulate
+their scores, then the agent can learn a best-response decision rule
+that nearly recovers the accuracy of the optimal decision rule on un-
+manipulated scores. Generally, this robust strategy employs a more
+conservative decision threshold that forces some quali￿ed candi-
+dates to manipulate their scores, but is too costly for unquali￿ed
+candidates to reach.
+Robustness, however, imposes a burden on applicants. Both Hu
+et al. [16] and Milli et al. [22] point out that deploying a robust
+decision rule in this setting has important fairness implications. In
+the college admissions scenario, they show that robust strategies
+can impose disproportionate burdens on quali￿ed applicants from
+disadvantaged groups. This sets up a trade-o￿ between the agent’s
+utility, which is increasing in the classi￿er’s accuracy, and applicant
+utility, which is decreasing in the cost that quali￿ed applicants must
+pay to be accepted by the agent. The implication of this work is that
+responsible actors should consider this trade-o￿ before deploying
+robust policies.
+Using simulation, we extend these analyses in two ways. First,
+we compare the behavior of one-shot agents considered in previous
+work against the behavior of an agent that is able to retrain its
+classi￿er across many rounds of decisions, but remains unaware of
+gaming behavior. Second, we consider how noise in the relation-
+ship between an applicant’s unmanipulated score and their true
+label a￿ects the continuously retrained classi￿er (previous work
+considered a noiseless relationship). We ￿nd that with and with-
+out noise, the continuously retrained agent behaves strategically
+(i.e., implements a robust strategy) by raising its threshold to some
+extent in the presence of gaming behavior, and we ￿nd that noise
+compounds this incidental strategic behavior. This suggests that
+the fairness implications of robust policies need to be considered
+in continuous retraining contexts, even if the agent is not designed
+to anticipate strategic manipulation.
+5.1 Environment
+At each round the agent5, representing a college, publishes its
+admission threshold score   . The environment then generates a
+set of applicants with a set of ground truth test scores in [0, 1]
+that determine the true eligibility of each applicant. The applicants
+then choose whether to pay a cost to manipulate their scores in
+order to pass the admissions bar published in   . The cost is group-
+speci￿c, and depends on the di￿erence between the true scores
+and manipulated scores. Applicants play rationally and only pay
+to change their score if it will change an unfavorable decision
+to a favorable one, and if the cost does not exceed the bene￿t of
+a favorable decision. The environment emits these manipulated
+features to the agent, which attempts to classify these applicants.
+To examine the fairness in this environment, we follow the ter-
+minology used in Milli et al. [22] and report the social burden, which
+is the cost that all eligible candidates in a group would have to pay
+to get favorable decisions. We also consider applicants belonging to
+two groups, one of which faces the disadvantage of paying a higher
+cost to improve their score by the same amount.
+5.2 Agents
+For this set of simulations, we consider the following policies for
+agents, all trying to maximize accuracy. First, we consider a static
+agent that implements a naïve, one-shot classi￿cation strategy. This
+is implemented as a policy that accepts all applicants for a ￿xed
+number of rounds, then trains a ￿xed classi￿er on the unmanipu-
+lated (score, label) pairs that it has observed. Secondly, we consider
+a robust agent that implements a similar one-shot policy, but uses
+the robust classi￿cation algorithm from Hardt et al. [13] for train-
+ing. Finally, we consider a continuous agent that gathers an initial
+set of unmanipulated applicants, then continuously retrains a non-
+robust classi￿er based on the subsequent manipulated scores and
+labels that it observes. We consider the continuous agent to be a
+reasonable model of deployed machine learning systems.
+5.3 Experiments and results
+Our key ￿nding is that the continuously retraining agent compen-
+sates for strategic manipulation to varying extents, even though it
+is not explicitly designed to do so, and that this behavior is exacer-
+bated by noise.
+We illustrate the results of our simulations in Figure 9. The plots
+on the left are from the setting where unmanipulated scores can
+perfectly classify applicants; the plots on the right are from the
+setting where there is noise in the score-label relationship. The top
+row of plots shows the accuracy that an agent could achieve within
+each group, and overall, if it were to ￿x its threshold at a particular
+value.6 The decision thresholds that each agent arrives at after many
+rounds are shown with vertical lines; as predicted by previous
+5In the strategic classi￿cation literature, applicants are often referred to as agents and
+the college as a jury. In our setting where we consider agents and environments, it is
+simpler to think of the the college as the agent whose action is publishing a threshold
+score and the actions of the applicants as the environment’s response.
+6A key property of the strategic classi￿cation game is that these curves do not map on
+to the empirical risk curve that one would use to train a standard classi￿er.
+Figure 9: Illustration of limiting decision thresholds and their implications in the college admission scenario. The columns
+show outcomes in two di￿erent noise regimes, and the rows show accuracy (agent utility) and social burden (costs borne by
+applicants) outcomes. Vertical lines show long-run thresholds reached by each agent type, and curves show outcomes for the
+whole population and strati￿ed by group. The naïve continuously retrained agent incorporates no knowledge of score manip-
+ulation, but still sets a higher threshold at equilibrium than the naïve static agent, achieving a higher accuracy, but inducing
+a higher social burden. In the high-noise regime, this agent’s threshold converges to the manipulation-robust threshold.
+work, the robust threshold is always larger than the static one,
+and optimizes overall accuracy. The bottom row shows the social
+burden incurred by each group, which is increasing in the decision
+threshold; this is the social cost of robust classi￿cation discussed in
+previous work [16, 22]. The continuous threshold settles between
+the static and robust thresholds. In the noisy case, it climbs all the
+way to the robust threshold after many rounds. These ￿ndings are
+consistent with results in Milli et al. [22], who show that Nash
+equilibria can occur in this strategic classi￿cation setting, and these
+equilibria always lie between the static naïve and robust thresholds.
+Because repeated games settle into Nash equilibria, this simulation
+is useful for characterizing the particular equilibrium that a learning
+agent reaches, and how the noise regime in￿uences that particular
+equilibrium.
+The results suggest that, if manipulation is occurring, practition-
+ers should consider the fairness implications of robust classi￿cation
+even if they are not deploying a robust agent.
+6 DISCUSSION
+6.1 Simulations complement experiments with
+real data
+The simulations in this paper are all extremely simple. This should
+not be interpreted as a claim that the world is actually simple; rather,
+this is meant to highlight that even with these simpli￿ed dynamics,
+the consequences of using learning agents are not immediately
+obvious and require simulation to uncover. Building and verifying
+realistic simulations of processes as complex as e.g., college admis-
+sions and how they in￿uence and are in￿uenced by educational
+systems and cultural frames, is a laborious process and achieving a
+high level of realism may be impossible. Striking the right balance
+of highlighting the important dynamics abstractly in simulation,
+and e￿ectively using real data and possibly even small experiments
+to ensure relevance of the results to the real world is an ongoing
+tension and we expect to see more work in that space.
+6.2 Policy search via reinforcement learning
+Rather than using simulations to evaluate an agent’s fairness in
+the long term, we can also invert the problem, and use simula-
+tion as a way to suggest new fair algorithms, using reinforcement
+learning [31] to search for policies that optimize for positive long
+term consequences. The simulation library that accompanies this
+paper (https://github.com/google/ml-fairness-gym) uses the stan-
+dard reinforcement learning API of OpenAI Gym [1], and is thus
+compatible with a many modern reinforcement learning tools.
+We note that this search is extremely sensitive to characteriza-
+tion of the rewards to be optimized. For example, in the dynamic
+attention allocation problem described in Section 4, maximizing dis-
+covered incidents is not the same as minimizing missed incidents. In
+early experiments with reinforcement learning agents, we observe
+that a DQN (Deep Q-Network) agent [24] that receives rewards
+for every discover incident learns to “neglect” locations for long
+enough for the rates to rise so that it is likely to make a discovery,
+rather than keeping incidents rates low (which results in fewer dis-
+coveries). Code to reproduce this experiment using the Dopamine
+reinforcement learning framework [4] is available with the rest
+of the experiments code for this paper. Designing rewards that do
+not lead to this kind of “gaming the system” behavior is left as a
+direction for future work.
+6.3 Other interesting directions
+By expanding the frame of the learning problem to include the con-
+current data collection and decision making of an agent (i.e., online
+learning), we open a number of avenues for exploration including
+optimal data collection for fairness, and determining whether it is
+possible to detect unfair actions of a (possibly adversarial) agent
+whose decisions a￿ect what data it collects.
+The simulation framework used here can also be extended to
+scenarios where multiple agents interact competitively or coopera-
+tively and examine the fairness implications that emerge.
+The framework also sets up simulation experiments to be easily
+reproducible and extendable, whichwe hope to see become standard
+in the fairness community. We are excited to see how algorithms
+can be designed to make fair decisions in dynamic environments
+and strongly believe that simple simulations are a ￿rst step in
+establishing understanding and tools to address this challenging
+problem.
+ACKNOWLEDGMENTS
+We thank William Isaac, Donald Martin, Meredith Whittaker, An-
+drew Smart, Vinodkumar Prabhakaran, Alex Hanna, Emily Denton,
+X Eyee, Ed Chi, Zelda Mariet, and the participants at the KDD XAI
+workshop for in-depth feedback about the focus, implementation,
+and framing of this manuscript and the ml-fairness-gym project.
+REFERENCES
+[1] Greg Brockman, Vicki Cheung, Ludwig Pettersson, Jonas Schneider, John Schul-
+man, Jie Tang, and Wojciech Zaremba. 2016. Openai gym. arXiv preprint
+arXiv:1606.01540 (2016).
+[2] Michael Brückner and Tobias Sche￿er. 2011. Stackelberg games for adversar-
+ial prediction problems. In Proceedings of the 17th ACM SIGKDD international
+conference on Knowledge discovery and data mining. ACM, 547–555.
+[3] Alex Campolo, Madelyn San￿lippo, Meredith Whittaker, and Kate Crawford.
+2017. AI now 2017 report. AI Now Institute at New York University (2017).
+[4] Pablo Samuel Castro, Subhodeep Moitra, Carles Gelada, Saurabh Kumar, and
+Marc G. Bellemare. 2018. Dopamine: A Research Framework for Deep Reinforce-
+ment Learning. (2018). http://arxiv.org/abs/1812.06110
+[5] Dheeru Dua and Casey Gra￿. 2017. UCI Machine Learning Repository. http:
+//archive.ics.uci.edu/ml
+[6] Hadi Elzayn, Shahin Jabbari, Christopher Jung, Michael Kearns, Seth Neel, Aaron
+Roth, and Zachary Schutzman. 2019. Fair algorithms for learning in alloca-
+tion problems. In Proceedings of the Conference on Fairness, Accountability, and
+Transparency. ACM, 170–179.
+[7] Danielle Ensign, Sorelle A Friedler, Scott Neville, Carlos Scheidegger, and Suresh
+Venkatasubramanian. 2018. Runaway Feedback Loops in Predictive Policing. In
+Conference on Fairness, Accountability and Transparency. ACM, 160–171.
+[8] Michael Feldman, Sorelle A Friedler, JohnMoeller, Carlos Scheidegger, and Suresh
+Venkatasubramanian. 2015. Certifying and removing disparate impact. In Proceed-
+ings of the 21th ACM SIGKDD International Conference on Knowledge Discovery
+and Data Mining. ACM, 259–268.
+[9] Jay W Forrester. 2007. System dynamicsâĂŤa personal view of the ￿rst ￿fty
+years. System Dynamics Review: The Journal of the System Dynamics Society 23,
+2-3 (2007), 345–358.
+[10] Ian Hacking. 1986. Making Up People. In Reconstructing individualism: Autonomy,
+individuality, and the self in Western thought, Thomas C Heller, Morton Sosna,
+and David E Wellberry (Eds.). Stanford University Press.
+[11] Ian Hacking. 1995. The looping e￿ects of human kinds. (1995).
+[12] Ian Hacking, Jan Hacking, et al. 1999. The social construction of what? Harvard
+university press.
+[13] Moritz Hardt, NimrodMegiddo, Christos Papadimitriou, andMaryWootters. 2016.
+Strategic classi￿cation. In Proceedings of the 2016 ACM conference on innovations
+in theoretical computer science. ACM, 111–122.
+[14] Moritz Hardt, Eric Price, and Nathan Srebro. 2016. Equality of opportunity in
+supervised learning. In Proceedings of the 30th International Conference on Neural
+Information Processing Systems. Curran Associates Inc., 3323–3331.
+[15] Anna Lauren Ho￿mann. 2019. Where fairness fails: data, algorithms, and the
+limits of antidiscrimination discourse. Information, Communication & Society 22,
+7 (2019), 900–915.
+[16] Lily Hu, Nicole Immorlica, and Jennifer Wortman Vaughan. 2019. The disparate
+e￿ects of strategic manipulation. In Proceedings of the Conference on Fairness,
+Accountability, and Transparency. ACM, 259–268.
+[17] Shahin Jabbari, Matthew Joseph, Michael Kearns, Jamie Morgenstern, and Aaron
+Roth. 2017. Fairness in reinforcement learning. In Proceedings of the 34th Interna-
+tional Conference on Machine Learning-Volume 70. JMLR. org, 1617–1626.
+[18] Matthew Joseph, Michael Kearns, Jamie H Morgenstern, and Aaron Roth. 2016.
+Fairness in learning: Classic and contextual bandits. In Advances in Neural Infor-
+mation Processing Systems. 325–333.
+[19] Faisal Kamiran and Toon Calders. 2009. Classifying without discriminating. In
+2009 2nd International Conference on Computer, Control and Communication. IEEE,
+1–6.
+[20] Sampath Kannan, Aaron Roth, and Juba Ziani. 2019. Downstream e￿ects of
+a￿rmative action. In Proceedings of the Conference on Fairness, Accountability,
+and Transparency. ACM, 240–248.
+[21] Lydia T Liu, Sarah Dean, Esther Rolf, Max Simchowitz, and Moritz Hardt. 2018.
+Delayed Impact of Fair Machine Learning. In Proceedings of the 35th International
+Conference on Machine Learning.
+[22] Smitha Milli, John Miller, Anca D Dragan, and Moritz Hardt. 2019. The Social
+Cost of Strategic Classi￿cation. In Proceedings of the Conference on Fairness,
+Accountability, and Transparency. ACM, 230–239.
+[23] Shira Mitchell, Eric Potash, and Solon Barocas. 2018. Prediction-based decisions
+and fairness: A catalogue of choices, assumptions, and de￿nitions. arXiv preprint
+arXiv:1811.07867 (2018).
+[24] Volodymyr Mnih, Koray Kavukcuoglu, David Silver, Andrei A Rusu, Joel Veness,
+Marc G Bellemare, Alex Graves, Martin Riedmiller, Andreas K Fidjeland, Georg
+Ostrovski, et al. 2015. Human-level control through deep reinforcement learning.
+Nature 518, 7540 (2015), 529.
+[25] ProPublica. 0. compas-analysis. https://github.com/propublica/compas-
+analysis/
+[26] Rashida Richardson, Jason Schultz, and Kate Crawford. 2019. Dirty Data, Bad
+Predictions: How Civil Rights Violations Impact Police Data, Predictive Policing
+Systems, and Justice. New York University Law Review Online, Forthcoming (2019).
+[27] Ken Ross. 2007. A mathematician at the ballpark: Odds and probabilities for
+baseball fans. Penguin.
+[28] Andrew D Selbst, Danah Boyd, Sorelle A Friedler, Suresh Venkatasubramanian,
+and Janet Vertesi. 2019. Fairness and abstraction in sociotechnical systems. In
+Proceedings of the Conference on Fairness, Accountability, and Transparency. ACM,
+59–68.
+[29] Till Speicher, Hoda Heidari, Nina Grgic-Hlaca, Krishna P Gummadi, Adish Singla,
+Adrian Weller, and Muhammad Bilal Zafar. 2018. A Uni￿ed Approach to Quan-
+tifying Algorithmic Unfairness: Measuring Individual &Group Unfairness via
+Inequality Indices. In Proceedings of the 24th ACM SIGKDD International Confer-
+ence on Knowledge Discovery & Data Mining. ACM, 2239–2248.
+[30] John D Sterman. 2001. System dynamics modeling: tools for learning in a complex
+world. California management review 43, 4 (2001), 8–25.
+[31] Richard S Sutton and Andrew G Barto. 2018. Reinforcement learning: An intro-
+duction.
+[32] Sebastian Thrun, Wolfram Burgard, and Dieter Fox. 2005. Probabilistic robotics.

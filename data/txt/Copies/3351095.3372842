@@ -1,0 +1,1610 @@
+The E￿ects of Competition and Regulation on Error Inequality
+in Data-Driven Markets
+Hadi Elzayn
+University of Pennsylvania*
+hads@sas.upenn.edu
+Benjamin Fish
+Microsoft Research
+benjamin.￿sh@microsoft.com
+ABSTRACT
+Recent work has documented instances of unfairness in deployed
+machine learning models, and signi￿cant researcher e￿ort has been
+dedicated to creating algorithms that intrinsically consider fairness.
+In this work, we highlight another source of unfairness: market
+forces that drive di￿erential investment in the data pipeline for dif-
+fering groups. We develop a high-level model to study this question.
+First, we show that our model predicts unfairness in a monopoly
+setting. Then, we show that under all but the most extreme mod-
+els, competition does not eliminate this tendency, and may even
+exacerbate it. Finally, we consider two avenues for regulating a
+machine-learning driven monopolist - relative error inequality and
+absolute error-bounds - and quantify the price of fairness (and who
+pays it). These models imply that mitigating fairness concerns may
+require policy-driven solutions, not only technological ones.
+CCS CONCEPTS
+• Theory of computation→Market equilibria;Machine learn-
+ing theory; Sample complexity and generalization bounds; Quality of
+equilibria; • Applied computing→ Economics.
+KEYWORDS
+learning theory, algorithmic fairness, data markets, game theory,
+industrial organization, economics
+ACM Reference Format:
+Hadi Elzayn and Benjamin Fish. 2020. The E￿ects of Competition and
+Regulation on Error Inequality in Data-Driven Markets. In Conference on
+Fairness, Accountability, and Transparency (FAT* ’20), January 27–30, 2020,
+Barcelona, Spain. ACM, New York, NY, USA, 18 pages. https://doi.org/10.
+1145/3351095.3372842
+1 INTRODUCTION
+As machine learning has become more integrated into products,
+markets, and decision-making throughout society, researchers, prac-
+titioners, and activists have identi￿ed many instances of unfairness
+in predictions or decisions made by machine-learned models (or by
+humans in￿uenced by said models). A large and developing body
+*This work was completed while the author was an intern at Microsoft Research.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for pro￿t or commercial advantage and that copies bear this notice and the full citation
+on the ￿rst page. Copyrights for components of this work owned by others than the
+author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or
+republish, to post on servers or to redistribute to lists, requires prior speci￿c permission
+and/or a fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 978-1-4503-6936-7/20/01. . . $15.00
+https://doi.org/10.1145/3351095.3372842
+of work, which we brie￿y survey in Section 2, has empirically docu-
+mented unfairness in practical machine learning settings, identi￿ed
+many theoretical sources and mechanisms of unfairness, and con-
+structed innovative fairness-aware algorithms. Researchers have
+developed many innovative technical solutions to these problems,
+yet the issue in practice remains far from solved. This paper high-
+lights a simple and important point: while technical solutions to
+unfairness are certainly important, mitigating unfairness in practice
+may require tackling economic incentives promoting unfairness.
+Most of the existing literature assumes that a ￿xed dataset, pos-
+sibly biased, arrives in the hands of a data scientist, and solutions
+often revolve around clever ways to mitigate this bias. In practice,
+however, economic incentives may create disparities well before
+the data scientist enters the picture. Consider, for example, the task
+of speech recognition: producing accurate models may require a
+large amount of data, and data from speakers with accented or
+rarer dialects may be more costly to collect. If the market size of a
+minority group is small relative to the costs a ￿rm would expend
+in developing accurate speech recognition software, it is likely that
+the group will be served with lower quality products.
+In this paper, we model the unfairness that arises when data-
+driven, pro￿t-maximizing ￿rms choose to di￿erentially invest in
+data collection across groups, creating unequal error rates. In order
+to focus on this speci￿c source of unfairness, we use a simple
+framework that elides the many other sources of bias that can seep
+into the machine learning pipeline. For instance, we assume that
+￿rms have unlimited budgets to purchase data at a cost from group-
+speci￿c data sources of potentially in￿nite quantity. We also assume
+that both ￿rms and users bene￿t from more accurate models, so
+that incentives are aligned. Furthermore, we assume that ￿rms must
+build separate models for each group, to avoid unfairness that may
+come from ￿tting to the majority.
+In order to construct our models, we borrow from the tools of
+learning theory and microeconomics to build simple, stylized mod-
+els with crisp predictions of quanti￿able unfairness. We assume
+each pro￿t-maximizing ￿rm faces a known demand curve as a func-
+tion of the worst-case error rates for each group. Standard results
+from learning theory allow us to model worst-case error rates as
+a function of the amount of data the ￿rm buys. We investigate
+three models of demand: linear demand, demand proportional to
+error rates, and (approximately) rational demand. For the precise
+description of our models and these assumptions, see Section 3.
+We show in Section 4 that a pro￿t-maximizing monopolist will
+choose to serve minorities (as de￿ned by their market power) with
+lower quality models. Assuming linear demand, an oft-used bench-
+mark in the economics literature, we quantify the di￿erence in
+relative model quality between groups as a function of their market
+size, elasticity, and cost of data.
+We then consider two classical remedies to the ills of monop-
+olies: competition and regulation. Under two natural models of
+competition – multilinear demand (Section 5.1) and proportional
+demand (Section 5.2) – introducing competition does not mitigate
+inequality, and proportional demand even exacerbates it. Only a
+model in which all consumers choose the ￿rm with (even in￿nitesi-
+mally) smaller error until ￿rms reach su￿cient accuracy suggests
+that competition will mitigate inequality (Section 5.3); to do so,
+however, this model assumes a stringent notion of rationality that
+may not be re￿ective of consumer behavior in the real world.
+Given that our most plausible models suggest that competition
+does improve the situation, we askwhether regulation could be used
+to mitigate error inequality by design. In particular, in Section 6
+we examine two simple kinds of constraints: a ‘relative equality’
+constraint where error rates across groups must be multiplicatively
+close to each other, and an ‘absolute equality’ constraint where
+error rates across all groups must be su￿ciently small, but may
+be far apart from each other. We then formally quantify the costs
+to pro￿ts (and when relevant, to the majority group’s error rate)
+as a function of the threshold chosen. Finally, we conclude with
+takeaways, limitations, and directions for future work in Section 7.
+2 RELATEDWORK
+Motivation for our work comes from the many documented in-
+stances of disparity in learned model performance between groups.
+The existing literature has demonstrated troubling disparities in a
+number of domains, including incentive-aligned domains (where
+both the ￿rms and users receive bene￿t frommore accurate models)
+that are the focus of this work. Wilson et al. [34] studies the per-
+formance of state-of-the-art object recognition systems, intended
+for applications like autonomous vehicles, and ￿nd that systems
+fail to recognize darker-skinned persons at much higher rates than
+lighter ones. Sweeney shows that search engine queries of black-
+associated names generated about four times the likelihood of ads
+for arrest records [30]. Blodgett and O’Connor show that on both
+complicated tasks like parsing and simple tasks like language identi-
+￿cation, texts from speakers of African American English see vastly
+higher error rates [8]. Buolamwini and Gebru show that commer-
+cial facial recognition software systems misclassify race and gender
+among dark-skinned females at orders of magnitude higher rates
+than light-skinned males [9]. Mehrotra et al. [26] and Ekstrand et
+al. [13] identify di￿ering satisfaction levels by age and gender in
+recommendation systems. The list goes on.
+Researchers have engaged in many empirical and theoretical in-
+vestigations to understand why these instances of unfairness occur,
+with the hope of developing solutions to mitigate them. Much of
+this work focuses on the learning algorithm itself as the source
+of unfairness, and attempts to incorporate fairness notions into
+the algorithm [21]; see e.g. Verma and Rubin [33] for a survey of
+fairness de￿nitions. Training data has also been identi￿ed as source
+of unfairness; for example, Chen et al. identify sample size di￿er-
+ences as a crucial source of unfairness, and decomposes induced
+unfairness into bias, variance, and noise [10]. Various feedback
+loops stemming from historical bias have also been identi￿ed as
+sources of unfairness [14, 15, 24]. There are a few others, including
+selection bias [20], using the wrong metric [27], or using a single
+model across multiple underlying data generating processes [22].
+However, to the best of our knowledge, market forces in data in-
+vestment have seen little attention as a source of unfairness. See
+the survey of Cowgill and Tucker [11] for an in-depth survey of
+perspectives on the sources of unfairness from computer science
+and economics.
+Our models are built on insights from two extensive, and his-
+torically separate, literatures: the formalization of learning from
+data embodied in computational and statistical learning theory,
+and models of strategic interactions from the theory of industrial
+organization (see e.g. Tirole [31]). From learning theory, we apply
+fundamental bounds on sample complexity derived from the Proba-
+bly Approximately Correct (PAC) framework (see e.g. Kearns and
+Vazirani [23]) to relate ￿rms’ costs to worst-case error rates; from
+industrial organization, we modify widely used models of demand
+(such as linear demand, multilinear models of imperfect substitutes
+[6], the Tullock contest [32], and Bertrand competition [29]) to link
+￿rms’ choices to consumer behavior.
+Recently, these two ￿elds have drawn closer, as both computer
+scientists and economists have begun to model markets for infor-
+mation and data. For example, Aridor et al. [1] and Mansour et
+al. [25] consider the exploration-exploitation tradeo￿s faced by
+￿rms competing to win users in a bandits setting, while Ben-Porat
+and Tennenholtz formalize competition in the prediction space that
+can lead to models very di￿erent than those produced by empirical
+risk minimization algorithms [3, 4]. To the best of our knowledge,
+however, this is the ￿rst work to apply learning theory and indus-
+trial organization to explore di￿ering incentives in the context of
+fairness. The work of Dong et al. [12] is the closest in form to ours,
+and uses a similar high-level abstraction of learning theory, as well
+as a proportional-error split in market share, but primarily explores
+questions of market concentration.
+3 CONSUMER BEHAVIOR AND LEARNING
+THEORY
+We begin by describing our framework at a high level. In our models,
+￿rms use data to create a classi￿er (or other machine learning
+model) that is then used to serve consumers. Consumers are split
+into non-overlapping groups, and choose a ￿rm based on how
+well the ￿rm’s model is performing for their group. Firms receive
+revenue based on how many consumers they attract, but must pay
+for the amount of the data they buy. The more data, the better their
+model. The ￿rms aim to maximize their pro￿ts. In the case where
+there are multiple ￿rms, the goal of each ￿rm is to maximize their
+pro￿t at equilibrium, as other ￿rm’s choices a￿ect the number of
+consumers that they get, and hence their choices. Here, the ￿rm’s
+only (strategically relevant) choice is how much data to buy.
+We start with the monopoly case, where there is only one ￿rm.
+The ￿rm chooses a number of data pointsM  to buy for each group,
+where we writeM for the vector of these choices; we write   (M )
+for the worst-case error the ￿rm can guarantee for group  , and
+assume this error is known to consumers. The groups then respond
+by entering the market according to a demand function D (  ),
+where D (  ) represents the proportion of   that uses the ￿rm’s
+model. Each group has µ  total people, so the ￿rm’s revenue is
+Õ
+ 2G µ D (  (M )). The ￿rm also pays for the data, represented
+by a cost function C(M).
+We will discuss our choices for   , D, andC in Sections 3.1 and 3.2.
+But for now, the ￿rm’s pro￿t is just the revenue the ￿rm makes
+minus the cost it spends to acquire that data, leading to the following
+optimization problem:
+D￿￿￿￿￿￿￿￿￿ 3.1 (T￿￿M￿￿￿￿￿￿￿￿￿’￿ P￿￿￿￿￿￿). The ￿rm chooses
+M to maximize its pro￿t   (M), i.e.
+max
+M
+  (M) = max
+M
+’
+ 2G
+µ D (  (M ))  C(M).
+Because we will assume in Section 3.1 that    is a deterministic
+function ofM  , we can also rewrite this optimization problem as
+max
+ 
+  ( ) = max
+ 
+’
+ 
+µ D (  )  C( ),
+where   is the vector of    . We de￿ne   ( ) = Õ
+  µ D (  )  C( )
+as the total pro￿t the monopolist makes. We will have an ad-
+ditively separable cost function in  , i.e. C( ) = Õ
+ 2G C (  ),
+which will allow us to also refer to the per-group pro￿t:   (  ) =Õ
+ 2G µ D (  )  C ( ).
+On the other hand, when there are multiple ￿rms F , maximizing
+pro￿t is not longer just an optimization problem, because each
+￿rm’s optimal choice will depend on its opponent’s choice. So in-
+stead, we search for a Nash equilibrium, which is the workhorse
+solution concept in classical game theory. Under such a Nash equi-
+librium, each ￿rm plays their best response, given all the choices
+of the other ￿rms. For a more thorough background, see [17].
+Extending our notation, we have the same components as in the
+monopolist case, except now we writeM i for the number of data
+points the ith ￿rm buys for group  ,   i is the error rate of the ith
+￿rm on group  , and D i (  ) = D i (  i ,   , i ) is the demand for
+the ith ￿rm from group  , given the vector    = (  i )i 2F of error
+rates.
+D￿￿￿￿￿￿￿￿￿ 3.2 (T￿￿ C￿￿￿￿￿￿￿￿￿’￿ P￿￿￿￿￿￿). Firms simulta-
+neously announce their choices, resulting in a matrixM = (M i ) of
+data points purchased. Each group in the market responds according
+to   (M ).
+Then a (pure) equilibrium under pro￿t-maximizing ￿rms is a set
+of vectorsM⇤
+i chosen with a best response:
+For all i ,
+M
+⇤
+i = argmax
+Mi
+ i (Mi ,M
+⇤
+ i )
+where for anyM ,
+ i (Mi ,M i ) =
+’
+ 
+µ D i (  i (M i ),   , i (M , i ))  C(Mi ).
+We will only consider pure strategy Nash equilibria in this work.
+Again, we can write an equivalent de￿nition of the competitor’s
+problem in terms of error:
+max
+ i
+ i ( i ,  ⇤ i ) = max
+ i
+’
+ 2G
+µ D i (  i ,  ⇤ , i )  C( i ),
+where  ⇤i is the vector of error rates given by the associated equi-
+librium choiceM⇤
+i . We also use   i (  i ,  ⇤ , i ) = µ D i (  i ,  ⇤ , i ) 
+C ( i ) to refer to the pro￿t i makes on group  .
+Note that a ￿rm i only enters amarket in the ￿rst place if  i ( ⇤) >
+0. In this work, we do not consider the case when  i ( ⇤)  0, as our
+goal is to show that even when ￿rms do enter the market for each
+group, market forces may still create a disparity between groups.
+Finally, in Section 6, we discuss imposing regulation on a monop-
+olist to ensure some kind of ‘fairness’ across groups. We consider
+two di￿erent kinds of constraints a regulator could impose on a
+￿rm. The ￿rst is what we refer to as relative error equality, which
+roughly corresponds to group fairness in binary classi￿cation [5]
+For all  , 0 2 G, we require
+  
+  0
+ (1 +   ),
+for parameter     0. On the other hand, we could ask for an absolute
+error guarantee, requiring that the error rates for both ￿rms are low,
+regardless of how close to each other they are: For all   2 G, we
+require instead
+      .
+This roughly corresponds with maximin notions of fairness, e.g. [5,
+7, 16].
+We investigate what happens when a monopolist satis￿es one
+of these two constraints. Because error is the relevant quantity
+from the regulator’s perspective, and error and data investment are
+so tightly linked, we write the regulated monopolist’s problem in
+terms of the choice of error:
+D￿￿￿￿￿￿￿￿￿ 3.3 (R￿￿￿￿￿￿￿￿ M￿￿￿￿￿￿￿￿￿’￿ P￿￿￿￿￿￿). The ￿rm
+choosesM to maximize its pro￿t   (M) subject to a constraint:
+max
+ 
+  ( ) = max
+ 
+’
+ 
+µ D (  )  C( ) s.t. fr ( )  0 8r 2 R,
+where either R = G ⇥G and f , 0( ) =      (1+   )  0 , or R = G and
+f ( ) =        .
+Just as is the case in binary classi￿cation, where di￿erent settings
+may call for di￿erent notions of fairness, which version of fairness
+regulator should impose will depend on the context and the ethical
+assumptions she maintains.
+3.1 Data, Costs, and Learning Theory
+A key component to our model is how choices in data investment
+drive error rates. We assume that ￿rms build a model to provide
+a product to consumers, and that this model is learned from data.
+The ￿rms have access to independent and identically distributed
+data from ￿xed data sources that re￿ect the same distribution that
+consumers care about.
+In the PAC model of learning [23], there is a class of hypotheses
+H , and each hypothesis h 2 H has an associated risk R(h), typically
+representing the error rate ofh. For example, in binary classi￿cation,
+R(h) = Ex, ⇠D[h(x) ,  ], though our model will be applicable to
+other settings as well. With only access to data drawn from D,
+rather than D itself, the learner cannot guarantee its risk, but can
+achieve high probability upper bounds on its risk. In the agnostic
+PAC setting, there is a learning algorithm that upon seeing a sample
+of size M , except with probability   , returns a hypothesis h such
+that
+R(h)   min
+h0 2H
+R(h0)  K
+r
+dH + log(1/  )
+M
+,
+whereminh0 2H R(h0) is the Bayes error, dH is the VC dimension
+of H , and K is a universal constant. (See [28] for more on PAC
+learning, VC dimension, and the various kinds of PAC learning.)
+To model the fact that getting appropriate data can have group-
+dependent sources and thus costs, we assume data for each group is
+drawn separately from distributions D  . The ￿rms chooseM  , the
+number of data points to draw, and will use a learning algorithm
+with a PAC guarantee for each data set and give to a consumer of
+group   the output of the corresponding hypothesis.
+Achieving such bounds would not be useful to the ￿rm unless
+consumers make decisions based on these bounds. Here, we assume
+that the consumers have no more access than the ￿rms: they do
+not have access to the distribution, so they cannot make decisions
+based on the true group-level error rates. Given this, we assume
+that the consumers use ￿rms’ bound on the excess error R(h)  
+minh0 2H R(h0), which we refer to as the worst-case excess error
+rate. Of course, in reality, consumer decisions are not necessarily
+based on the worst-case error rate. However, given that consumers
+often do in practice have to make choices using relatively little
+information about ￿rms, and have trouble predicting how well
+exactly a ￿rm will treat them, we believe this is a natural place to
+start. In particular, bounds on the the excess error rates represent the
+minimal amount of information consumers need to make informed
+decisions.
+Thus, we set
+  i (M i ) =
+  
+M
+1/q
+ i
+,
+for constants    > 0 and q > 0. For example, in agnostic PAC
+learning, q = 2 and    =
+p
+K(dH + log(1/  )). Note that we are
+assuming   is ￿xed ahead of time, but we allow in general for    to
+be group-dependent. Agnostic PAC learning is far from the only
+type of learning to have this form; the realizable PAC setting, the
+multi-class setting, and many regression settings all have this form
+[28].
+This set-up does ignore the possibility of transfer learning, i.e. us-
+ing the data fromD  to help with learning for another group  0. We
+avoid this scenario so as to concentrate on the ‘unfairness’ gener-
+ated via the market incentives instead of the unfairness generated,
+for example, when an assumption about the similarity between D 
+and D 0 fails to hold.
+The choice ofM  determines not only the worst-case error rates,
+but the cost to the ￿rm of generating that data, either by collecting
+it in the wild or buying it from another source. As mentioned above,
+we permit the costs to be group-dependent. We assume the cost is
+additively separable and linear inM  :
+C i (M i ) =   i + c iM i and Ci (Mi ) =
+’
+ 2G
+C i (M i ),
+for constants   i , c i , where   i represents the ￿xed cost of enter-
+ing the market.
+Since we can rewriteM i = (  /  i )q , this model is equivalent
+to ￿rst choosing a worst-case error rate   i and then paying a cost
+C i (  i ) =   i +
+  
+ 
+q
+ i
+for each group  , where    is rede￿ned to minimize the number of
+constants we employ.
+So now
+M i =
+  
+c i 
+q
+ i
+.
+This version is the one we will use for the remainder of the paper.
+Note that the cost function is convex, which means that whenever
+the demand is concave, so is the pro￿t function.
+3.2 Models of Consumer Choice
+The ￿rm’s revenue is driven by how demand for its product reacts
+to its choice of worst-case error guarantees. We consider several
+models of this demand, each inspired by well-studied models in
+microeconomics. While ￿rms are primarily concerned only with ag-
+gregate changes in demand, rather than the decisions of individual
+consumers, each of our models can be founded on natural models
+of individual consumer behavior, and we provide such models in
+several cases.
+In the monopoly case, we use a simple model of linear demand;
+while an idealization, linear demand is often used even in econo-
+metric estimation (see e.g. [18]). In the competitive case, there are
+a variety of natural demand models, each embedding di￿erent as-
+sumptions about how consumers choose between ￿rms and how
+stringently they react to di￿ering error levels. We study three mod-
+els along a spectrum of rationality: amultilinear demand, generaliz-
+ing the monopoly case; a parameterized proportional demand; and
+an approximately rational demand, where consumers exclusively
+use the ￿rm with lowest error (up to some tolerance).
+We give the details of these models of demand in each appro-
+priate subsection in Sections 4 and 5. Under each model, there are
+parameter regimes where ￿rms choose not to invest in data collec-
+tion for some groups at all ; while this may re￿ect some real-world
+scenarios, the purpose is of this paper is to highlight economic
+incentives that create inequality even aside from such extreme sce-
+narios. As such, we will focus on interior optima or equilibria. In
+an interior optimum, the monopolist must make positive pro￿t (so
+that it enters the market) and choose error rates strictly smaller
+than 1 for each group (so that it is investing in data collection for
+each group). Similarly, interior equilibria require that pro￿ts for
+both ￿rms must be positive and each error rate strictly smaller than
+1. Our theorems statements will highlight this focus.
+4 MONOPOLY
+We start with the case where there is one ￿rm in the market and
+demand is linear:
+D￿￿￿￿￿￿￿￿￿ 4.1 (L￿￿￿￿￿ D￿￿￿￿￿). A linear demand function for
+each group   is given by:
+D (  ) =           ,
+where 0 <       1.
+A linear demand curve can arise from a simple model of con-
+sumer behavior: suppose utility-maximizing consumers consider
+whether or not to use the product, and only use it if it is above some
+threshold (equivalent to being better than some ‘outside option’).
+If these thresholds are uniformly distributed over some interval,
+then demand will be linearly decreasing over an interval. Strictly
+speaking, this is a piecewise linear demand, but this does not greatly
+a￿ect optimal behavior of the ￿rm - it merely means that it will
+never choose outside the linearly decreasing range unless they
+are choosing not to invest in providing quality products at all. For
+simplicity of our theorem statements, we will assume that parame-
+ters are such that the ￿rm’s achievable errors are a subset of the
+linear portion of the demand curve, here 0 <       1, but in
+Appendix A, we generalize to arbitrarily large   ,   to ensure that
+our results still qualitatively hold.
+Our main result here is the following:
+T￿￿￿￿￿￿ 4.2 (M￿￿￿￿￿￿￿ I￿￿￿￿￿￿￿￿). Suppose a monopolist
+with learning rate q faces linear demand. Then in any interior opti-
+mum, for every pair of groups   and  0, the error inequality is given
+by:
+ 
+⇤
+ 
+ 
+⇤
+ 0
+=
+✓
+µ 0  0  
+µ     0
+◆ 1
+q+1
+.
+Again, we focus on an interior optimum. Three factors a￿ect the
+error gap between the minority and the majority: the size of the mi-
+nority as a share of the total market; the marginal cost of gathering
+data on the minority vs. on the majority; and the elasticities of the
+populations with respect to the error. It is also worth noting that
+the fundamental nature of the learning problem, via the learning
+rate q, a￿ects the magnitude of error inequality.
+Theorem 4.2 is a consequence of the following lemma:
+L￿￿￿￿ 4.3. Suppose a monopolist with learning rate q faces lin-
+ear demand. Then in any interior optimum, error levels set by the
+monopolist are given by:
+ 
+⇤
+  =
+✓
+q  
+µ   
+◆ 1
+q+1
+.
+P￿￿￿￿. Recall that
+  ( ) =
+’
+ 2G
+µ 
+ 
+         
+ 
+ 
+’
+ 2G
+ 
+   +
+  
+ 
+q
+ 
+!
+.
+Now, we notice that this pro￿t function is separable into the sum
+of pro￿ts from each market. Di￿erentiating with respect to    sep-
+arately and setting to zero,we arrive at the ￿rst-order conditions:
+@ 
+@  
+=  µ    +
+q  
+ 
+q+1
+ 
+= 0.
+Solving this equation yields  ⇤  =
+⇣ q  
+µ   
+⌘ 1
+q+1 . This is indeed a
+maximum because pro￿t is concave, so the only alternative is an
+exterior optimum. ⇤
+Notice that if, for all  ,   
+⇣
+ 
+⇤
+ 
+⌘
+> 0,   
+⇣
+ 
+⇤
+ 
+⌘
+>   (1), and  ⇤  < 1,
+then the interior optimum exists and is unique.
+5 COMPETITION
+In this section, we show that under most reasonable models of
+competition, the introduction of competition does not mitigate
+error-inequality compared to the monopoly equilibrium, and may,
+in fact, increase it. Only under Bertrand-like competition, which
+assumes consumers are strictly rational, is inequality signi￿cantly
+mitigated. In particular, we show that under both the Tullock and
+the multi-linear models of demand, the inequality between groups
+as measured by the error rates does not improve relative to the
+monopoly case. In the case of the Tullock model, as a function of
+the relative size of the groups, inequality is actually worse.
+5.1 Multilinear Demand
+Next, we consider a simple generalization of linear demand to
+the two-￿rm case. This model can be interpreted as a model of
+competition in identical products with di￿ering quality levels as
+in [2], but can also be interpreted (as well as microfounded, and
+used to estimate structural parameters, as in [6]) as markets for
+imperfect substitutes.
+D￿￿￿￿￿￿￿￿￿ 5.1 (M￿￿￿￿￿￿￿￿￿￿ D￿￿￿￿￿). The multilinear linear
+demand function is, for ￿rms i and j, and for each group  ,
+D i (  i ,   j ) =   i       i +     j ,
+where 0 <    <       i and   i +     1.
+We require    >    so that demand reacts more strongly to a
+￿rm’s own error rates than its opponents – this ensures that if both
+￿rms increase error, total demand decreases. The other conditions
+on the parameters are to ensure that the demand is truly (multi)-
+linear, as opposed to piece-wise linear.
+Note it is not the case that all consumers choose the ￿rm with
+lower error, as one might expect if the products of the ￿rms were
+perfect substitutes. Instead, users switch between ￿rms depending
+on their error rates, and even if ￿rms achieved perfect accuracy, the
+split of the total market might not be even, as captured by di￿ering
+  i . This could represent brand loyalty, for example, or perhaps
+that ￿rms’ products are not perfectly identical.
+Our main result for this case states that the gap between error
+rates is the same as in the monopoly case:
+T￿￿￿￿￿￿ 5.2. Suppose that two ￿rms with learning rate q compete
+under multilinear demand. Then in any interior equilibrium, for every
+pair of groups   and  0, error inequality is given by
+ 
+⇤
+ i
+ 
+⇤
+ 0i
+=
+✓
+µ 0  0  i
+µ     0i
+◆ 1
+q+1
+.
+Theorem 5.2 is a consequence of the fact that the ￿rm’s opti-
+mal choice does not depend on its opponent’s error rates; that is
+they have a dominant strategy. This is formalized by the following
+lemma, which is enough to prove Theorem 5.2:
+L￿￿￿￿ 5.3. Suppose that two ￿rms with learning rate q compete
+under multilinear demand. Then in any interior equilibrium, error
+levels are given by
+ 
+⇤
+ i =
+✓
+q  i
+µ   
+◆ 1
+q+1
+.
+P￿￿￿￿. This proof will be very similar to that of Lemma 4.3, only
+now, the behavior of the other ￿rm will a￿ect pro￿t. Recall
+ i (  i ,   j ) =
+’
+ 2G
+µ (  i +      i +     j )  
+’
+ 2G
+  i
+ 
+q
+ i
+.
+We can see that even though the behavior of the other ￿rm will
+a￿ect pro￿t, ￿rm i still has a dominant strategy. This is because the
+￿rst-order conditions do not depend on the other ￿rm:
+@ i
+@  i
+=  µ    +
+q  i
+ 
+q+1
+ i
+.
+This is the same ￿rst order condition as in the monopolist’s case,
+with the same implication:  ⇤ i =
+⇣ q  i
+µ   
+⌘ 1
+q+1 .
+⇤
+Similar to the case of the monoplist’s, notice that if, for all  , i ,
+  i
+⇣
+ 
+⇤
+ i ,  
+⇤
+ j
+⌘
+> 0,   i
+⇣
+ 
+⇤
+ i ,  
+⇤
+ j
+⌘
+>   i (1,  ⇤ j ), and  ⇤ i < 1, then an
+interior equilibrium exists.
+5.2 Proportional Demand
+In this section, we consider a model inspired by [12], and thus,
+indirectly, by the Tullock contest [32]. In particular, ￿rms split the
+market proportionally to the other ￿rms’ error:
+D￿￿￿￿￿￿￿￿￿ 5.4 (P￿￿￿￿￿￿￿￿￿￿￿ D￿￿￿￿￿). In a multi-￿rm mar-
+ket, we say that demand is proportionally split with competition
+exponent   if
+D i ( ) = 1  
+ 
+ 
+ iÕ
+j  
+ 
+ j
+=
+Õ
+j,i  
+ 
+ jÕ
+j  
+ 
+ j
+.
+Here, we focus on the two-￿rm case, in which case we can write
+D i (  i ,   j ) = 1  
+ 
+ 
+ i
+ 
+ 
+ i +  
+ 
+ j
+=
+ 
+ 
+ j
+ 
+ 
+ i +  
+ 
+ j
+.
+Now we can write our inequality theorem:
+T￿￿￿￿￿￿ 5.5 (I￿￿￿￿￿￿￿￿U￿￿￿￿ P￿￿￿￿￿￿￿￿￿￿￿D￿￿￿￿￿). Sup-
+pose two ￿rms with learning rate q compete under proportional de-
+mand. Then in any interior equilibrium error inequality is given by
+ 
+⇤
+ i
+ 
+⇤
+ 0i
+=
+✓
+  0µ 0
+  µ 
+◆ 1
+q
+·
+f (  i ,  j ,q)
+f (  0i ,  0j ,q)
+,
+where
+f (  i ,  j ,q) =
+( q i +  
+q
+ j )
+ 
+1  1
+q
+ i  
+q
+ j
+.
+Recall that in the monopoly case, the exponent was 1/(q + 1)
+instead of 1/q, meaning that introducing competition under this
+model has actually exacerbated the e￿ect of minority status on
+inequality. Note also that the relative inequality between two groups
+based on the results from a particular ￿rm depends not only on that
+￿rm’s cost structure for the two groups, but also on the opposing
+￿rm’s cost structure for the two groups.
+Proving Theorem 5.5 requires ￿nding the equilibrium:
+L￿￿￿￿ 5.6. Suppose two ￿rms with learning rate q face propor-
+tional demand with competition exponent  . In any interior equilib-
+rium, error rates are given by:
+ 
+⇤
+ i =
+✓
+q  i
+  µ 
+◆ 1
+q ( q i +  
+q
+ j )
+ 
+q
+ i 
+q
+ j
+=
+✓
+q
+  µ 
+◆ 1
+q ( q i +  
+q
+ j )
+ 
+1  1
+q
+ i  
+q
+ j
+.
+If  ⇤ i < 1 for all   and i then there exists a setting of parameters for
+which ( ⇤ i ,  ⇤ j ) is the unique equilibrium.
+For brevity, we relegate the full proof and the characterization
+of when these conditions hold, to Section C. Below, we detail the
+instructive portion of the proof for the special case in which q =
+  = 1.
+L￿￿￿￿ 5.7. Suppose two ￿rms with learning rate 1 face propor-
+tional demand with competition exponent 1. In any interior equilib-
+rium, error levels are given by:
+ 
+⇤
+ i =
+·
+(  i +   j )2
+  j
+.
+Su￿cient conditions for existence are that for all   and i :   i 
+µ   2
+  j
+(  i+   j )2 ,  
+⇤
+ i < 1 , (  i+   j )2
+µ    j < 1. If, moreover, mink   k  
+(maxk   k )2, then ( ⇤ i ,  ⇤ j ) is the unique equilibrium.
+The conditions of Lemma 5.7 are stated in terms of   i ; recall,
+though, that   i is not a primitive of our model, but rather the prod-
+uct of the per-datapoint cost and learning theory constants. These
+conditions thus imply conditions on these underlying constants. In
+the symmetric case, this asks that the per-datapoint cost c  satis￿es:
+c  
+dH + log 1
+ 
+12q
+.
+which merely requires that the per-datapoint cost is not too large
+relative to the desired hypothesis class and success probability. In
+the asymmetric case, we require that ￿rms do not face ratios of
+data cost to learning constant that are too di￿erent from each other.
+If either of these conditions is violated, then one or both ￿rms may
+have an incentive to stop investing completely in data acquired for
+a group. Such non-interior equilibria can obviously lead to severe
+error inequality, but again, Theorem 5.5 demonstrates the existence
+of incentives to unfairness even ruling out these extreme cases.
+P￿￿￿￿ ￿￿ L￿￿￿￿ C.1. We can write Firm i’s pro￿t from each
+group as:
+  i (  i ,   j ) = µ 
+  j
+  i +   j
+ 
+  i
+  i
+    j .
+The strategy space of the ￿rm is to select an   i for each group in
+(0, 1]; we search for a pure strategyNash equilibrium. At a high level,
+our strategy to do so is as follows: ￿rst, we ￿x the opposing ￿rm’s
+action   j . Optimizing Firm i’s pro￿t gives a best-response to the
+￿xed action   j . An equilibrium pair must simultaneously satisfy
+both ￿rms’ ￿rst order conditions, given the other, so we obtain
+two simultaneous equations that yield the equilibrium relationship
+between the two ￿rms’ actions. Solving this yields a candidate
+solution. Then, we can show that the candidate solution is indeed
+a maximum via the concavity of the pro￿t function. Finally, we
+need but check that there are no solutions at the endpoints, and we
+provide conditions when this is ruled out.
+Now, ￿xing Firm j’s choice   j , the pro￿t function    is just a
+function of   i . Di￿erentiating this gives:
+@  i
+@  i
+=    j µ (  i +   j ) 2 +   i  2 i .
+We set this equal to zero. Since satisfying this condition is required
+for   i to be a best-response we can plug in  ⇤ j , whatever that may
+be, requiring:
+ 
+⇤
+ j
+µ   i
+= (  i +  ⇤ j )2, (1)
+and in particular, this must apply to the best-response  
+⇤
+ i . We
+can apply similar logic to Firm j. Hence, for ( ⇤ i ,  ⇤ j ) to be best-
+responses to each other – that is, to be in (interior) equilibrium –
+we must have that
+ 
+⇤
+ i
+⇤
+ j
+µ   i
+= ( ⇤ i +  ⇤ j )2 =
+ 
+⇤
+ j
+⇤
+ i
+µ   j
+. (2)
+This implies that
+ 
+⇤
+ j =  
+⇤
+ i
+  j
+  i
+.
+Substituting this condition back into Equation 2, we obtain that
+ 
+⇤
+ i
+3    j
+  i
+µ   i
+= ( ⇤ i +  ⇤ i
+  j
+  i
+)2 =)  
+⇤
+ i =
+(  i +   j )2
+µ   j
+.
+Symmetric logic yields  ⇤ j =
+(  i+   j )2
+µ   i .
+Now, to show that this candidate solution is indeed an equi-
+librium, we must show that these actions are best-responses to
+each other. Fix  
+⇤
+ j =
+(  i+   j )2
+µ   i . Then we can view   i (  i ,  ⇤ j )
+as a continuous function on (0, 1]. By construction, evaluating
+@
+@  i   i (  i ,  
+⇤
+ j ) at  ⇤ i must give zero. (It is also easy to verify
+that this is indeed the case.) If  i, ⇤  j (  i ) is concave at  
+⇤
+ i , then
+that is a local maximum of the pro￿t function (given  
+⇤
+ j ).
+To see that it is concave, note that
+@2
+@ 2 j
+  i (  i ,   j ) = 2  j µ (  j +   i ) 3   2
+  i
+ 
+.
+Evaluating this quantity at  ⇤ i gives:
+@2
+@ 2 i
+  i (  i ,  ⇤ j )
+    
+  i= ⇤ i
+= 2µ 
+(  i +   j )2
+µ   i
+ 
+(  i +   j )2
+µ   j
++
+(  i +   j )2
+µ   i
+! 3
+  2
+  i
+((  i +   j )2/(µ   i ))3
+.
+Straightforward, if tedious, algebra lets us rewrite the right hand
+side and conclude that
+@2
+@ 2 i
+  i (  i ,  ⇤ j )
+    
+  i= ⇤ i
+=
+2µ3   3 j  i
+(  i +   j )6
+
+  i
+  i +   j
+  1
+ 
+.
+But notice that this quantity is always negative if costs are posi-
+tive; hence,  ⇤ i is indeed a local maximum of  i, ⇤  j .
+To ensure that this point is a global maximum, we must com-
+pare it with the pro￿t at the endpoint. For brevity, we defer this
+calculation to the Appendix in Section C
+Finally, note that equilibrium pro￿ts are positive if   i ( ⇤ i ,  ⇤ j )  
+0; this is true whenever
+µ   2 j
+(  i +   j )2
+    i , (3)
+i.e. ￿xed costs are not extremely large. Positive pro￿ts and the
+fact that  ⇤ i globally maximizes pro￿t given   ⇤ j ensures that the
+putative equilibrium pair forms an equilibrium.
+To identify conditions in which this equilibrium is unique, we
+need to eliminate the only other possible equilibrium (both ￿rms
+choosing   = 1). Again, for brevity, we defer this calculation to the
+appendix.
+⇤
+Again, we pause to highlight several intuitive properties of the
+equilibrium. First, Firm i’s choice of error for group   is decreasing
+with themarket size of Group  as well as the ferocity of competition
+in Group  . These results are similar to those of Lemma 4.3, with
+a di￿erent functional form and the competition exponent of the
+Tullock game replacing the error elasticity of demand. It is also,
+intuitively, increasing in   i and decreasing in   j , though this is
+harder to see due to the functional form of f .
+5.3 Approximately Rational Demand
+Now we consider markets where consumers behave rationally. If
+we allow consumers to behave fully rationally, in the sense of
+always picking the ￿rm with (even in￿nitesimally) smaller error,
+we obtain a model similar to the Bertrand model of competition
+[19]; accordingly, no equilibrium exists, as we show in Section B.3.
+Hence, we instead consider a slight relaxation of the fully rational
+model: Suppose consumers behave rationally, except that they do
+not care about excess error up to    over the optimal error. That
+is, the lower ￿rm will capture the whole market for errors that are
+not too small, but for   i ,   j 2 [0,   ], ￿rms again split the market.
+We formally de￿ne this demand function below:
+D￿￿￿￿￿￿￿￿￿ 5.8 (B￿￿￿￿￿￿￿￿￿￿￿￿T￿￿￿￿￿￿￿D￿￿￿￿￿). In amulti-
+￿rm market, we say demand is   -tolerant rational with   > 0 if
+D i ( ) =
+8>>>>>>>>><
+>>>>>>>>>:
+1 mink   k >    and   i < min
+j,i
+  j
+1Õ
+j 1[   j=min
+k
+  k ] mink   k >    and   i = min
+j,i
+  j
+0 mink   k >    and   i > min
+j,i
+  j
+1[  i    ]Õ
+j 1[   j    ] mink   k    
+.
+We will show that there exists a unique equilibrium here (for ap-
+propriate parameters) in which groups’ error levels are determined
+not by their sizes, but by their optimal errors and their tolerances.
+T￿￿￿￿￿￿ 5.9 (A￿￿￿￿￿￿￿￿￿￿￿￿ R￿￿￿￿￿￿￿ I￿￿￿￿￿￿￿￿). Suppose
+that two ￿rms compete under   -tolerant demand. Then in any interior
+equilibrium, error inequality is given by
+  
+  0
+=
+  
+  0
+where    ,   0 is users’ tolerance threshold (assumed to be strictly
+positive). Moreover, if   i <
+   µ 
+2 for all  , i , the unique equilibrium
+is interior.
+In particular, Theorem 5.9 shows that under this approximate
+Bertrand-like model of competition, the dependence on group size
+in the error inequality is eliminated. Instead, inequality depends
+merely on the optimal error achievable under the hypothesis class
+used by ￿rms and groups’ tolerances.
+Note that the conditions of Theorem 5.9 is just asking that
+c i 
+✓
+µ   
+dHi + log
+.
+As before, we can interpret this as a condition that the per-datapoint
+cost is not too large relative to the total market size and the learning
+theory constants.
+Theorem 5.9 follows from the following lemma:
+L￿￿￿￿ 5.10 (A￿￿￿￿￿￿￿￿￿￿ R￿￿￿￿￿￿￿ E￿￿￿￿￿￿￿￿￿). Suppose
+that two ￿rms compete under   -tolerant demand, and   i <
+   µ 
+2 for
+all  , i . Then an interior pure strategy equilibrium exists in which
+ 
+⇤
+ i =    ,
+and this equilibrium is unique.
+P￿￿￿￿. We posit that the pro￿le (   ,   ) is an equilibrium. To see
+this, note that a ￿rm deviating to some   >    would lose its entire
+market share, and so would end up with negative pro￿t. Under the
+conditions of the theorem, though,
+ i (   ,   0) =
+µ 
+  
+> 0
+so deviating to a higher error, with negative pro￿t, cannot be a
+pro￿table deviation. On the other hand, deviating to   2 [0,   )
+would result in the same market share, but with increased costs.
+Hence, deviating to decreased error is also not a pro￿table deviation.
+To see that there can be no other equilibria, notice that if both
+￿rms were setting error in 2 [0,   ), they would have an incentive
+to deviate to    ; if one ￿rm’s error were in that range and the
+other’s were above, then the ￿rm with higher error would have an
+incentive to deviate to    ; and ￿nally, if both ￿rms were above    ,
+either ￿rm could pro￿tably deviate to slightly lower error. ⇤
+Unfortunately, even this relaxation of full rationality may not
+be a realistic model of competition in many cases; it still requires
+that outside of the range of [0,   ], all consumers are perfectly
+discerning. This is unlikely to be true in practice. Without such an
+assumption, the conclusions of this model do not hold. Models like
+the proportional split and multilinear demand are more likely to
+capture salient market features in practice.
+6 REGULATION
+In this section, we consider the perspective of a regulator with the
+power to require one of two kinds of error equality, and analyze the
+response of the monopolistic ￿rm to each. These constraints that
+the regulator may impose are relative error equality and absolute
+error equality. We quantify the direct cost associated with imposing
+these constraints, in terms of increased error to the majority group
+under the ￿rst kind and lost pro￿t to the monopolist in both. This
+serves to give a sense of the direct tradeo￿s involved in regulating
+machine-learning driven markets. We highlight, though, that there
+may be non-quanti￿able bene￿ts to equity across groups, and only
+societal deliberation can evaluate these tradeo￿s.
+Which of these two types of regulation is preferred will depend
+on the context. Requiring errors across groups to all be similar –
+relative error equality – may not be su￿ciently strong if large error
+is harmful regardless of another group’s error rate, but also may be
+too strict when small absolute errors are perceived as approximately
+equivalent. On the other hand, absolute error equality – where
+we require all errors to be below a threshold – treats all small
+absolute errors as equivalent, but still allows a large relative gap
+in error rates across groups. An absolute error bound shifts the
+‘burden’ of fairness entirely to the ￿rm, which may be preferable
+from a consumer standpoint; at the same time, decreasing pro￿ts
+for monopolies may reduce the incentive to innovate, which may
+also be undesirable.
+We make the following assumption for the rest of the section for
+ease of exposition:
+A￿￿￿￿￿￿￿￿￿ 6.1. There are two groups G = {A,B}, there is an
+interior optimum  
+M
+A ,  
+M
+B < 1 (i.e. the unconstrained monopoly enters
+the market), and B has lesser market power and higher data costs, i.e.
+µB B  µA A and  B    A .
+We refer to group A as the majority group and B as the minority
+group. We also de￿ne ( MA ,  
+M
+B ) and ( RA,  
+R
+B ) to be the monopolist’s
+and regulated monopolist’s optimal choices, respectively.
+Note that an immediate consequence of Assumption 6.1 and
+Theorem 4.3 is that  MB    
+M
+A . Finally, we defer omitted proofs from
+this section to Sections D and E.
+6.1 Relative Error Equality
+In this section, we imagine that a regulator requires the monopolist
+to achieve error rates within a bounded ratio. We will show that a
+monopoly responds by investing less in majority data collection and
+more in minority data collection than it otherwise would, resulting
+in worse error rates for the majority, better error rates for the
+minority, approximate equality between groups, and lower pro￿ts
+for the ￿rm. In particular we quantify by how much error rates
+worsen for the majority and by how much pro￿ts are lowered for
+the monopolist, which we refer to as the ‘price’ of fairness.
+We formalize the regulator’s constraint as follows:
+D￿￿￿￿￿￿￿￿￿ 6.2 (R￿￿￿￿￿￿￿ ￿￿￿￿￿ ￿￿￿￿￿￿￿). The regulator forces
+the ￿rm to achieve error guarantees of bounded ratio:
+ A
+ B
+ 1 +   and
+ B
+ A
+ 1 +  
+where   is a positive constant.
+As in Section 4, we consider a pro￿t-maximizing monopolist. As
+before, each group has linear demand with market sizes µA and µB .
+Now, if the regulation has ‘bite’ – that is, if it changes the outcome
+– the regulated monopolist does the minimum it can to satisfy the
+constraint; that is, it sets  RB =  
+R
+A(1 +   ). Formally:
+L￿￿￿￿ 6.3 (S￿￿￿￿￿￿￿￿￿). Suppose that the unregulatedmonopoly
+sets  MB >  
+M
+A (1 +   ). Then the pro￿t-maximizing monopoly facing
+the relative error constraint sets
+ 
+R
+B =  
+R
+A(1 +   ).
+The proof follows from concavity and Jensen’s inequality; we
+provide details in D.
+Lemma 6.3 allows us to characterize the regulated monopolist’s
+optimal choice of errors under this regulation:
+T￿￿￿￿￿￿ 6.4. Suppose that the unregulated monopoly sets er-
+ror  MB > (1 +   ) MA . Then in any interior optimum, the regulated
+monopoly sets the errors as
+ 
+R
+A =
+✓
+q ·  A +  B/(1 +   )q
+µA A + µB B (1 +   )
+◆ 1
+q+1
+and  RB = (1 +   ) RA .
+P￿￿￿￿. By Lemma 6.3,  RB = (1 +   ) RA . Thus, the pro￿t maxi-
+mization problem can be written solely as a function of  A:
+  ( A) = µA( A    A A) + µB ( B    B A(1 +   ))
+ 
+ 
+ A +
+ A
+ 
+q
+A
+!
+ 
+ 
+ B +
+ B
+ 
+q
+A(1 +   )q
+!
+.
+Then, the ￿rst order condition is
+µA A + µB B (1 +   ) = q ( A +  B/(1 +   )q )
+ 
+q+1
+A
+,
+and hence we must have that
+ 
+R
+A =
+✓
+q ( A +  B/(1 +   )q )
+µA A + µB B (1 +   )
+◆ 1
+q+1
+.
+Concavity guarantees that this is a global optimum. ⇤
+These together provide insight into to what the regulation is
+doing. The monopolist’s problem can be written as:
+max
+ 
+  ( ) = max
+ 
+µA A + µB B   (µA A + µB B (1 +   )) 
+  ( A +  B )  
+( A +  B/(1 +   )q ).
+This is equivalent to facing a single population of with demand
+function µA A+µB B   (µA A+µB B (1+   ))  , ￿xed cost  A+ B ,
+andmarginal cost ( A+ B/(1+  )q ). We later use this interpretation
+to quickly calculate the constrained monopolist’s pro￿ts.
+One might worry that imposing fairness requires making both
+groups worse o￿ in an absolute sense. It turns out that this is not
+the case; if the regulation has bite, then it necessarily increases
+the error of the majority group, and necessarily decreases the error
+of the minority group. That is, equality comes at a price for the
+majority group, but does not require a Pareto deterioration.
+Our ￿rst result is that the monopolist will respond to regulation
+by increasing majority error rates.
+C￿￿￿￿￿￿￿￿ 6.5.
+ 
+R
+A    
+M
+A and  
+R
+B   
+M
+B .
+At this point, members of the majority group may be concerned
+because their error rate increases. We refer to the gap between their
+error rates under the constrained and unconstrained monopolies
+as a price of fairness for this reason, even though imposing this con-
+straint may be on the whole desirable from a societal perspective:
+PoF1+  =
+ 
+R
+A
+ 
+M
+A
+.
+Fortunately, we can show this price is relatively small:
+C￿￿￿￿￿￿￿￿ 6.6 (P￿￿￿￿ ￿￿ F￿￿￿￿￿￿￿ U￿￿￿￿ B￿￿￿￿).
+PoF1+  
+✓
+1 +
+ B
+ A
+· 1
+(1 +   )q
+◆ 1
+q+1
+.
+Unsurprisingly, this bound is increasing in the ratio of minority
+cost to majority cost and decreasing in the leniency of the regulator.
+Also unsurprisingly, decreasing the ratio µB
+µA or  B
+ A
+and increasing
+the ratio  B
+ A all increase the price of fairness for the majority.
+If regulation changes the monopolist’s behavior, it must weakly
+decrease pro￿ts. This loss is quanti￿able as another price of fairness:
+D￿￿￿￿￿￿￿￿￿ 6.7 (M￿￿￿￿￿￿￿￿￿ P￿￿￿￿ ￿￿ F￿￿￿￿￿￿￿, R￿￿￿￿￿￿￿ E￿￿
+￿￿￿). We de￿ne the price of fairness as the ratio between the uncon-
+strained monopoly pro￿t and constrained monopoly pro￿t under the
+relative error constraint, i.e.
+MonPoF1+  =
+ 
+⇣
+ 
+M
+A ,  
+M
+B
+⌘
+ 
+⇣
+ 
+R
+A,  
+R
+B
+⌘ =   ( MA ,  
+M
+B )
+max A, B :  A B 1+ ,  B A 1+    ( A,  B )
+.
+We can write down this price of fairness as a function of the
+parameters of the model:
+T￿￿￿￿￿￿ 6.8. The Monopolist’s price of fairness is given by
+MonPoF1+  =
+µA A + µB B  Q (µA A)
+q
+q+1  
+A  Q (µB  B )
+q
+q+1  
+B
+µA A + µB B  Q (µA A + µB  B (1 +   ))
+q
+q+1 ( A +  B 1
+(1+  )q )
+,
+where Q = q
+qq/(q+1) .
+P￿￿￿￿. The optimal solution to the monopolist’s problem with
+parameters µ  ,   ,    ,   for   in G = {A,B} is the following:
+ 
+⇤( ⇤) =
+’
+ 2{A,B }
+µ      (µ   )
+q
+q+1 
+  Q .
+(See Appendix D.) Using this form and plugging in the market
+parameters, we obtain the optimal pro￿t of the unconstrained mo-
+nopolist for the numerator. The denominator is derived using the
+interpretation of the constrained monopolist’s problem as optimiz-
+ing its pro￿ts against a single market with parameters modi￿ed by
+regulation, and plugging these parameters into the same form. ⇤
+Theorem 6.8 provides a quantitative price of fairness in terms of
+monopoly pro￿ts. However, it is somewhat unwieldy; Proposition
+6.9 provides some clarity on the limiting behavior of this price of
+fairness as a function of the minority group’s size in absolute terms.
+P￿￿￿￿￿￿￿￿￿￿ 6.9 (M￿￿P￿F L￿￿￿￿ ￿ R￿￿￿￿￿￿￿ E￿￿￿￿ I￿￿￿￿￿￿￿￿).
+Let µB/µA = r for constant ratio r . Then
+lim
+µB!1MonPoF1+  = 1.
+On the other hand, for constant µA,
+lim
+µB!0
+MonPoF1+  =
+1   (Q/q) MA
+1   (Q/q) MA
+"
+1 +  B
+ A
+# 1
+q+1
+where Q is as above.
+6.2 Absolute Error Equality
+In this section, we suppose instead that the regulator imposes an
+absolute upper bound on error rates for each group. We show that
+the monopolist responds by purchasing just enough data to meet
+the constraint using the pro￿ts from the majority to subsidize the
+minority. In this case, minority error rates can be improved without
+increasing error for the majority; the regulator can even improve
+error rates for the majority as well, up to a point. We characterize
+the price of fairness for the monopolist and the minimum error the
+regulator can guarantee. We formalize this constraint as follows:
+D￿￿￿￿￿￿￿￿￿ 6.10 (A￿￿￿￿￿￿￿ ￿￿￿￿￿ ￿￿￿￿￿￿￿). For   < 1, the
+regulator forces the ￿rm to achieve error of:
+ A    and  B    .
+We have another saturation lemma for this kind of constraint
+too: either the unconstrained error was already less than   , or the
+pro￿t maximizing error subject to regulation is exactly   . Formally:
+L￿￿￿￿ 6.11 (S￿￿￿￿￿￿￿￿￿). 8  2 {A,B}, if  R  ,  
+M
+  then  R  =   .
+Lemma 6.11 lets us reason very simply about the behavior of the
+regulated monopolist: for any group in which imposing regulation
+requires the ￿rm to improve error rates, the ￿rm will use up the
+entirety of this ‘error budget.’ Pro￿t will decrease, of course, because
+imposing constraints can only decrease its objective. In this scenario,
+if the ￿rm enters the market at all, it must enter the market for both
+groups so as to achieve the constrained error rates. A regulator then
+has to choose   so as to still induce the ￿rm to enter the market at
+all if they want to ensure the constrained error rate for the minority
+group. Of course, a regulator may also wish to choose the smallest
+such error rate, which we refer to as the minimum achievable error.
+Lemma 6.11 let us characterize the minimum achievable error:
+P￿￿￿￿￿￿￿￿￿￿ 6.12. Let  0 be the smallest   2 [0, 1] which solves
+K1 
+q+1 + K2 
+q   K3 = 0, (4)
+where K1 =  (µA A + µB B ), K2 = µA A + µB B    A    B , and
+K3 =  A +  B .  0 exists and is the minimum achievable error, i.e. the
+minimum   2 [0, 1] for which the monopolist still enters the market.
+Equation 4 can be solved via the quadratic or cubic formulae in
+the realizable and agnostic cases, respectively, and learning rates
+in between can be accommodated numerically. This leads us to the
+monopoly’s optimal error rates as a function of   :
+T￿￿￿￿￿￿ 6.13 (A￿￿￿￿￿￿￿ O￿￿￿￿￿￿￿). Outcomes fall into one of
+the following possibilities:
+(1) If      MB then ( RB ,  RB ) = ( MA ,  MB ).
+(2) If  MA    <  MB then ( RB ,  RB ) = ( MA ,   ).
+(3) If  0 <   <  MA then ( RB ,  RB ) = ( ,   ).
+(4) If   <  0 then the ￿rm exits the market.
+P￿￿￿￿. Case 1 is trivial. Case 2 and 3 follow from Lemma 6.11.
+Case 4 follows by the de￿nition of  0. ⇤
+Theorem 6.13 contrasts starkly with Theorem 6.5: as long as the
+constraint is not so strict the monopolist exits the market, outcomes
+either improve for the minority and remain just as good for the
+majority, or improve for both groups. In other words, this style of
+regulation does not impose a price of fairness on the majority. Note
+that unless  0 <   <  
+M
+A , the regulator is not guaranteeing relative
+equality. Which type of equality is preferable will depend on the
+context. Of course, this regulation does still impact pro￿t:
+D￿￿￿￿￿￿￿￿￿ 6.14 (M￿￿￿￿￿￿￿￿￿ P￿￿￿￿ ￿￿ F￿￿￿￿￿￿￿). We de￿ne
+the monopolist’s price of fairness under absolute error constraints as:
+MonPoF  =
+ 
+⇣
+ 
+M
+A ,  
+M
+B
+⌘
+ 
+⇣
+ 
+R
+A,  
+R
+B
+⌘ =   ( MA ,  
+M
+B )
+max A, B : A , B     ( A,  B )
+.
+Notice that given the market parameters, Theorem 6.13 allows
+the regulator to evaluate the monopolist’s price of fairness for each
+potential choice of error threshold via straightforward calculation.
+Proposition 6.15 characterizes the limiting behavior of the monopo-
+list’s price of fairness as a function of absolute size of the minority
+group under absolute error guarantees, and these are qualitatively
+similar to limiting behavior under relative error guarantees.
+P￿￿￿￿￿￿￿￿￿￿ 6.15 (M￿￿P￿F L￿￿￿￿ ￿ A￿￿￿￿￿￿￿ E￿￿￿￿ G￿￿￿￿￿￿
+￿￿￿￿). For ￿xed   , and for µB ! 1 at a constant ratio µA/µB = r :
+lim
+µB!1MonPoF  = 1.
+On the other hand, let  0 be the minimal achievable error when
+µB = 0 (i.e. when the ￿rm faces group A alone). Then if   >  0, then
+MonPoF  converges to a parameter-speci￿c constant as µB ! 0.
+7 DISCUSSION
+In this work, we identify economic incentives leading to unfairness
+in data-driven markets. At a high level, we show that monopolists
+are incentivized to invest less in minority groups (as measured
+by market size, elasticity, and data costs) because they are less
+pro￿table; that competition does not mitigate this incentive towards
+inequality, under reasonable models; and that judicious regulation
+can improve outcomes, potentially at a cost in terms of pro￿ts or,
+depending on the regulation, error rates for the majority group.
+We view this paper as highlighting an important and understud-
+ied point of view, but certainly not as the last word. We made many
+choices that situate our models in particular contexts; for example,
+the assumption that ￿rms and users bene￿t from improved accuracy
+does not capture many settings that currently are or will soon be
+urgent domains of adjudicating fairness concerns - machine learn-
+ing in loans, insurance, and facial recognition systems are obvious
+cases, but the potential, and consequent scope for unfairness, is
+vast. We hope that future work will further clarify the possibility
+- and perhaps necessity- of leveraging policy tools in addition to
+algorithmic solutions to combat unfairness in machine learning.
+REFERENCES
+[1] Guy Aridor, Kevin Liu, Aleksandrs Slivkins, and Zhiwei Steven Wu. 2019. Com-
+peting Bandits: The Perils of Exploration under Competition. arXiv preprint
+arXiv:1902.05590 (2019).
+[2] Rajiv D. Banker, Inder Khosla, and Kingshuk K. Sinha. 1998. Quality and Compe-
+tition. Manage. Sci. 44, 9 (Sept. 1998), 1179–1192. https://doi.org/10.1287/mnsc.
+44.9.1179
+[3] Omer Ben-Porat and Moshe Tennenholtz. 2018. Competing prediction algorithms.
+arXiv preprint arXiv:1806.01703 (2018).
+[4] Omer Ben-Porat and Moshe Tennenholtz. 2019. Regression equilibrium. arXiv
+preprint arXiv:1905.02576 (2019).
+[5] Richard Berk, Hoda Heidari, Shahin Jabbari, Michael Kearns, and Aaron Roth.
+2018. Fairness in criminal justice risk assessments: The state of the art. Sociological
+Methods & Research (2018), 0049124118782533.
+[6] Steven T. Berry. 1994. Estimating Discrete-Choice Models of Product Dif-
+ferentiation. The RAND Journal of Economics 25, 2 (1994), 242–262. http:
+//www.jstor.org/stable/2555829
+[7] Reuben Binns. 2017. Fairness in machine learning: Lessons from political philos-
+ophy. arXiv preprint arXiv:1712.03586 (2017).
+[8] Su Lin Blodgett and Brendan O’Connor. 2017. Racial disparity in natural language
+processing: A case study of social media african-american english. arXiv preprint
+arXiv:1707.00061 (2017).
+[9] Joy Buolamwini and Timnit Gebru. 2018. Gender shades: Intersectional accu-
+racy disparities in commercial gender classi￿cation. In Conference on Fairness,
+Accountability and Transparency. 77–91.
+[10] Irene Chen, Fredrik D Johansson, and David Sontag. 2018. Why is my classi￿er
+discriminatory?. In Advances in Neural Information Processing Systems. 3539–
+3550.
+[11] Bo Cowgill and Catherine E Tucker. 2019. Economics, fairness and algorithmic
+bias. preparation for: Journal of Economic Perspectives (2019).
+[12] Jinshuo Dong, Hadi Elzayn, Shahin Jabbari, Michael Kearns, and Zachary Schutz-
+man. 2019. Equilibrium Characterization for Data Acquisition Games. Proceedings
+of the International Joint Conference on Arti￿cial Intelligence.
+[13] Michael D Ekstrand, Mucun Tian, Ion Madrazo Azpiazu, Jennifer D Ekstrand,
+Oghenemaro Anuyah, David McNeill, and Maria Soledad Pera. 2018. All the
+cool kids, how do they ￿t in?: Popularity and demographic biases in recom-
+mender evaluation and e￿ectiveness. In Conference on Fairness, Accountability
+and Transparency. 172–186.
+[14] Hadi Elzayn, Shahin Jabbari, Christopher Jung, Michael Kearns, Seth Neel, Aaron
+Roth, and Zachary Schutzman. 2019. Fair algorithms for learning in alloca-
+tion problems. In Proceedings of the Conference on Fairness, Accountability, and
+Transparency. ACM, 170–179.
+[15] Danielle Ensign, Sorelle A Friedler, Scott Neville, Carlos Scheidegger, and Suresh
+Venkatasubramanian. 2017. Runaway feedback loops in predictive policing. arXiv
+preprint arXiv:1706.09847 (2017).
+[16] Benjamin Fish, Ashkan Bashardoust, Danah Boyd, Sorelle A. Friedler, Carlos
+Scheidegger, and Suresh Venkatasubramanian. 2019. Gaps in Information Access
+in Social Networks. In TheWorld WideWeb Conference, WWW 2019, San Francisco,
+CA, USA, May 13-17, 2019. 480–490.
+[17] D. Fudenberg, J. Tirole, J.A. TIROLE, and MIT Press. 1991. Game Theory. MIT
+Press. https://books.google.ca/books?id=pFPHKwXro3QC
+[18] F. Hayashi. 2011. Econometrics. Princeton University Press. https://books.google.
+com/books?id=QyIW8WUIyzcC
+[19] Kenneth L Judd. 1996. Cournot versus Bertrand: A dynamic resolution. (1996).
+[20] Nathan Kallus and Angela Zhou. 2018. Residual unfairness in fair machine
+learning from prejudiced data. arXiv preprint arXiv:1806.02887 (2018).
+[21] Michael Kearns. 2017. Fair Algorithms for Machine Learning. In Proceedings of
+the 2017 ACM Conference on Economics and Computation (EC ’17). ACM, New
+York, NY, USA, 1–1. https://doi.org/10.1145/3033274.3084096
+[22] M. Kearns and A. Roth. 2019. The Ethical Algorithm: The Science of Socially Aware
+Algorithm Design. Oxford University Press, Incorporated. https://books.google.
+ca/books?id=sE2jwgEACAAJ
+[23] Michael J. Kearns and Umesh V. Vazirani. 1994. An Introduction to Compu-
+tational Learning Theory. MIT Press. https://books.google.com/books?id=
+vCA01wY6iywC
+[24] Kristian Lum and William Isaac. 2016. To predict and serve? Signi￿cance 13, 5
+(2016), 14–19.
+[25] Yishay Mansour, Aleksandrs Slivkins, and Zhiwei Steven Wu. 2018. Competing
+Bandits: Learning Under Competition. In 9th Innovations in Theoretical Com-
+puter Science Conference (ITCS 2018). Schloss Dagstuhl-Leibniz-Zentrum fuer
+Informatik.
+[26] Rishabh Mehrotra, Ashton Anderson, Fernando Diaz, Amit Sharma, Hanna Wal-
+lach, and Emine Yilmaz. 2017. Auditing Search Engines for Di￿erential Satisfac-
+tion Across Demographics. In Proceedings of the 26th International Conference
+on World Wide Web Companion (WWW ’17 Companion). International World
+Wide Web Conferences Steering Committee, Republic and Canton of Geneva,
+Switzerland, 626–633. https://doi.org/10.1145/3041021.3054197
+[27] Ziad Obermeyer and Sendhil Mullainathan. 2019. Dissecting Racial Bias in an
+Algorithm that Guides Health Decisions for 70 Million People. In Proceedings of
+the Conference on Fairness, Accountability, and Transparency. ACM, 89–89.
+[28] Shai Shalev-Shwartz and Shai Ben-David. 2014. Understanding machine learning:
+From theory to algorithms. Cambridge university press.
+[29] Carl Shapiro. 1989. Theories of oligopoly behavior. Handbook of industrial
+organization 1 (1989), 329–414.
+[30] Latanya Sweeney. 2013. Discrimination in Online Ad Delivery. Queue 11, 3,
+Article 10 (March 2013), 20 pages. https://doi.org/10.1145/2460276.2460278
+[31] Jean Tirole. 1988. The theory of industrial organization. MIT press.
+[32] Gordon Tullock. 2001. E￿cient rent seeking. In E￿cient Rent-Seeking. Springer,
+3–16.
+[33] Sahil Verma and Julia Rubin. 2018. Fairness de￿nitions explained. In Proceedings of
+the International Workshop on Software Fairness, FairWare@ICSE 2018, Gothenburg,
+Sweden, May 29, 2018. 1–7.
+[34] Benjamin Wilson, Judy Ho￿man, and Jamie Morgenstern. 2019. Predictive
+Inequity in Object Detection. CoRR abs/1902.11097 (2019). arXiv:1902.11097
+http://arxiv.org/abs/1902.11097

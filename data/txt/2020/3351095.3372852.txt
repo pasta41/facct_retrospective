@@ -1,0 +1,1302 @@
+Effect of Confidence and Explanation on Accuracy and Trust Calibration in AI-Assisted Decision Making
+Yunfeng Zhang
+zhangyun@us.ibm.com
+IBM Research AI
+Yorktown Heights, USA
+Q. Vera Liao
+vera.liao@ibm.com
+IBM Research AI
+Yorktown Heights, USA
+Rachel K. E. Bellamy
+rachel@us.ibm.com
+IBM Research AI
+Yorktown Heights, USA
+ABSTRACT
+Today, AI is being increasingly used to help human experts make
+decisions in high-stakes scenarios. In these scenarios, full automa-
+tion is often undesirable, not only due to the signiicance of the
+outcome, but also because human experts can draw on their domain
+knowledge complementary to the model’s to ensure task success.
+We refer to these scenarios as AI-assisted decision making, where
+the individual strengths of the human and the AI come together
+to optimize the joint decision outcome. A key to their success is
+to appropriately calibrate human trust in the AI on a case-by-case
+basis; knowing when to trust or distrust the AI allows the human
+expert to appropriately apply their knowledge, improving decision
+outcomes in cases where the model is likely to perform poorly. This
+research conducts a case study of AI-assisted decision making in
+which humans and AI have comparable performance alone, and ex-
+plores whether features that reveal case-speciic model information
+can calibrate trust and improve the joint performance of the hu-
+man and AI. Speciically, we study the efect of showing conidence
+score and local explanation for a particular prediction. Through
+two human experiments, we show that conidence score can help
+calibrate people’s trust in an AI model, but trust calibration alone is
+not suicient to improve AI-assisted decision making, which may
+also depend on whether the human can bring in enough unique
+knowledge to complement the AI’s errors. We also highlight the
+problems in using local explanation for AI-assisted decision mak-
+ing scenarios and invite the research community to explore new
+approaches to explainability for calibrating human trust in AI.
+KEYWORDS
+decision support, trust, conidence, explainable AI
+ACM Reference Format:
+Yunfeng Zhang, Q. Vera Liao, and Rachel K. E. Bellamy. 2020. Efect of Con-
+idence and Explanation on Accuracy and Trust Calibration in AI-Assisted
+DecisionMaking. InConference on Fairness, Accountability, and Transparency
+(FAT* ’20), January 27ś30, 2020, Barcelona, Spain. ACM, New York, NY, USA,
+11 pages. https://doi.org/10.1145/3351095.3372852
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for proit or commercial advantage and that copies bear this notice and the full citation
+on the irst page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior speciic permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27ś30, 2020, Barcelona, Spain
+© 2020 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6936-7/20/02. . . $15.00
+https://doi.org/10.1145/3351095.3372852
+1 INTRODUCTION
+Artiicial Intelligence (AI) technologies, especially Machine Learn-
+ing (ML), have become ubiquitous and are increasingly used in a
+wide range of tasks. While algorithms can perform impressively, in
+many situations full delegation to ML models is not desired because
+their probabilistic nature means that there is never a guarantee
+of correctness for a particular decision. Furthermore, ML models
+are only as accurate as the historical data used to train them, and
+this data could sufer from input error, unknown laws, and biases.
+ML models can assist human decision-makers to produce a joint
+decision outcome that is hopefully better than what could be pro-
+duced by either the model or human alone. Ultimately however,
+humans would be responsible for the decisions made. Therefore
+ML decision-support applications should be developed not only
+with the goal of high performance, safety and fairness, but also
+allowing the decision-maker to understand the predictions made by
+the model. This is especially important for decision-making in high-
+stakes situations afecting human lives such as medical diagnosis,
+law enforcement, and inancial investment.
+A key to success in AI-assisted decision making is to form a cor-
+rect mental model of the model’s error boundaries [2]. That is, the
+decision-makers need to know when to trust or distrust the model’s
+recommendations. If they mistakenly follow the model’s recom-
+mendations at times when it is likely to err, the decision outcome
+would sufer, and catastrophic failures could happen in high-stakes
+decisions. Many have called out the challenges for humans to form
+a clear mental model of an AI, since opaque, "black-box" models are
+increasingly used. Furthermore, by exclusively focusing on opti-
+mizing model performance, developers of AI systems often neglect
+the system users’ needs for developing a good mental model of
+the AI’s error boundaries. For example, frequently updating the AI
+algorithm may cause confusion to the human decision-maker, who
+may accept or reject the AI’s recommendations at a wrong time,
+even if the algorithm’s overall performance improved [2].
+To help people develop a mental model of an ML model’s error
+boundaries means to correctly calibrate trust on a case-by-case basis.
+We emphasize that this goal is distinct from enhancing trust in AI.
+For example, while research repeatedly demonstrates that providing
+high-performance indicators of an AI system, such as showing high
+accuracy scores, could enhance people’s trust and acceptance of the
+system [17, 30, 32], they may not help people distinguish cases they
+can trust from those they should not. Meanwhile, ML is probabilistic
+and the probability of each single prediction can be indicated by a
+conidence score. In other words, the conidence scores relect the
+chances that the AI is correct. Therefore, to optimize for the joint
+decisions, in theory people should rely on the AI in cases where it
+has high conidence, and use their own judgment in cases where
+it has low conidence. However, in practice, we know little about
+how conidence scores are perceived by people, or how they impact
+human trust and actions in AI-assisted decisions.
+To improve people’s distrust in ML models, many considered the
+importance of transparency by providing explanations for the ML
+model [4, 9, 28]. In particular, local explanations that explain the
+rationale for a single prediction (in contrast to global explanations
+describing the overall logic of the model) are recommended to help
+people judge whether to trust a model on a case-by-case basis [28].
+For example, many local explanation techniques explain a predic-
+tion by how each attribute of the case contributes to the model’s
+prediction [19, 28]. It is possible that in low-certainty cases none of
+the features stands out to make strong contributions. So the expla-
+nation may appear ambivalent, thus alarming people to distrust the
+prediction. While such a motivation to help people calibrate trust
+underlies the development of local explanation techniques, to the
+best of our knowledge, this assumption has not been empirically
+tested in the context of AI-assisted decision making.
+In this paper, we conduct a case study of AI-assisted decision-
+making and examine the impact of information designs that re-
+veal case-speciic model information, including conidence score
+and local explanation, on people’s trust in the AI and the decision
+outcome. We explored two types of AI-assisted decision-making
+scenarios. One where the AI gave direct recommendation, and the
+other where the decision-maker had to choose whether to delegate
+the decision without seeing the AI’s prediction, the latter of which
+represents a stricter test of trust. We designed the study in a way
+to have the human decision-makers performing comparably to the
+AI, and also explored a situation where the humans know they
+had more domain knowledge than the AI. In contrast, prior works
+studying AI-assisted decision-making often used setups where hu-
+mans’ decision performance was signiicantly inferior than the
+model’s [17, 30], which would by default reward people to rely
+on the AI. While such a setup is appropriate for studying how to
+enhance trust in AI, our focus is to study the calibration of trust
+for cases where the AI has high or low certainty. This paper makes
+the following contribution:
+• We highlight the problem of trust calibration in AI at a
+prediction speciic level, which is especially important to the
+success of AI-assisted decision-making.
+• Wedemonstrate that showing prediction speciic conidence
+information could support trust calibration, even in situa-
+tions where the human has to blindly delegate the decision
+to the AI. However, whether trust calibration could translate
+into improved joint decision outcome may depend on other
+factors, such as whether the human can bring in a unique
+set of knowledge that complements the AI’s errors. We con-
+sider the concept of error boundary alignment between the
+human and the AI, and its implication for studying diferent
+AI-assisted decision making scenarios.
+• We show that local, prediction speciic explanations may
+not be able to create a perceivable efect for trust calibration,
+even though theywere theoretically motivated for such tasks.
+We discuss the limitations of the explanation design we used,
+and future directions for developing explanations that can
+better support trust calibration.
+2 RELATED WORK
+The concept of trust has its roots in relationships between humans,
+relected in many aspects of collaborative behaviors with others
+such as willingness to depend, give information and make pur-
+chase [12, 21]. Trust has been widely studied in human-computer
+and human-machine interaction since users’ decisions to continue
+using a system or accept output from a machine are highly trust-
+dependant behaviors [18, 25]. Very recently, understanding trust
+in interaction with ML systems has sparked much interest across
+disciplines, driven by the rapidly growing adoption of ML technolo-
+gies. On the one hand, trust in ML systems can be seen as a case
+for trust in algorithmic systems. Decades of research on this topic
+yielded complex insights on humans’ inclination to trust algorithms
+and what factors impact the trust. For example, while some studies
+found an "algorithm aversion" where people stop trusting algo-
+rithms after seeing mistakes [7], others found the reverse tendency
+of "automation bias" with which people overly rely on delegation
+to algorithms [6]. On the other hand, ML systems present some
+unique challenges for fostering trust. One is their challenge for
+scrutablity, especially given the increasing usage of "black box"
+ML models such as neural networks. Another challenge is their
+inherent uncertainty, since a ML system can make mistakes in its
+prediction based on learned patterns, and such uncertainty often
+cannot be fully captured before deployment using testing methods.
+While many emphasized the requisite of transparency for trust-
+ing AI [9, 28], several recent empirical studies found little evidence
+that the level of transparency has signiicant impact on people’s
+willingness to trust a ML system, whether by using a directly
+interpretable model, allowing user to inspect the model behav-
+ior, showing explanation or reducing the number of features pre-
+sented [5, 16, 27, 29]. Many reasons could have contributed to this
+lack of efect. One is the complex mechanism driving trusting be-
+haviors. According to theories of trust [6, 12, 15], trusting behaviors
+such as adopting suggestions are not only driven by a more posi-
+tive perception of the trustee but also other factors such as one’s
+disposition to trust and situation awareness. In fact, several studies
+suggest that overloading users with information about the system
+could potentially harm people’s situation awareness and lead to
+worse performance or decision-making outcome [6, 27, 29].
+Perhaps more critically, the premise that transparency or show-
+ing information to faithfully relect the model’s behavior should
+enhance trust is questionable, because enhancing trust for an infe-
+rior model is deceiving. Instead, in this paper we focus on the goal
+of calibrating trust, to help people correctly distinguish situations
+to trust or distrust an AI. While the concept of trust calibration
+has been studied for automation [13, 18, 20, 26], as to prevent both
+automation aversion and automation bias, it is not well understood
+in the context of AI systems. In one relevant study [8], Dodge et al.
+compared the efect of diferent explanation methods for calibrating
+perceived fairness of MLmodels, i.e. distinguishing between statisti-
+cally fair and unfair models. They found that local explanations, by
+highlighting unfair features used for individual predictions, appear
+to be more alarming than global explanations when used to explain
+an unfair model’s decisions, and thus more efective in calibrating
+people’s fairness judgment of ML models. Diferent from Dodge et
+al., we explore the efect of local explanation on calibrating trust for
+diferent predictions made by the same model, instead of calibrating
+human perception of diferent models.
+As we discussed, calibrating trust for individual predictions is
+especially important in AI-assisted decision making scenarios. We
+note several recent studies employed similar AI-assisted decision-
+making setups and studied how various model related information
+impacts trust and decision outcome [17, 27, 29, 30, 32]. Multiple
+studies examined the efect of accuracy information [17, 30, 32], and
+found people to increase their trust in the model when high accu-
+racy indicators are displayed, relected both in subjective reporting
+and more consistent choices with the model’s recommendations.
+Closest to ours is the work by Lai and Tan [17], where they studied
+the efect of showing prediction (in contrast to baseline without
+AI assistance), accuracy and multiple types of explanation for AI
+assisted decision-making in a deception-detection scenario. They
+found that all these features increased people’s trust, measured
+as acceptance of the AI’s recommendation as the inal decision,
+and also the decision accuracy. However, a caveat in interpreting
+the results is that the AI used in this task surpasses human perfor-
+mance by a large margin (87% compared to 51%), so any features
+that manifest the AI’s advantage could potentially increase people’s
+willingness to trust the AI, which by default would improve the
+decision outcome. In fact, observing the results reported by cor-
+rect versus incorrect model decisions, all these features increased
+participants willingness to accept the AI’s prediction regardless
+of its correctness, which is evidence that they are inefective in
+calibrating trust.
+3 EXPERIMENT 1: EFFECT OF SHOWING AI
+CONFIDENCE SCORE
+In the irst experiment, we tested the following hypotheses with a
+case study of AI-assisted prediction task:
+• Hypothesis 1 (H1): Showing AI conidence score improves
+trust calibration in AI such that people trust the AI more in
+cases where the AI has higher conidence.
+• Hypothesis 2 (H2): Showing AI conidence score improves
+accuracy of AI-assisted predictions.
+H2 is based on the assumption that if H1 holds, then humans
+may be able to adopt the AI’s recommendation at the right time
+and avoid following wrong recommendations. In addition, we also
+explored the following research questions:
+• Research Question 1 (RQ1): How does showing AI’s predic-
+tion versus not showing, afect trust, accuracy of AI-assisted
+predictions, and the efect of conidence score on trust cali-
+bration?
+While the former is a commonAI-assisted decision-making scenario
+where the AI gives direct recommendations, the latter represents
+a scenario where the human has to make blind delegation to the
+AI without seeing its output. Blind delegation can happen in real-
+world scenarios where delegation has to happen beforehand, or
+when the AI decisions have latency. We were also interested in it as
+a stricter test of trust and trust calibration, following the setup used
+in Bansal et al. [2] to test mental modeling of error boundaries.
+• Research Question (RQ2): How does knowing to have more
+domain knowledge than the AI afect humans’ trust, accuracy
+of AI-assisted predictions, and the efect of conidence score
+on trust calibration?
+To achieve these goals, we designed a prediction task in which
+participants could achieve comparable performance to an AI model.
+This task served as the foundation for both the irst and the second
+experiment.
+3.1 Experimental Design
+3.1.1 Participants. We recruited 72 participants from Amazon Me-
+chanical Turk for this irst experiment. 19 participants were women,
+and 2 declined to state their gender. 16 participants were between
+Age 18 and 29, 32 between Age 30 and 39, 15 between Age 40 and
+49, and 9 over Age 50.
+3.1.2 Task and Materials. We designed an income prediction task
+where a participant was asked to predict whether a person’s an-
+nual income would exceed $50K based on some demographic and
+job information. The data used for the task was the 1994 Census
+Data published as the Adult Data Set in UCI Machine Learning
+Repository [10]. The entire dataset has 48,842 instances of surveyed
+persons, each described by 14 attributes. These people’s annual
+income, recorded as a binary value indicating above/below $50K,
+was used as the ground truth for assessing the participants’ pre-
+diction accuracy. ML models are trained based on a sample of the
+dataset to make recommendations to the participants. We selected
+8 most important features out of the 14 attributes (as determined
+by the feature importance values of a Gradient Boosting Decision
+Tree model over all the data) as features for the models, and as
+proile features shown to the participants in the prediction trials.
+The model was trained based on a 70% random split of the original
+data set, while the prediction trials given to the participants were
+drawn from the remaining 30%. Each prediction trial was shown
+to the participants with the eight proile attributes in a table like
+Figure 1.
+We intended to create a setup close to real-world AI-assisted
+decision scenarios where the humans have comparable domain
+knowledge with the AI and are motivated to optimize the decision
+outcome. We took two measures to improve the ecological validity.
+First, the decision performance was linked to monetary bonus,
+with a reward of 5 cents if the inal prediction was correct and a
+loss of 2 cents if otherwise (in addition to a base pay of $3). Prior
+research showed that such a reward design is efective in motivating
+participants to optimize the decision outcome [2, 31]
+Second, since MTurk workers were unlikely familiar with this
+task, we boosted their domain knowledge and performance by a
+training task (detailed in Section 3.1.4) and an additional piece of
+informationÐthe third column in Figure 1 showing the chance a
+person with that attribute-value earning income above $50K on
+a scale of 0 to 10. This chance number was calculated from the
+training dataset based on the percentages of people with the corre-
+sponding attribute-value earning income above 50K. We multiplied
+the percentages by 10 and rounded the number since prior work
+shows that people understand frequencies better than probabilities
+[17]. For example, in Figure 1, the chance value for occupation
+indicates that 5 people out of 10 with the occupation of Executive &
+Managerial have annual income above 50K. For continuous values
+like Age and Years of Education, chance is calculated over a range,
+Figure 1: A screenshot of a proile table shown in the exper-
+iment. The table lists eight attribute values and their corre-
+sponding chances (out of 10) that a person with the same
+attribute value would have income above $50K.
+e.g. Age between 45 and 55. The speciic range is shown when the
+participant hovered the mouse pointer on the chance number.
+The chance number can be seen as analogous to learning mate-
+rials that experts may have in real-world scenarios. For example,
+decision-makers often have access to statistics of historical events.
+However, these statistics do not obviate the need for human deci-
+sion making to synthesize various information. This is also relected
+in our task in that the chance values only show probabilities condi-
+tioned on single attributes, and the participants still had to learn to
+combine them to form a prediction based on all attributes.
+3.1.3 Design. We designed three experimental factors to evaluate
+the efect of showing conidence scores (H1 and H2), as well as to
+explore the diference in showing prediction (RQ1) and in scenar-
+ios where humans have additional knowledge (RQ2). This 2x2x2
+design yields a total of 8 conditions, and we randomly assigned 9
+participants to each condition.
+Show vs. not show AI conidence. Studying the efect of con-
+idence scores on people’s trust in AI and AI-assisted prediction
+outcomes is the main goal of this experiment. Conidence is deined
+as the model’s predicted probability for the most likely outcome.
+For certain ML models, their predicted event probabilities may devi-
+ate substantially from the true outcome probabilities (this is called
+poor calibration). We checked our models and found that their
+probabilities matched the outcome probabilities very well. Like the
+chance number, we stated conidence probabilities as frequencies
+in messages like this: "The model’s prediction is correct N times out
+of 10 on individuals similar to this one", where N is the rounded
+number of conidence probability multiplied by 10.
+Show vs. not show AI prediction. We compared a scenario
+where human had access to the AI’s prediction to assist their inal
+decision, versus one where the human had to choose whether to
+delegate the task to AI without seeing the prediction. The latter was
+a stricter test of people’s trust and trust calibration. In both condi-
+tions, feedback were provided on whether each trial was correct or
+not, so participants would still experience the AI’s performance in
+conditions where the AI’s predictions were not shown.
+Full vs. partial model. We explored whether it made a difer-
+ence when people knew they had access to more information than
+the AI. This situation is common in real-world AI-assisted decision
+making, as human experts often posses domain knowledge that
+is not captured by the data to train the AI. For this purpose, we
+trained a second partial model without the most important attribute,
+marital status. Note our focus was not to test human trust on an
+inferior model, as the accuracy of the partial model (83%) was only
+slightly less than that of the full model (84%) when evaluated on a
+reserved 20% test set. Instead, we were interested in the efect of
+subjectively knowing to have more domain knowledge than the AI
+on people’s trust and decision-making. Therefore, for participants
+assigned to the partial model condition, we explicitly told them the
+model was not considering the martial status attribute, and further
+highlighted the point by distinguishing the marital status attribute
+in the proile table with a description text "extra information for
+you".
+Since the focus of this research was on calibration of trust for
+cases where AI prediction was more or less reliable, instead of
+random sampling, we opted for stratiied sampling of cases across
+diferent conidence levels. This would increase the number of
+cases where the AI was less certain about, and allow us to bet-
+ter compare the efect of studied features on cases with diferent
+certainty levels. The conidence scores of the model for a binary
+prediction ranged from 50% to 100%. We divided this range into ive
+bins, each covers a 10% range, and randomly sampled 8 trials from
+each bin for a participant. The order of these trials was randomized.
+3.1.4 Procedure. Upon accepting the task on Amazon Mechanical
+Turk, participants were brought to our experimental website. They
+were asked to irst give their consent, then read the instruction
+about the experiment, including the goal of the task and how to
+read the proile table. The instruction was tailored for the condition
+the participants were assigned to.
+Next, they were given 20 training trials to practice. In each train-
+ing trial, after participants gave their predictions, they were shown
+the actual income category of that person as well as the AI’s pre-
+diction, so that they could learn from the feedback and assess the
+AI’s accuracy for diferent cases. They were also shown the AI’s
+conidence level if they were assigned to the with-conidence condi-
+tions. After inishing all training trials, participants were told their
+accuracy and the model’s accuracy for the last 10 training trials.
+They then proceeded to the 40 task trials, where they were asked
+to make their own prediction irst. They were then shown the
+version of AI information (with/without conidence, with/without
+prediction) depending on which condition they were assigned to.
+Then the participants were asked to choose their own or themodel’s
+prediction as their inal prediction. Finally, a feedback message
+was shown about whether the participant and the model were
+correct. In the with-prediction conditions, if the participant’s own
+prediction agreed with the AI’s prediction, we automatically took
+that prediction as the inal prediction. A 10-second count down
+was imposed on each trial before the prediction submission button
+was enabled, encouraging participants to pay more attention in
+each decision. After the 40 task trials, participants completed a
+demographic survey.
+As discussed, participants received a base pay of $3 in addition
+to the performance-based bonus payment (plus 5 cents if correct
+and minus 2 cents if wrong). On average, each participant received
+$1.16 bonus, and a total of $4.16 compensation for completing the
+half-hour long experiment.
+3.2 Results
+3.2.1 Trust. Prior work suggests that subjective self-reported trust
+may not be a reliable indicator for trusting behaviors [16, 29], which
+are what ultimately matter in AI-assisted decision tasks. Therefore,
+following recent studies [17, 27, 30], we measured participants’
+trust in the AI by two behavioral indicators:
+1) Switch percentage, the percentage of trials in which the par-
+ticipant decided to use the AI’s prediction as their inal prediction.
+In conditions where the AI’s prediction was shown, it was the
+percentage of trials using the AI’s prediction among trials where
+participants and the AI disagreed. In conditions where the AI’s
+prediction was not shown, it was the percentage of trials in which
+participants chose to delegate the prediction to the AI among all
+trials.
+2) Agreement percentage, the percentage of trials in which the
+participant’s inal prediction agreed with the AI’s prediction.
+The main diference between the two measures was that in the
+with-prediction conditions, the agreement percentage would count
+the trials in which the participant’s and the AI’s predictions agreed
+and automatically counted as the inal decision; whereas the switch
+percentage would only consider cases where they disagreed and
+had to make an intentional act of switching. Therefore, we consider
+switch percentage to be a stricter measure of trust, even though
+agreement percentage was used in prior research [17].
+Figure 2 shows the switch percentage across the prediction and
+conidence factors. The result that the orange error bars (w/ coni-
+dence conditions) are higher than the green error bars (w/o con-
+idence conditions) indicates that the participants switched to the
+AI’s predictions (or decided to use AI in the without-prediction
+conditions) more often when the AI’s conidence scores were dis-
+played. A four factor ANOVA, conidence × prediction × model
+completeness × model conidence level, conirmed that the main
+efect of showing conidence scores was signiicant, F (1, 64) = 4.64,
+p = .035.
+The other two factors, prediction and model completeness, did
+not have any signiicant main efect or interaction, partially answer-
+ing RQ1 and RQ2. As can be seen in Figure 2, showing prediction
+did not afect switch percentages signiicantly, F (1, 64) = 0.217,
+p = .643. The insigniicant efect of model completeness, F (1, 64) =
+0.07, p = .792, suggests that participants did not distrust the partial
+model. Given that the two models had similar accuracy, participants
+acted rationally.
+Figure 3 further examines how showing conidence calibrated
+trust for cases of diferent conidence levels. The igure shows that
+when the AI’s conidence level was between 50% and 80%, there
+was not much diference between with- and without-conidence
+conditions. In fact, participants seemed to trust the model less
+●
+●
+●
+●
+30%
+35%
+40%
+45%
+50%
+55%
+w/o prediction w/ prediction
+S
+w
+it
+c
+h
+ P
+e
+rc
+e
+n
+ta
+g
+e
+●
+●
+w/o confidence
+w/ confidence
+Figure 2: Switch percentage, measured as how often partic-
+ipants chose the AI’s predictions as their inal predictions,
+across conidence and prediction conditions. The dots indi-
+cate the mean percentages. All error bars in this and subse-
+quent graphs show +/- one standard error.
+when AI conidence was shown and was less than 60%, But when
+the AI’s conidence level was highÐabove 80%Ðparticipants’ trust
+was signiicantly enhanced by seeing the conidence scores. This
+calibration of trust was conirmed by a statistically signiicant in-
+teraction between showing conidence and the AI’s conidence
+level, F (4, 256) = 15.8, p < .001. Further, when the AI conidence
+score was not shown, participants’ trust was generally maintained
+around the same level across trials of all conidence levels. This was
+conirmed by an ANOVA on the without-conidence conditions:
+main efect of conidence level was not signiicant, F (4, 128) = 1.84,
+p = .126.
+To answer RQ1, the trust calibration efect by showing coni-
+dence score held regardless of whether the model prediction was
+shown. In other words, high conidence scores encouraged partici-
+pants to delegate the decision task to the AI even without seeing
+its predictions. This was conirmed by the insigniicant three-way
+interaction between conidence, prediction, and conidence level,
+F (4, 256) = 0.266, p = .899.
+A similar pattern was observed in the other trust measure, agree-
+ment percentage, as shown in Figure 4. When the conidence score
+was shown, the diference in the agreement percentage between
+high-conidence levels and low-conidence levels became more
+pronounced. The calibration efect of conidence score on the agree-
+ment percentage, as indicated by the interaction between con-
+idence and conidence levels, was signiicant, F (4, 256) = 3.82,
+p = .005. Similarly, this calibration efect held in scenarios of show-
+ing and not showing AI prediction, F (4, 256) = 0.331, p = .857. H1
+was thus fully supported.
+3.2.2 Accuracy. During the experiment, we collected three types
+of predictions: (a) participants’ own predictions before they saw
+any information from the AI, (b) the AI’s predictions, and (c) the
+participants’ inal prediction after seeing AI information, which we
+call AI-assisted prediction. We measured the accuracy for each type
+of prediction. On average, the participants’ own accuracy was 65%,
+with only 14 of 72 participants under 60%, while the AI accuracy
+was 75% (note this number is lower thanmodel accuracy on test data
+because of stratiied sampling for experiment trials). These accuracy
+●
+●
+●
+● ●
+●
+●
+●
+●
+●
+●
+●
+●●
+●
+●
+●
+●
+●
+●
+w
+/o
+ p
+re
+d
+ic
+tio
+n
+w
+/ p
+re
+d
+ic
+tio
+n
+50−60 60−70 70−80 80−90 90−100
+25%
+50%
+75%
+25%
+50%
+75%
+AI confidence level (%)
+S
+w
+it
+c
+h
+ P
+e
+rc
+e
+n
+ta
+g
+e
+●
+●
+w/o confidence
+w/ confidence
+Figure 3: Switch percentage across ive conidence levels and
+various conditions.
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+w
+/o
+ p
+re
+d
+ic
+tio
+n
+w
+/ p
+re
+d
+ic
+tio
+n
+50−60 60−70 70−80 80−90 90−100
+70%
+80%
+90%
+100%
+70%
+80%
+90%
+100%
+AI confidence level (%)
+A
+g
+re
+e
+m
+e
+n
+t 
+P
+e
+rc
+e
+n
+ta
+g
+e
+●
+●
+w/o confidence
+w/ confidence
+Figure 4: Agreement percentage, measured as how often par-
+ticipants agree with the model’s prediction, across coni-
+dence levels and various conditions.
+numbers did not show statistically signiicant variations across
+experimental conditions. Thus, in our task, AI had an advantage
+over the humans but not by much. This is in contrast to [17] where
+the humans performed substantially worse than the AI (by 37%).
+After conirming that displaying conidence both improved over-
+all trust and helped calibrate trust with conidence levels, we inves-
+tigated whether this translated to improvement in the accuracy of
+the AI-assisted predictions. Figure 5 shows this AI-assisted accuracy
+●
+●
+●
+●
+●
+●●
+●
+68%
+70%
+72%
+74%
+w/o prediction w/ prediction
+A
+I−
+A
+s
+s
+is
+te
+d
+ P
+re
+d
+ic
+ti
+o
+n
+ A
+c
+c
+u
+ra
+c
+y
+model with all variables
+model w/o marital status
+●
+●
+w/o confidence
+w/ confidence
+Figure 5: Accuracy of the human andAI-assisted predictions
+across conditions.
+across conditions. It suggests that there was no signiicant difer-
+ence in AI-assisted accuracy across the prediction and conidence
+conditions. Indeed, an ANOVA showed that only the AI conidence
+level (F (4, 256) = 79.6, p < .001) and its interaction with model
+completeness (F (4, 256) = 2.95, p = .021) had signiicant efect.
+Furthermore, we also analyzed the diference between AI-assisted
+accuracy and AI accuracy, and none of the factors showed signii-
+cant efects. We originally expected that the AI-assisted prediction
+(i.e. human-AI joint decision) would be more accurate than the AI
+alone when the AI conidence was low, but that did not turn out to
+be true.
+The fact that showing conidence improved trust and trust cali-
+bration but failed to improve the AI-assisted accuracy is puzzling,
+and it rejects our H2. This phenomenon could be explained by
+the correlation between model decision uncertainty and human
+decision uncertainty, because trials where the model prediction had
+low conidence were also more challenging for humans. This can
+be seen in Figure 6 that the humans were less accurate than AI
+across all conidence levels, although the diference is smaller in the
+low conidence trials. Therefore, even though showing conidence
+encouraged participants to trust the AI more in high-conidence
+zone, the number of trials in which the human and the AI disagreed
+in these cases were low to begin with, while in the low-conidence
+zone, human’s predictions were not better substitutes for AI’s. A
+caveat to interpret the results here is that if the correlation between
+human and model uncertainty decreases, for example if the human
+expert and the model each has a unique set of knowledge, it is
+possible that better calibration of trust with the model certainty
+could lead to improved AI-assisted decisions.
+In summary, results of Experiment 1 showed that displaying
+conidence score improved trust calibration (H1 supported) and
+increased people’s willingness to rely on AI’s prediction in high-
+conidence cases. This trust calibration efect held in AI-assisted
+decision scenarios where the AI’s recommendation was shown, and
+in scenarios where people had to make blind delegation without
+●
+●
+●
+●
+●
+−15%
+−10%
+−5%
+0%
+50−60 60−70 70−80 80−90 90−100
+AI confidence level (%)
+D
+if
+fe
+re
+n
+c
+e
+ b
+e
+tw
+e
+e
+n
+H
+u
+m
+a
+n
+ a
+n
+d
+ A
+I 
+A
+c
+c
+u
+ra
+c
+y
+Figure 6: Diference between human and AI accuracy across
+conidence levels.
+seeing the AI’s recommendation (RQ1). However, in this case study,
+trust calibration did not translate into improvement in AI-assisted
+decision outcome (H2 rejected), potentially because there was not
+enough complementary knowledge for people to draw on.While we
+explored a scenario where participants knew they had additional
+knowledge that the AI did not have access to, it did not make
+signiicant diference in the AI-assisted prediction task (RQ2)
+4 EXPERIMENT 2: EFFECT OF LOCAL
+EXPLANATION
+The second experiment examined the efect of local explanations.
+It had the same setup as Experiment 1, but instead of showing
+conidence scores, we showed local explanations for each AI predic-
+tion. The main hypothesis we wanted to test was that: because local
+explanation is suggested to help people judge whether to trust a par-
+ticular prediction [28], and it could potentially expose uncertainty
+underlying an AI prediction, showing explanation could support
+trust calibration (H3) and improve AI-assisted predictions (H4).
+4.1 Experiment Setup
+We developed a visual explanation feature like the one in Figure 7.
+This visualization explains a particular model prediction by how
+each attribute contributes to the model’s prediction. The contribu-
+tion values were generated using a state-of-the-art local explanation
+technique called Shapley method [19].
+Experiment 2 was carried out only under the full-model, with-
+prediction condition. We only tested the full-model condition be-
+cause the irst experiment did not show signiicant efect of the
+model completeness. We only tested the with-prediction condition,
+because even if the prediction was not shown, participants could
+still derive them from the explanation graphsÐif the sum of the
+orange bars is longer than the sum of the blue bars, the model
+predicts income above 50K and vice versa.
+Nine participants were recruited for Experiment 2. Four of them
+were women. One participant was between Age 18-29, four between
+Age 30 and 39, two between 40 and 49, and two above 50.
+4.2 Results
+The goal of Experiment 2 was to test the efect of local explanation
+on people’s trust in the AI and the AI-assisted decision outcomes,
+Figure 7: A screenshot of the explanation shown for a par-
+ticular trial. Participants were told that orange bars indicate
+that the corresponding attributes suggest higher likelihood
+of income above 50K, whereas blue bars indicate higher like-
+lihood of income below 50K. The light blue bar at the bottom
+indicates the base chanceÐa person with average values in
+all attributes is unlikely to have income above 50K.
+as compared to baseline condition and the efect of conidence
+scores. Therefore, for the subsequent analysis, we combined the
+data collected from this experiment with those from the baseline
+and with-conidence condition of Experiment 1 (all conditions are
+full-model, with-prediction).
+4.2.1 Trust. Figure 8 shows that unlike conidence, explanation did
+not seem to afect participants’ trust in the model predictions across
+conidence levels. As discussed before, indicated by the orange bars,
+showing model conidence encouraged participants to trust the
+model more in high-conidence cases (note that the statistics are
+not identical to those in Figure 3 because results here only included
+data in the full-model, with-prediction condition), but the results for
+explanation (blue error bars) did not show such a pattern. Instead,
+the switch percentage seemed to stay constant across conidence
+levels similar to that in the control condition. Results of an ANOVA
+supported these observations: the model information factor (no info
+vs. conidence vs. explanation) had a signiicant efect on the switch
+percentage, F (2, 24) = 4.17, p = .028, and its interaction with model
+conidence level was also signiicant, F (8, 96) = 3.81, p < .001. A
+Tukey’s honestly signiicant diference (HSD) post-hoc test showed
+that the switch percentage in the conidence condition was signii-
+cantly higher than those in the baseline condition (p=.011) and the
+explanation condition (p < .001), but the explanation condition was
+not signiicantly diferent from the baseline (p = .66).
+The agreement percentage showed a similar efect, albeit less
+pronounced. As shown in Figure 9, the baseline condition (green)
+and the explanation condition (blue) had similar agreement per-
+centages, while the with-conidence condition (orange) had higher
+percentage when the conidence level was above 70%. Nonetheless,
+this efect was not signiicant on this measure, F (2, 24) = 0.637,
+p = .537. Taken together,H3 was rejected as we found no evidence
+that showing explanation was more efective in trust calibration
+than the baseline.
+4.2.2 Accuracy. In Experiment 2, the average Human accuracy
+was 63%, while the AI’s accuracy was again 75% due to stratiied
+sampling. Figure 10 examines the efect of explanation on the accu-
+racy of AI-assisted predictions. Similar to Experiment 1, we did not
+ind any signiicant diference in AI-assisted accuracy across model
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+●
+0%
+25%
+50%
+75%
+100%
+50−60 60−70 70−80 80−90 90−100
+AI confidence level (%)
+S
+w
+it
+c
+h
+ P
+e
+rc
+e
+n
+ta
+g
+e
+● ● ●no info confidence explanation
+Figure 8: Switch percentage across conidence levels and
+model information conditions.
+●
+●
+●
+●
+●
+● ●
+●
+●
+●
+●
+●
+●
+●
+●
+60%
+70%
+80%
+90%
+100%
+50−60 60−70 70−80 80−90 90−100
+AI confidence level (%)
+A
+g
+re
+e
+m
+e
+n
+t 
+P
+e
+rc
+e
+n
+ta
+g
+e
+● ● ●no info confidence explanation
+Figure 9: Agreement percentage across conidence levels and
+model information conditions.
+information conditions, F (2, 24) = 0.810, p = .457. If anything,
+there was a reverse trend of decreasing the AI-assisted accuracy by
+showing explanation. H4 was thus also rejected.
+Taken together, the results suggest a lack of efect of local expla-
+nations on improving trust calibration and AI-assisted prediction.
+Our results appeared to contradict conclusions in Lai and Tan’s
+study [17], which showed that explanations could improve peo-
+ple’s trust and the joint decision outcome. But a closer look at Lai
+and Tan’s results revealed a trend of indiscriminatory increase in
+trust (willingness to accept) whether the AI made correct or incor-
+rect predictions, suggesting similar conclusion that explanations
+are inefective for trust calibration. However, since in their study
+the AI outperformed human by a large margin, this indiscrimina-
+tory increase in trust improved the overall decision outcome. It is
+●
+●
+●
+62%
+65%
+68%
+70%
+72%
+no info confidence explanationA
+I−
+A
+s
+s
+is
+te
+d
+ P
+re
+d
+ic
+ti
+o
+n
+ A
+c
+c
+u
+ra
+c
+y
+● ● ●no info confidence explanation
+Figure 10: Accuracy of the AI-assisted predictions across
+conditions.
+also possible in that setup explanations could display the superior
+capability of the system and more efectively enhance the trust.
+In the next section, we discuss the implications of diferences in
+the AI-assisted decision task setups and the limitations of local
+explanations for trust calibration.
+5 DISCUSSIONS
+We discuss broader implications of this case study for improving
+AI-assisted decision-making.
+5.1 Mental Model of Error Boundaries
+Consistent with prior work on trust calibration for automation [20],
+we show that case speciic conidence information can improve
+trust calibration in AI-assisted decision making scenarios. In these
+scenarios, showing conidence is potentially more helpful than
+showing model-wide information such as accuracy. Bansal et al. [2]
+mentioned that well-calibrated conidence scores can potentially
+help people form a good mental model of AI’s error boundariesś
+understanding of when the AI is likely to err. We recognize that we
+did not measure people’s mental model directly but instead focus-
+ing on behavioral manifestation of trust calibration. Developing a
+good mental model is indeed a higher target, which requires one to
+construct explicit representation of error boundaries. With a good
+mental model, one may be able to more eiciently calibrate trust
+without the needs to access and comprehend conidence informa-
+tion for every prediction. A recent paper by Hofman et al. [14]
+recognizes that forming a good mental model of AI is the key to ef-
+fectively appropriating trust and usage. The paper also calls out the
+need to develop methods to measure the soundness of users’ mental
+model, and suggests references from methods in cognitive psychol-
+ogy. Using these methods, future work could examine whether
+having access to conidence information could efectively foster a
+mental model of error boundaries.
+However, showing conidence scores has its drawbacks. It is well
+understood that conidence scores are not always well calibrated
+in ML classiiers [23]. Also a numeric score may not be interpreted
+meaningfully by all people, especially in complex tasks. Moreover,
+conidence scores alone may be insuicient to foster a good mental
+model, since it would require people to extract explicit knowledge
+from repeated experience. Future work could explore techniques
+to provide more explicit description of error boundaries or low-
+conidence zones, and study their efect on trust calibration and
+AI-assisted decision making.
+5.2 Alignment of Human’s and AI’s Error
+Boundaries
+Our study found little efect of conidence information on improving
+AI-assisted decision outcome, even though it improved trust calibra-
+tion. A potential reason is that, in our setup, the error boundaries of
+human’s and AI’s were largely aligned. In other words, in situations
+where the AI was likely to err, the humans were also likely to err.
+Participants recruited from Mechanical Turk are not experts in an
+income prediction task. We attempted to inject domain knowledge
+by providing participants with chance numbers for each feature,
+while the model was trained on the same data with the same set
+of features. While we explored conditions where the human had
+access to an additional key attribute, it might not have created suf-
+icient advantage for the human. We envision in situations where
+the AI and the human have complementary error boundaries, trust
+calibration may be more efective in improving AI-assisted decision
+outcomes. Future work should test this hypothesis.
+Results of our study show some discrepancies with prior works,
+especially Lai and Tan’s study [17]. We recognize the diferences be-
+tween the setups. While in our study the human and AI had largely
+aligned knowledge and performance, in [17] the humans had sig-
+niicantly worse performance in the deception detection task. We
+may consider the setup in [17] to be a situation where the human
+and the AI not only have unaligned, but also unequal error zones.
+These comparisons highlight the problem of generalizability from
+studies of AI-assisted decision making tasks without explicitly char-
+acterizing or controlling for the human’s performance proile and
+its diference from the AI’s. Our results suggest that such character-
+ization or experimental control may need to go beyond the overall
+performance, but also consider the alignment of error boundaries
+between the human and the AI. While how to characterize the level
+of error boundary alignment poses an open question, we invite the
+research community to consider it in order to collectively produce
+uniied theories and best practices of AI-assisted decision making.
+5.3 Explainability for Trust Calibration
+Explainable Artiicial Intelligence is a rapidly growing research
+discipline [1, 4, 11, 22]. The quest for explainability has its roots in
+the growing adoption of high-performance "black-box" AI models,
+which spurs public concerns about the safety and ethical usage
+of AI. Given such "AI aversion", research has largely embraced ex-
+plainability as a potential cure for enhancing trust and usage of AI.
+Empirical studies of human-AI interaction also tend to seek vali-
+dation of trust enhancement by explainability, albeit with highly
+mixed results. But in practice, there are diverse needs for explain-
+ability, as captured by [1, 9], including scenarios for ensuring safety
+in complex tasks, guarding against discrimination, and improving
+user control of AI. In many of these scenarios, one would desire sup-
+port for efectively and eiciently identifying errors, uncertainty,
+and mismatched objectives of AI, instead of being persuaded to
+Figure 11: Screenshots of explanation for cases where the
+model had low conidence.
+over-trust the system. Therefore, we highlight the problem of trust
+calibration and designed a case study to explore whether a popular
+local explanation method could support trust calibration.
+Unfortunately, we did not ind the explanation to create per-
+ceivable efect in calibrating trust in AI predictions. This stands in
+contrast to the indings of [28] where explanations helped expose
+a critical law in the model (treating snow as Husky), which could
+help the debugging work. We note the diference in our setupśthe
+classiication model may not have obvious laws in its overall logic
+and trust calibrationmay require more than recognizing laws in the
+explanation. Figure 11 lists two examples of explanation shown for
+a low-conidence prediction. In theory, prediction conidence could
+be inferred by summing the positive and negative contributions
+of all attributes. If the sum is close to zero, then the prediction is
+not made with conidence. However, we speculate that this method
+of inference might not have been obvious for people without ML
+training. Instead, one may simply focus on whether the top features
+and their contributions are sensible. In these two examples, marital
+status is considered as the main reason for the model to predict
+higher income. This is a sensible rationale that would frequently
+appear in explanations regardless of prediction conidence. It is also
+possible that the explanation created information overload [27]
+or are simply ignored by some participants. We acknowledge that
+some of these problems may be speciic to the visual design we
+adopted. It is also possible that the underlying explanation algo-
+rithm has its limitation in faithfully relecting prediction certainty.
+Nonetheless, our study highlights the importance of studying how
+an AI explanation design is perceived by a particular group of users,
+for a particular goal.
+There are many other explanation methods and techniques, and
+it is possible that some are more efective in calibrating trust or
+exposing model problems. For example, Dodge et al. [8] compared
+the efect of diferent explanation methods in exposing discrimina-
+tion of an unfair model. The study showed that sensitivity based
+explanation, which highlights only a small number of features that,
+if changed, could "lip" the model’s prediction, is perceived as more
+alarming and therefore more efective at calibrating fairness judg-
+ment than methods that list the contribution of every feature. A
+study conducted by Cai et al. [3] found that comparative expla-
+nation, by comparisons with examples in alternative classes, can
+lead to better discovery of the limitations of the AI, compared to
+normative explanation that describes examples in the intended
+class. Although these results imply that some explanation meth-
+ods may better serve the goal of trust calibration, we know little
+about the mechanism, neither from the algorithmic side on what
+makes an explanation technique sensitive to the trustworthiness of
+a model or prediction, nor from the human perception side on what
+characteristics of explanations are associated with trust or distrust.
+We therefore invite the research community to explore AI ex-
+plainability speciically for trust calibration, both at the model level
+and the prediction level. As a starting point, explanation methods
+and techniques could target a diferent set of goals in addition to
+metrics suggested in the current literature such as faithfulness,
+improved human understanding or acceptance [9]. For example,
+explanation that could efectively support trust calibration at the
+model level should be sensitive to the model performance, while
+explanation that support trust calibration at the prediction level
+should be sensitive to the prediction uncertainty. Ultimately, trust
+resides in human perception and the efect on trust calibration
+should be evaluated by having targeted users in the loop. Our study
+provides an example of how to conduct such an evaluation for trust
+calibration.
+6 LIMITATIONS
+One limitation of our study is that our participants are not experts in
+income prediction. This problem was mitigated by the training task
+and the access to statistics of the domain (the chance column). The
+fact that participants’ accuracy was only 10% less than the model
+trained on a large dataset suggests that these domain-knowledge
+enhancement measures were efective. Although it is desirable
+to conduct the experiment with real experts, it can be extremely
+expensive. Our approach can be considered as "human grounded
+evaluation" [9], a valid approach by using lay people as "proxy" to
+understand the general behavioral patterns.
+Another limitation is that we use a contrived prediction task
+where the participants would not be held responsible. We miti-
+gated the problem by introducing an outcome based bonus reward,
+which prior studies suggest could efectively motivate optimizing
+the decision-making. While future study could experiment with
+scenarios with more signiicant real-world impact, we note that
+they have to be executed with caution to avoid ethical concerns.
+Lastly, themethod thatwe proposed for calibrating trustÐshowing
+model prediction conidence to the decisionmakerÐclearly depends
+on the model’s predicted probabilities being well calibrated to the
+true outcome probabilities. There are certain machine learning
+models that do not meet this criterion such as SVM, though this
+issue can be potentially addressed through Platt Scaling or Isotonic
+Regression [24].
+REFERENCES
+[1] Amina Adadi and Mohammed Berrada. 2018. Peeking inside the black-box: A
+survey on Explainable Artiicial Intelligence (XAI). IEEE Access 6 (2018), 52138ś
+52160.
+[2] Gagan Bansal, Besmira Nushi, Ece Kamar, Dan Weld, Walter Lasecki,
+and Eric Horvitz. 2019. Updates in Human-AI Teams: Understanding
+and Addressing the Performance/Compatibility Tradeof. In AAAI Con-
+ference on Artiicial Intelligence. AAAI. https://www.microsoft.com/en-
+us/research/publication/updates-in-human-ai-teams-understanding-and-
+addressing-the-performance-compatibility-tradeof/
+[3] Carrie J. Cai, Jonas Jongejan, and Jess Holbrook. 2019. The efects of example-
+based explanations in a machine learning interface. In International Conference
+on Intelligent User Interfaces, Proceedings IUI, Vol. Part F147615. Association for
+Computing Machinery, 258ś262. https://doi.org/10.1145/3301275.3302289
+[4] Diogo V. Carvalho, Eduardo M. Pereira, and Jaime S. Cardoso. 2019. Machine
+Learning Interpretability: A Survey on Methods and Metrics. Electronics 8, 8 (jul
+2019), 832. https://doi.org/10.3390/electronics8080832
+[5] Hao Fei Cheng, Ruotong Wang, Zheng Zhang, Fiona O’Connell, Terrance Gray,
+F. Maxwell Harper, and Haiyi Zhu. 2019. Explaining decision-making algorithms
+through UI: Strategies to help non-expert stakeholders. In Conference on Human
+Factors in Computing Systems - Proceedings. Association for ComputingMachinery.
+https://doi.org/10.1145/3290605.3300789
+[6] M. L. Cummings. 2004. Automation bias in intelligent time critical decision
+support systems. In Collection of Technical Papers - AIAA 1st Intelligent Systems
+Technical Conference, Vol. 2. 557ś562.
+[7] Berkeley J Dietvorst, Joseph P Simmons, and Cade Massey. 2015. Algorithm
+aversion: People erroneously avoid algorithms after seeing them err. Journal of
+Experimental Psychology: General 144, 1 (2015), 114.
+[8] Jonathan Dodge, Q. Vera Liao, Yunfeng Zhang, Rachel K.E. Bellamy, and Casey
+Dugan. 2019. Explaining models: An empirical study of how explanations impact
+fairness judgment. In International Conference on Intelligent User Interfaces, Pro-
+ceedings IUI, Vol. Part F147615. Association for Computing Machinery, 275ś285.
+https://doi.org/10.1145/3301275.3302310
+[9] Finale Doshi-Velez and Been Kim. 2017. Towards A Rigorous Science of Inter-
+pretable Machine Learning. (feb 2017). arXiv:1702.08608 http://arxiv.org/abs/
+1702.08608
+[10] Dheeru Dua and Casey Graf. 2017. UCI Machine Learning Repository. http:
+//archive.ics.uci.edu/ml
+[11] Riccardo Guidotti, Anna Monreale, Salvatore Ruggieri, Franco Turini, Fosca
+Giannotti, and Dino Pedreschi. 2018. A survey of methods for explaining black
+box models. Comput. Surveys 51, 5 (aug 2018). https://doi.org/10.1145/3236009
+[12] D Harrison McKnight, Larry L Cummings, and Norman L Chervany. 1998. The
+Academy of Management Review. Technical Report.
+[13] Tove Helldin, Göran Falkman, Maria Riveiro, and Stafan Davidsson. 2013. Pre-
+senting system uncertainty in automotive UIs for supporting trust calibration
+in autonomous driving. In Proceedings of the 5th International Conference on
+Automotive User Interfaces and Interactive Vehicular Applications, AutomotiveUI
+2013. 210ś217. https://doi.org/10.1145/2516540.2516554
+[14] Robert R Hofman, Shane TMueller, Gary Klein, and Jordan Litman. 2018. Metrics
+for explainable AI: Challenges and prospects. arXiv preprint arXiv:1812.04608
+(2018).
+[15] Jason D Johnson, Julian Sanchez, Arthur D Fisk, and Wendy A Rogers. 2004.
+Type of automation failure: The efects on trust and reliance in automation. In
+Proceedings of the Human Factors and Ergonomics Society Annual Meeting, Vol. 48.
+SAGE Publications Sage CA: Los Angeles, CA, 2163ś2167.
+[16] Johannes Kunkel, Tim Donkers, Lisa Michael, Catalin-Mihai Barbu, and Jürgen
+Ziegler. 2019. Let Me Explain: Impact of Personal and Impersonal Explanations
+on Trust in Recommender Systems. In Proceedings of the 2019 CHI Conference on
+Human Factors in Computing Systems. ACM, 487.
+[17] Vivian Lai and Chenhao Tan. 2019. On Human Predictions with Explanations
+and Predictions of Machine Learning Models. In Proceedings of the Conference
+on Fairness, Accountability, and Transparency - FAT* ’19. ACM Press, New York,
+New York, USA, 29ś38. https://doi.org/10.1145/3287560.3287590
+[18] J. D. Lee and K. A. See. 2004. Trust in Automation: Designing for Appropriate
+Reliance. Human Factors: The Journal of the Human Factors and Ergonomics
+Society 46, 1 (jan 2004), 50ś80. https://doi.org/10.1518/hfes.46.1.50_30392
+[19] Scott M Lundberg and Su-In Lee. 2017. A Uniied Approach to Interpreting Model
+Predictions. In Advances in Neural Information Processing Systems 30, I Guyon,
+U V Luxburg, S Bengio, H Wallach, R Fergus, S Vishwanathan, and R Garnett
+(Eds.). Curran Associates, Inc., 4765ś4774.
+[20] John M. McGuirl and Nadine B. Sarter. 2006. Supporting trust calibration and
+the efective use of decision aids by presenting dynamic system conidence
+information. Human Factors 48, 4 (dec 2006), 656ś665. https://doi.org/10.1518/
+and validating trust measures for e-commerce: An integrative typology. Informa-
+tion Systems Research 13, 3 (2002), 334ś359. https://doi.org/10.1287/isre.13.3.334.
+Sciences. (2017). https://doi.org/arXiv:1706.07269v1 arXiv:1706.07269
+[23] AnhNguyen, Jason Yosinski, and Jef Clune. 2015. Deep neural networks are easily
+fooled: High conidence predictions for unrecognizable images. In Proceedings of
+the IEEE Computer Society Conference on Computer Vision and Pattern Recognition,
+Vol. 07-12-June-2015. IEEE Computer Society, 427ś436. https://doi.org/10.1109/
+CVPR.2015.7298640
+[24] Alexandru Niculescu-Mizil and Rich Caruana. 2005. Predicting Good Probabilities
+with Supervised Learning. In Proceedings of the 22Nd International Conference
+on Machine Learning (ICML ’05). ACM, New York, NY, USA, 625ś632. https:
+//doi.org/10.1145/1102351.1102430
+[25] John O’Donovan and Barry Smyth. 2005. Trust in recommender systems. In
+Proceedings of the 10th international conference on Intelligent user interfaces. ACM,
+167ś174.
+[26] Vlad L. Pop, Alex Shrewsbury, and Francis T. Durso. 2015. Individual diferences
+in the calibration of trust in automation. Human Factors 57, 4 (jun 2015), 545ś556.
+https://doi.org/10.1177/0018720814564422
+[27] Forough Poursabzi-Sangdeh, Daniel G Goldstein, Jake M Hofman, Jennifer Wort-
+man Vaughan, and Hanna Wallach. 2018. Manipulating and Measuring Model
+Interpretability. (feb 2018). arXiv:1802.07810 https://arxiv.org/pdf/1802.07810.
+pdfhttp://arxiv.org/abs/1802.07810
+[28] Marco Tulio Ribeiro, Sameer Singh, and Carlos Guestrin. 2016. "Why Should I
+Trust You?": Explaining the Predictions of Any Classiier Marco. In Proceedings
+of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and
+Data Mining - KDD ’16. ACM Press, New York, New York, USA, 1135ś1144.
+https://doi.org/10.1145/2939672.2939778 arXiv:1602.04938
+[29] James Schafer, John O’Donovan, James Michaelis, Adrienne Raglin, and Tobias
+Höllerer. 2019. I can do better than your AI: Expertise and explanations. In
+International Conference on Intelligent User Interfaces, Proceedings IUI, Vol. Part
+F147615. Association for Computing Machinery, 240ś251. https://doi.org/10.
+1145/3301275.3302308
+[30] Ming Yin, Jennifer Wortman Vaughan, and Hanna Wallach. 2019. Understanding
+the efect of accuracy on trust in machine learning models. In Conference on
+Human Factors in Computing Systems - Proceedings. Association for Computing
+Machinery. https://doi.org/10.1145/3290605.3300509
+[31] Forrest W Young. 1967. Twelve-choice probability learning with payofs. Psycho-
+nomic Science 7, 10 (1967), 353ś354.
+[32] Kun Yu, Shlomo Berkovsky, Ronnie Taib, Jianlong Zhou, and Fang Chen. 2019.
+Do I trust my machine teammate? An investigation from perception to decision.
+In International Conference on Intelligent User Interfaces, Proceedings IUI, Vol. Part
+F147615. Association for Computing Machinery, 460ś468. https://doi.org/10.
+1145/3301275.3302277

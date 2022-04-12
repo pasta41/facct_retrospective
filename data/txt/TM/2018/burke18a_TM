@@ -1,0 +1,203 @@
+
+Fairness has emerged as an important cat-
+egory of analysis for machine learning sys-
+tems in some application areas. In extend-
+ing the concept of fairness to recommender
+systems, there is an essential tension be-
+tween the goals of fairness and those of
+personalization. However, there are con-
+texts in which equity across recommenda-
+tion outcomes is a desirable goal. It is also
+the case that in some applications fairness
+may be a multisided concept, in which the
+impacts on multiple groups of individuals
+must be considered. In this paper, we ex-
+amine two different cases of fairness-aware
+recommender systems: consumer-centered
+and provider-centered. We explore the con-
+cept of a balanced neighborhood as a mech-
+anism to preserve personalization in rec-
+ommendation while enhancing the fairness
+of recommendation outcomes. We show
+that a modified version of the Sparse Linear
+Method (SLIM) can be used to improve the
+balance of user and item neighborhoods,
+with the result of achieving greater out-
+come fairness in real-world datasets with
+minimal loss in ranking performance.
+Keywords: Recommender systems, fair-
+ness, multi-sided platform, sparse linear
+method
+1 INTRODUCTION
+Bias and fairness in machine learning are topics
+of considerable recent research interest Pedreshi
+et al. (2008); Dwork et al. (2012); Bozdag (2013).
+A standard approach in this area is to identify a
+variable or variables representing membership in
+a protected class, for example, race in an employ-
+ment context, and to develop algorithms that re-
+move bias relative to this variable. See, for exam-
+ple, Zemel et al. (2013); Kamishima et al. (2012);
+Kamiran et al. (2010); Zhang and Wu (2017).
+To extend this concept to recommender sys-
+tems, we must recognize the key role of person-
+alization. Inherent in the idea of recommenda-
+tion is that the best items for one user may be
+different than those for another. It is also impor-
+tant to note that recommender systems exist to
+facilitate transactions. Thus, many recommen-
+dation applications involve multiple stakeholders
+and therefore may give rise to fairness issues for
+more than one group of participants Abdollah-
+pouri et al. (2017).
+In this paper, we examine applications in which
+fairness with respect to consumers and to item
+providers is important, and we show that variants
+of the well-known sparse linear method (SLIM)
+can be used to negotiate the tradeoff between
+fairness and accuracy.
+1.1. Personalization
+The dominant recommendation paradigm, col-
+laborative filtering, uses user behavior as its in-
+put, ignoring user demographics and item at-
+tributes Koren and Bell (2015). However, this
+does not mean that fairness with respect to such
+attributes is irrelevant. Consider a recommender
+system suggesting job opportunities to job seek-
+ers. The operator of such a system might wish,
+for example, to ensure that male and female users
+with similar qualifications get recommendations
+of jobs with similar rank and salary. The system
+c© 2018 R. Burke, N. Sonboli & A. Ordoñez-Gauger.
+Balanced Neighborhoods for Multi-sided Fairness
+would therefore need to defend against biases in
+recommendation output, even biases that arise
+due to behavioral differences: for example, male
+users might be more likely to click optimistically
+on high-paying jobs.
+Defeating such biases is difficult if we can-
+not assert a shared global preference ranking
+over items. Personal preference is the essence
+of recommendation especially in areas like mu-
+sic, books, and movies where individual taste is
+paramount. Even in the employment domain,
+some users might prefer a somewhat lower-paying
+job if it had other advantages: such as a shorter
+commute time, or better benefits. Thus, to
+achieve the policy goal of fair recommendation
+of jobs by salary, a site operator will have to
+go beyond a personalization-oriented approach,
+identify key outcome variables such as salary, and
+control the recommendation algorithm to make it
+sensitive to these outcomes for protected groups.
+1.2. Multiple stakeholders
+As the example of job recommendation makes
+clear, a recommender system is often in the po-
+sition of facilitating a transaction between par-
+ties, such as job seeker and prospective employer.
+Fairness towards both parties may be important.
+For example, at the same time that a job recom-
+mender system is ensuring that male and female
+users to get recommendations with similar salary
+distributions, it might also need to ensure that
+jobs at minority-owned businesses are being rec-
+ommended to the most desirable job candidates
+at the same rate as jobs at white-owned busi-
+nesses.
+A multistakeholder recommender system is one
+in which the end user is not the only party whose
+interests are considered in generating recommen-
+dations Burke et al. (2016); Abdollahpouri et al.
+(2017). This term acknowledges that recom-
+mender systems often serve multiple goals and
+therefore a purely user-centered approach is in-
+sufficient. Bilateral considerations, such as those
+in employment recommendation, were first stud-
+ied in the category of reciprocal recommendation
+where a recommendation must be acceptable to
+both parties in a transaction Akoglu and Falout-
+sos (2010). Other reciprocal recommendation do-
+mains include on-line dating Pizzato et al. (2010),
+peer-to-peer “sharing economy” recommendation
+(such as AirBnB, Uber and others), on-line ad-
+vertising Iyer et al. (2005), and scientific collab-
+oration Lopes et al. (2010); Tang et al. (2012).
+When recommendations must account for the
+needs of more than just the two transacting par-
+ties, we move beyond reciprocal recommendation
+to multistakeholder recommendation. Today’s
+web economy hosts a profusion of multisided
+platforms, systems of commerce and exchange
+that bring together multiple parties in a market-
+place, where the transacting individuals and the
+market itself all share in the transaction Evans
+and Schmalensee (2016). These platforms must
+by design try to satisfy multiple stakeholders.
+Examples include LinkedIn, which brings to-
+gether professionals, employers and recruiters;
+Etsy, which brings together shoppers and small-
+scale artisans; and Kiva.org, which brings to-
+gether charitably-minded individuals with third-
+world entrepreneurs in need of capital.
+1.3. Stakeholder utility
+Different recommendation scenarios can be dis-
+tinguished by differing configurations of interests
+among the stakeholders. We divide the stake-
+holders of a given recommender system into three
+categories: consumers C, providers P , and plat-
+form or system S. The consumers are those who
+receive the recommendations. They are the in-
+dividuals whose choice or search problems bring
+them to the platform, and who expect recommen-
+dations to satisfy those needs. The providers are
+those entities that supply or otherwise stand be-
+hind the recommended objects, and gain from
+the consumer’s choice.1 The final category is
+the platform itself, which has created the recom-
+mender system in order to match consumers with
+providers and has some means of gaining benefit
+from successfully doing so.
+Recommendation in multistakeholder settings
+needs to be approached differently from user-
+focused environments. In particular, we have
+found that formalizing and computing stake-
+holder utilities is a productive way to design
+and evaluate recommendation algorithms. Ulti-
+mately, the system owner is the one whose utility
+should be maximized: if there is some outcome
+1. In some recommendation scenarios, like on-line dat-
+ing, the consumers and providers are same individu-
+als.
+valued by the recommender system operator, it
+should be included in the calculation of system
+utility.
+The system inevitably has objectives that are
+a function of the utilities of the other stakehold-
+ers. Multisided platforms thrive when they can
+attract and retain critical masses of participants
+on all sides of the market. In our employment
+example, if a job seeker does not find the sys-
+tem’s recommendations valuable, he or she may
+ignore this aspect of the system or may migrate
+to a competing platform. The same is true of
+providers; a company may choose other platforms
+on which to promote its job openings if a given
+site does not present its ads as recommendations
+or does not deliver acceptable candidates.
+System utilities are highly domain-specific:
+tied to particular business models and types of
+transactions that they facilitate. If there is some
+monetary transaction facilitated by the platform,
+the system will usually get a share. The sys-
+tem will also have some utility associated with
+customer satisfaction, and some portion of that
+can be attributed to providing good recommen-
+dations. In domains subject to legal regula-
+tion, such as employment and housing, there will
+be value associated with compliance with anti-
+discrimination statutes. There may also be a
+(difficult to quantify) utility associated with an
+organization’s social mission that may also value
+fair outcomes. All of these factors will govern
+how the platform values the different trade-offs
+associated with making recommendations.

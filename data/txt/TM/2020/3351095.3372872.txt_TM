@@ -1,0 +1,154 @@
+
+Data collected about individuals is regularly used to make deci-
+sions that impact those same individuals. We consider settings
+where sensitive personal data is used to decide who will receive
+resources or benefits. While it is well known that there is a trade-
+off between protecting privacy and the accuracy of decisions, we
+initiate a first-of-its-kind study into the impact of formally private
+mechanisms (based on differential privacy) on fair and equitable
+decision-making. We empirically investigate novel tradeoffs on two
+real-world decisions made using U.S. Census data (allocation of
+federal funds and assignment of voting rights benefits) as well as a
+classic apportionment problem.
+Our results show that if decisions aremade using an ϵ-differentially
+private version of the data, under strict privacy constraints (smaller
+ϵ), the noise added to achieve privacy may disproportionately im-
+pact some groups over others. We propose novel measures of fair-
+ness in the context of randomized differentially private algorithms
+and identify a range of causes of outcome disparities. We also ex-
+plore improved algorithms to remedy the unfairness observed.
+ACM Reference Format:
+David Pujol, RyanMcKenna, Satya Kuppam,Michael Hay, AshwinMachanava-
+jjhala, and Gerome Miklau. 2020. Fair Decision Making Using Privacy-
+Protected Data. In Conference on Fairness, Accountability, and Transparency
+(FAT* ’20), January 27–30, 2020, Barcelona, Spain. ACM, New York, NY, USA,
+11 pages. https://doi.org/10.1145/3351095.3372872
+1 INTRODUCTION
+Data collected about individuals is regularly used to make decisions
+that impact those same individuals. One of our main motivations
+is the practice of statistical agencies (e.g. the U.S. Census Bureau)
+which publicly release statistics about groups of individuals that
+are then used as input to a number of critical civic decision-making
+procedures. The resulting decisions can have significant impacts
+on individual welfare or political representation. For example:
+• election materials must be printed in minority languages in
+specified electoral jurisdictions (only) if certain conditions are
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6936-7/20/01. . . $15.00
+https://doi.org/10.1145/3351095.3372872
+met, which are determined by published counts of minority
+language speakers and their illiteracy rates.
+• annual funds to assist disadvantaged children are allocated to
+school districts, determined by published counts of the number
+of eligible school-age children meeting financial need criteria;
+• seats in legislative bodies (national and state legislatures and
+municipal boards) are apportioned to regions based on their
+count of residents. For example, seats in the Indian parliament
+are allocated to states in proportion to their population.
+In many cases, the statistics used to make these decisions are
+sensitive and their confidentiality is strictly regulated by law. For
+instance, in the U.S., census data is regulated under Title 13 [3],
+which requires that no individual be identified from any data re-
+leased by the Census Bureau, and data released about students
+is regulated under FERPA
+regulated under GDPR
+vacy and confidentiality requirements by releasing statistics that
+have passed through a privacy mechanism. In the U.S., a handful of
+critical decisions (e.g. congressional apportionment) are made on
+unprotected true values, but the vast majority of decisions are made
+using privatized releases. Our focus is the impact of mechanisms
+satisfying formal privacy guarantees (based on differential privacy
+[14]) on resource allocation decisions.
+The accuracy of the above decisions is clearly important, but it
+conflicts with the need to protect individuals from the potential
+harms of privacy breaches. To achieve formal privacy protection,
+some error must be introduced into the properties of groups (i.e.
+states, voting districts, school districts), potentially distorting the
+decisions that are made. In the examples above, the consequences
+of error can be serious: seats in parliament could be gained or lost,
+impacting the degree of representation of a state’s citizens; funding
+may not reach eligible children; or a district deserving minority
+voting support may not get it, disenfranchising a group of voters.
+The tradeoff between privacy protection and the accuracy of
+decision making must therefore be carefully considered. The right
+balance is an important social choice [6] and the model of differ-
+ential privacy allows for a more precise analysis of this choice.
+Maximizing the accuracy achievable under differentially privacy
+has been a major focus of recent privacy research, resulting in
+many sophisticated algorithmic techniques [16, 22]. Yet that ef-
+fort has considered accuracy almost exclusively through aggregate
+European Parliament
+FAT* ’20, January 27–30, 2020, Barcelona, Spain David Pujol, Ryan McKenna, Satya Kuppam, Michael Hay, Ashwin Machanavajjhala, and Gerome Miklau
+measures of expected error, which can hide disparate effects on
+individuals or groups.
+In this paper we look beyond the classic tradeoff between privacy
+and error to consider fair treatment in decision problems based on
+private data. If we accept that privacy protection will require some
+degree of error in decision making, does that error impact groups
+or individuals equally? Or are some populations systematically
+disadvantaged as a result of privacy technology? These questions
+are especially important now: the adoption of differential privacy is
+growing [18, 19, 21, 26], and, in particular, the U.S. Census Bureau
+is currently designing differentially private methods planned for
+use in protecting 2020 census data [1, 11, 32].
+The contributions of our work include the following. We present
+a novel study of the impact of common privacy algorithms on the
+equitable treatment of individuals. In settings where the noise from
+the privacy algorithm is modest relative to the statistics underlying
+a decision, impacts may be negligible. But when stricter privacy (i.e.,
+small values of ϵ) is adopted, or decisions involve small populations,
+significant inequities can arise. We demonstrate the importance of
+these impacts by simulating three real-world decisions made using
+sensitive public data: the assignment of voting rights benefits, the
+allocation of federal funds, and parliamentary apportionment.
+• We show that even if privacy mechanisms add equivalent noise
+to independent populations, significant disparities in outcomes
+can nevertheless result. For instance, in the federal funds allo-
+cation use case, under strict privacy settings of ϵ = 10
+−3
+, some
+districts receive over 500× their proportional share of funds
+while others receive less than half their proportional share.
+Under weaker privacy settings (ϵ = 10), this disparity is still
+observed but on a much smaller scale.
+• For assigning voting rights benefits to minority language com-
+munities, we find that noise for privacy can lead to significant
+disparities in the rates of correct identification of those deserv-
+ing the benefits, especially under stricter privacy settings.
+• For the parliamentary apportionment problem, surprisingly,
+there are settings of ϵ where the apportionment of seats to
+Indian states based on the noisy data is more equitable, ex ante,
+than the standard deterministic apportionment.
+• For funds allocation and voting benefits (the allocation problems
+with the greatest disparities) we propose methods to remedy
+inequity, which can be implemented without modifying the
+private release mechanism.
+Our study reveals that the use of privacy algorithms involves com-
+plex tradeoffs which can impact social welfare. Further, these im-
+pacts are not easy to predict or control because they may be caused
+by features of the privacy algorithm, the structure of the decision
+problem, and/or properties of the input data. We believe these find-
+ings call for new standards in the design and evaluation of the
+privacy algorithms that are starting to be deployed by companies
+and statistical agencies.
+The organization of the paper is as follows. In the next section
+we describe our problem setting, followed by related work in Sec-
+tion 3. In Sections 4 to 6 we investigate fairness in the example
+problem domains of voting rights, funds allocation, and apportion-
+ment, respectively. We conclude with open challenges in Section 7.
+The appendix includes algorithm details to aid reproducibility, and
+proofs, but is not essential to the claims of the paper.
+Remark: This work uses only public data, released by the U.S. Census
+Bureau and other institutions. Our empirical results do not measure
+the actual impacts of any agency practice currently in use. Instead,
+we simulate the use of state-of-the-art privacy algorithms on real use-
+cases in order to understand and quantify potential unfair impacts,
+should these privacy algorithms be adopted.

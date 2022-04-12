@@ -1,0 +1,232 @@
+
+When consequential decisions are informed by algorithmic input,
+individuals may feel compelled to alter their behavior in order to
+gain a system’s approval. Models of agent responsiveness, termed
+"strategic manipulation," analyze the interaction between a learner
+and agents in a world where all agents are equally able to manip-
+ulate their features in an attempt to “trick" a published classi￿er.
+In cases of real world classi￿cation, however, an agent’s ability
+to adapt to an algorithm is not simply a function of her personal
+interest in receiving a positive classi￿cation, but is bound up in a
+complex web of social factors that a￿ect her ability to pursue certain
+action responses. In this paper, we adapt models of strategic ma-
+nipulation to capture dynamics that may arise in a setting of social
+inequality wherein candidate groups face di￿erent costs to manipu-
+lation. We ￿nd that whenever one group’s costs are higher than the
+other’s, the learner’s equilibrium strategy exhibits an inequality-
+reinforcing phenomenon wherein the learner erroneously admits
+some members of the advantaged group, while erroneously exclud-
+ing some members of the disadvantaged group. We also consider
+the e￿ects of interventions in which a learner subsidizes members
+of the disadvantaged group, lowering their costs in order to im-
+prove her own classi￿cation performance. Here we encounter a
+paradoxical result: there exist cases in which providing a subsidy
+improves only the learner’s utility while actually making both can-
+didate groups worse-o￿—even the group receiving the subsidy. Our
+results reveal the potentially adverse social rami￿cations of deploy-
+ing tools that attempt to evaluate an individual’s “quality” when
+agents’ capacities to adaptively respond di￿er.
+CCS CONCEPTS
+• Computing methodologies → Machine learning; • Theory
+of computation → Algorithmic game theory;
+KEYWORDS
+fairness in machine learning; strategic classi￿cation
+ACM Reference Format:
+Lily Hu, Nicole Immorlica, and Jennifer Wortman Vaughan. 2019. The Dis-
+parate E￿ects of Strategic Manipulation. In FAT* ’19: Conference on Fairness,
+Accountability, and Transparency (FAT* ’19), January 29–31, 2019, Atlanta,
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for pro￿t or commercial advantage and that copies bear this notice and the full citation
+on the ￿rst page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior speci￿c permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+https://doi.org/10.1145/3287560.3287597
+GA, USA. ACM, New York, NY, USA, 18 pages. https://doi.org/10.1145/
+3287560.3287597
+1 INTRODUCTION
+The expanding realm of algorithmic decision-making has not only
+altered the ways that institutions conduct their day-to-day oper-
+ations, but has also had a profound impact on how individuals
+interface with these institutions. It has changed the ways we com-
+municate with each other, receive crucial resources, and are granted
+important social and economic opportunities. Theoretically, algo-
+rithms have great potential to reform existing systems to become
+both more e￿cient and equitable, but as exposed by various high-
+pro￿le investigations [2, 11, 23, 27], prediction-based models that
+make or assist with consequential decisions are, in practice, highly
+prone to reproducing past and current patterns of social inequality.
+While few algorithmic systems are explicitly designed to be
+discriminatory, there are many underlying forces that drive such
+socially biased outcomes. For one, since most of the features used
+in these models are based on proxy, rather than causal, variables,
+outputs often re￿ect the various structural factors that bear on
+a person’s life opportunities rather than the individualized char-
+acteristics that decision-makers often seek. Much of the previous
+work in algorithmic fairness has examined a particular undesir-
+able proxy e￿ect in which a classi￿er’s features may be linked to
+socially signi￿cant and legally protected attributes like race and
+gender, interpreting correlations that have arisen due to centuries
+of accumulated disadvantage as genuine attributes of a particular
+category of people [13, 15, 19, 24].
+But algorithmic models do not only generate outcomes that pas-
+sively correlate with social advantages or disadvantages. These
+tools also provoke a certain type of reactivity, in which agents
+see a classi￿er as a guide to action and actively change their be-
+havior to accord with the algorithm’s preferences. On this view,
+classi￿ers both evaluate and animate their subjects, transforming
+static data into strategic responses. Just as an algorithm’s use of
+certain features di￿erentially advantages some populations over
+others, the room for strategic response that is inherent in many
+automated systems also naturally favors social groups of privilege.
+Admissions procedures that heavily weight SAT scores motivate
+students who have the means to take advantage of test prep courses
+and even take the exam multiple times. Loan approval systems that
+rely on existing lines of credit as an indication of creditworthiness
+encourage those who can to apply for more credit in their name.
+Thus an algorithm that scores applicants to determine how a
+resource should be allocated sets a standard for what an ideal candi-
+date’s features ought to be. A responsive subject would look to alter
+how she appears to a classi￿er in order to increase her likelihood
+of gaining the system’s approval. But since reactivity typically re-
+quires informational and material resources that are not equally
+accessible to all, even when an algorithm draws on features that
+seem to arise out of individual e￿ort, these metrics can be skewed
+to favor those who are more readily able to alter their features.
+In the machine learning literature, agent reactivity to a classi￿er
+is termed “strategic manipulation.” Since previous work in strategic
+classi￿cation has typically depicted agent-classi￿er interactions as
+antagonistic, such actions are usually viewed as distortions that
+aim to undermine a learner’s classi￿er [5, 14]. As shown in Hardt
+et al. [14], a learner who anticipates these responses can, under
+certain formulations of agent costs, adapt to protect against the mis-
+classi￿cation errors that would have resulted from manipulation,
+recovering an accuracy level that is arbitrarily close to the theoreti-
+cal maximum. These results are welcome news for a learner who
+correctly assesses agents’ best-responses. Indeed in most strategic
+manipulation models, agents are depicted as equally able to pursue
+manipulation, allowing the learner who knows their costs to accu-
+rately preempt strategic responses. While there are occasions in
+which agents do largely face homogenous costs—an even playing
+￿eld—in many other social use cases of machine learning tools,
+agents do not encounter the same costs of altering the attributes
+that are ultimately observed and assessed by the classi￿er. As such,
+in this paper we ask, “What are the e￿ects of strategic classi￿cation
+and manipulation in a world of social strati￿cation?”
+As in previous work in strategic classi￿cation, we cast the prob-
+lem as a Stackelberg game in which the learner moves ￿rst and
+publishes her classi￿er before candidates best-respond and manip-
+ulate their features [1, 5, 7, 14]. But in contrast with the models
+in Brückner & Sche￿er [5] and Hardt et al. [14], we formalize the
+setting of a society comprised of social groups that not only may
+di￿er in terms of distributions over unmanipulated features and
+true labeling functions but also face di￿erent costs to manipulation.
+This extra set of di￿erences brings to light questions that favor an
+analysis that focuses on the welfares of the candidates who must
+contend with these classi￿ers: Do classi￿ers formulated with strate-
+gic behavior in mind impose disparate burdens on di￿erent groups?
+If so, how can a learner mitigate these adverse e￿ects? The altered
+gameplay and outcomes of strategic classi￿cation beg questions of
+fairness that are intertwined with those of optimality.
+Though our model is quite general, we obtain technical results
+that reveal important social rami￿cations of using classi￿cation
+in systems marked by deep inequalities and a potential for ma-
+nipulation. Our analysis shows that, under our model, even when
+the learner knows the costs faced by di￿erent groups, her equi-
+librium classi￿er will always act to reinforce existing inequalities
+by mistakenly excluding quali￿ed candidates who are less able to
+manipulate their features while also mistakenly admitting those
+candidates for whom manipulation is less costly, perpetuating the
+relative advantage of the privileged group. We delve into the cost
+disparities that generate such inevitable classi￿cation errors.
+Next, we consider the impact of providing subsidies to lighten
+the burden of manipulation for the disadvantaged group. We ￿nd
+that such an intervention can improve the learner’s classi￿cation
+performance as well as mitigate the extent to which her errors are
+inequality-reinforcing. However, we show that there exist cases in
+which providing subsidies enforces an equilibrium learner strategy
+that actually makes some individual candidates worse-o￿ without
+making any better-o￿. Paradoxically, in these cases, paying a sub-
+sidy to the disadvantaged group actually bene￿ts only the learner
+while both candidate groups experience a welfare decline! Further
+analysis of these scenarios reveals that, in many cases, all parties
+would have preferred a world in which manipulation of features
+was not possible for any candidates.
+Our paper’s agent-centric analysis views data points as represent-
+ing individuals and classi￿cations as impacting those individuals’
+welfares. This orientation departs from the dominant perspective
+in learning theory, which privileges a vendor’s predictive accu-
+racy, and instead evaluates classi￿cation regimes in light of the
+social consequences of the outcomes they issue. By incorporating
+insights and techniques from game theory and economics, domains
+that consider deeply the e￿ects of various policies on agents’ be-
+haviors and outcomes, we hope to broaden the perspective that
+machine learning takes on socially-oriented tools. Presenting more
+democratically-inclined analysis has been central to the ￿eld of
+algorithmic fairness, and we hope our work sheds new light on this
+generic setting of classi￿cation with strategic agents.
+1.1 Related Work
+While many earlier approaches to strategic classi￿cation in the
+machine learning literature have tended to view learner-agent in-
+teractions as adversarial [3, 16], our work does not assume inher-
+ently antagonistic relationships, and instead, shares the Stackelberg
+game-theoretic perspective akin to that presented in Brückner &
+Sche￿er [5] and built upon by Hardt et al. [14]. Departing from
+these models’ focus on static prediction and homogeneous manipu-
+lation costs, Dong et al. [8] propose an online setting of strategic
+classi￿cation in which agents appear sequentially and have individ-
+ual costs for manipulation that are unknown to the learner. Unlike
+our work, they take a traditional learner-centric view, whereas our
+concerns are with the welfare of the candidates.
+Agent features and potential manipulations in the face of a
+learner classi￿er can also be interpreted as serving informational
+purposes. In the economics literature on signaling theory, agents in-
+teract with a principal—the counterpart to our learner—via signals
+that convey important information relevant to a particular task at
+hand. Classic works, such as Spence’s paper on job-market signal-
+ing, focus their analysis on the varying quality of information that
+signals provide at equilibrium [25]. The emphasis in our analysis
+on di￿erent group costs shares features with a recent update to the
+signaling literature by Frankel & Kartik [12], who also distinguish
+between natural actions, corresponding to unmanipulated features
+in our model, and “gaming" ability, which operate similarly to our
+cost functions. The connection between gaming capacity and social
+advantage is also explicitly discussed in work by Esteban & Ray [10]
+who consider the e￿ects of wealth and lobbying on governmental
+resource allocation. While most works in the economics signaling
+literature center on the decay of the informativeness of signals as
+gaming and natural actions become indistinguishable, some recent
+work in computer science has also considered the e￿ect of costly
+signaling on mechanism design [17, 18]. In contrast to both of these
+perspectives, our work highlights the e￿ect of manipulation on a
+learner’s action and as a consequence, on the agents’ welfares.
+In independent, concurrent work appearing at the same con-
+ference, Milli et al. [22] also consider the social impacts of strate-
+gic classi￿cation. Whereas our model highlights the interplay be-
+tween a learner’s Stackelberg equilibrium classi￿er and agents’
+best-response manipulations at the feature level, their work traces
+the relationship between the learner’s utility and the social bur-
+den, a measure of agents’ manipulation costs. They show that an
+institution must select a point on the outcome curve that trades
+o￿ its predictive accuracy with the social burden it imposes. In
+their model, an agent with an unmanipulated feature vector x has
+a likelihood `(x) of having a positive label and can manipulate to
+any vector y with `(y)  `(x) at zero cost, or to y with `(y) > `(x)
+for a positive cost. This assumption, called “outcome monotonicity,"
+allows them to reason about manipulations in (one-dimensional)
+likelihood space rather than feature space, since the optimal learner
+strategies amount to thresholds on likelihoods. In contrast, we al-
+low features to be di￿erently manipulable (perhaps a student can
+boost her SAT score via test prep courses, but can do nothing to
+change her grades from the previous year, and cannot freely obtain
+a higher SAT score in exchange for a worse record of extracurricular
+activities), which a￿ects the forms of both the learner’s equilibrium
+classi￿er and agents’ best-response manipulations. Despite these
+di￿erences in model and focus, their analysis yields results that are
+qualitatively similar to ours. Highlighting the di￿erential impact of
+classi￿ers on social groups, they also ￿nd that overcoming stringent
+thresholds is more burdensome on the disadvantaged group.

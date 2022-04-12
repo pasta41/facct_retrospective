@@ -1,0 +1,1846 @@
+Fairness in Risk Assessment Instruments: Post-Processing to
+Achieve Counterfactual Equalized Odds
+Alan Mishler
+Department of Statistics
+Carnegie Mellon University
+Edward H. Kennedy
+Department of Statistics
+Carnegie Mellon University
+Alexandra Chouldechova
+Heinz College
+Carnegie Mellon University
+ABSTRACT
+In domains such as criminal justice, medicine, and social welfare,
+decision makers increasingly have access to algorithmic Risk As-
+sessment Instruments (RAIs). RAIs estimate the risk of an adverse
+outcome such as recidivism or child neglect, potentially informing
+high-stakes decisions such as whether to release a defendant on bail
+or initiate a child welfare investigation. It is important to ensure
+that RAIs are fair, so that the benefits and harms of such decisions
+are equitably distributed.
+The most widely used algorithmic fairness criteria are formu-
+lated with respect to observable outcomes, such as whether a person
+actually recidivates, but these criteria are misleading when applied
+to RAIs. Since RAIs are intended to inform interventions that can
+reduce risk, the prediction itself affects the downstream outcome.
+Recent work has argued that fairness criteria for RAIs should in-
+stead utilize potential outcomes, i.e. the outcomes that would occur
+in the absence of an appropriate intervention [11]. However, no
+methods currently exist to satisfy such fairness criteria.
+In this paper, we target one such criterion, counterfactual equal-
+ized odds. We develop a post-processed predictor that is estimated
+via doubly robust estimators, extending and adapting previous post-
+processing approaches [16] to the counterfactual setting. We also
+provide doubly robust estimators of the risk and fairness prop-
+erties of arbitrary fixed post-processed predictors. Our predictor
+converges to an optimal fair predictor at fast rates. We illustrate
+properties of our method and show that it performs well on both
+simulated and real data.
+CCS CONCEPTS
+• Computing methodologies → Machine learning.
+KEYWORDS
+fairness, risk assessment, post-processing, counterfactual
+ACM Reference Format:
+Alan Mishler, Edward H. Kennedy, and Alexandra Chouldechova. 2021.
+Fairness in Risk Assessment Instruments: Post-Processing to Achieve Coun-
+terfactual Equalized Odds. In Conference on Fairness, Accountability, and
+Transparency (FAccT ’21), March 3–10, 2021, Virtual Event, Canada. ACM,
+New York, NY, USA, 15 pages. https://doi.org/10.1145/3442188.3445902
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+© 2021 Copyright held by the owner/author(s).
+ACM ISBN 978-1-4503-8309-7/21/03.
+https://doi.org/10.1145/3442188.3445902
+1 INTRODUCTION
+Machine learning is increasingly involved in high stakes decisions
+in domains such as healthcare, criminal justice, and consumer fi-
+nance. In these settings, ML models often take the form of Risk
+Assessment Instruments (RAIs): given covariates such as demo-
+graphic information and an individual’s medical/criminal/financial
+history, the model predicts the likelihood of an adverse outcome,
+such as a dangerous medical event, recidivism, or default on a loan.
+Rather than rendering an automatic decision, the model produces a
+“risk score,” which a decision maker may take into account when de-
+ciding whether to prescribe amedical treatment, release a defendant
+on bail, or issue a personal loan.
+The proliferation of machine learning has raised concerns that
+learned models may be discriminatory with respect to sensitive
+features like race, sex, age, and socioeconomic status. For exam-
+ple, there has been vigorous debate about whether a widely used
+recidivism prediction tool called COMPAS is biased against black
+defendants [1, 2, 12, 28, 30]. Concerns have also been raised about
+risk assessments used to identify high risk medical patients [36]
+and about common credit scoring algorithms such as FICO [37],
+among many others. Collectively, these types of algorithms directly
+impact a large and growing swath of the global population.
+These concerns have led to an explosion of methods in recent
+years for developing fair models and auditing the fairness of ex-
+isting models. The most widely discussed fairness criteria impose
+constraints on the joint distribution of a sensitive feature, an out-
+come, and a predictor. These “observational” fairness criteria are
+inappropriate for RAIs, however. RAIs are not concerned with the
+observable outcomes in the training data (“Did patients of this type
+historically experience serious complications?”), which are them-
+selves a product of historical treatment decisions. Rather, they are
+concerned with the potential outcomes associated with available
+treatment decisions (“Would patients of this type experience com-
+plications if not treated?”). Because treatments are not assigned at
+random—doctors naturally treat the patients they think are at high
+risk—these are distinct questions.
+Coston et al. [11] showed how RAIs that are optimized to pre-
+dict observable rather than potential outcomes systematically un-
+derestimate risk for units that have historically been receptive to
+treatment, leading to suboptimal treatment decisions. They further
+showed how evaluations of the performance and fairness properties
+of RAIs with respect to observable outcomes are misleading. They
+proposed that RAIs should instead target counterfactual versions
+of standard performance and fairness metrics. However, they left
+open the question of how to develop predictors that satisfy such
+fairness notions.
+In this paper, we develop a method to generate predictors that
+satisfy the fairness criterion approximate counterfactual equalized
+386
+This work is licensed under a Creative Commons Attribution International 4.0 License. 
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Alan Mishler, Edward H. Kennedy, and Alexandra Chouldechova
+odds. While many existing methods target observational fairness
+criteria [7, 13, 16, 21, 25, 34, 47] and various types of causally moti-
+vated fairness [24, 27, 32, 33], no methods currently exist that target
+counterfactual versions of standard observable fairness criteria like
+equalized odds. Our method post-processes an arbitrary existing
+predictor, extending previous post-processing methods [16] to the
+counterfactual setting.
+Our contributions are as follows. We first define approximate
+counterfactual equalized odds (§2). After discussing related work
+(§3) and motivating the use of equalized odds over other candidate
+criteria (§4), we present a linear program that produces a loss-
+optimal post-processed predictor that satisfies this criterion (§5).
+We provide theoretical results that our post-processed predictor
+is consistent in a particular sense at rates that depend on certain
+nuisance parameters. We show that our method performs well on
+both simulated and real data (§6).
+2 NOTATION AND FAIRNESS DEFINITIONS
+A table listing all notational choices can be found in Appendix F.
+Let 𝐴, 𝐷,𝑌 denote a sensitive feature, decision, and outcome,
+respectively. We consider the setting in which all three are binary,
+though most of the definitions below extend readily to continuous
+settings. We define the counterfactual quantities of interest via the
+potential outcomes framework of [17, 35, 39]. Denote by 𝑌 0, 𝑌 1
+the potential (equivalently, “counterfactual”) outcomes 𝑌𝐷=0, 𝑌𝐷=1
+.
+𝑌𝑑
+𝑖
+is the outcome that would be observed for unit 𝑖 if, possibly
+contrary to fact, the decision were set to 𝐷𝑖 = 𝑑 . We refer to the
+two levels of the sensitive feature 𝐴 as the two “groups,” and we
+use “treatment” and “intervention” synonymously with “decision.”
+Let 𝑆 be any random variable that takes values in {0, 1}.
+In most RAI settings, one of the decision options is a natural
+baseline corresponding to “no intervention” (𝐷 = 0). Examples
+include the risk of recidivism if a defendant is released pretrial, or
+the risk of neglect or abuse if a child welfare call is not screened
+in for further investigation. Many or most RAIs do not generate a
+separate risk score for the outcome associated with intervention.
+In the case of child welfare, for example, call screeners must screen
+in any case in which a child is in apparent danger of neglect or
+abuse, regardless of the chances that a subsequent intervention will
+successfully prevent that neglect or abuse.
+Denote the observational and counterfactual false positive rates
+of 𝑆 for group 𝑎 by FPR(𝑆, 𝑎) = P(𝑆 = 1 | 𝑌 = 0, 𝐴 = 𝑎) and
+cFPR(𝑆, 𝑎) = P(𝑆 = 1 | 𝑌 0 = 0, 𝐴 = 𝑎). For example, cFPR(𝑆, 0)
+could represent the chance of being falsely labeled high-risk, among
+those black defendants who would not actually go on to recidivate
+if released pretrial, while cFPR(𝑆, 1) could represent the correspond-
+ing error rate for white defendants who would not recidivate if
+released pretrial. Let FNR, cFNR, denote the corresponding false
+negative rates.
+Definition 2.1. A predictor 𝑆 satisfies observational equalized odds
+(oEO) with respect to𝐴 and𝑌 if 𝑆 ⊥ 𝐴 | 𝑌 . It satisfies counterfactual
+equalized odds (cEO) if 𝑆 ⊥ 𝐴 | 𝑌 0
+.
+When 𝐴, 𝑌 , and 𝑆 are all binary, equalized odds is equivalent to
+requiring that the corresponding false positive and false negative
+rates be equal for the two levels of 𝐴. Our post-processed predictor
+will target a relaxation of this criterion, defined below.
+Definition 2.2. The counterfactual error rate differences for a pre-
+dictor 𝑆 are the differences Δ+
+and Δ−
+in the cFPR and cFNR for the
+two groups 𝐴 = 0, 𝐴 = 1, defined as follows:
+Δ+ (𝑆) = cFPR(𝑆, 0) − cFPR(𝑆, 1)
+Δ− (𝑆) = cFNR(𝑆, 0) − cFNR(𝑆, 1)
+Definition 2.3. When 𝐴,𝑌 , and 𝑆 are all binary, 𝑆 satisfies ap-
+proximate counterfactual equalized odds with fairness constraints
+𝜖+, 𝜖− ∈ [0, 1] if
+|Δ+ (𝑆) | ≤ 𝜖+
+|Δ− (𝑆) | ≤ 𝜖−
+In general, a fairness-constrained predictor would not outper-
+form an optimal unconstrained predictor, and in some cases, sat-
+isfying cEO exactly might degrade performance to the point that
+the RAI is no longer useful. This relaxation of cEO allows RAI
+designers to negotiate this tradeoff. This is similar in spirit to no-
+tions of approximate fairness that appear throughout the literature
+[13, 22, 31].
+3 RELATEDWORK
+3.1 Observational fairness criteria
+Equalized odds is one of several popular fairness criteria that impose
+constraints on the joint distribution of (𝐴,𝑌, 𝑆) [3]. These criteria
+appear under a variety of names. Equalized odds is known more
+generally as separation, a term which covers settings in which these
+variables are not necessarily binary. The other two popular criteria
+in this class are independence (𝑆 ⊥ 𝐴) and sufficiency (𝑌 ⊥ 𝐴 |
+𝑆). Independence also manifests as demographic parity, statistical
+parity, and group fairness. Sufficiency is equivalent to calibration
+or predictive parity when all three variables are binary. Variants of
+all three criteria may be defined for example by conditioning on
+additional variables.
+The counterfactual versions of these criteria simply replace 𝑌
+with the potential outcome𝑌 0
+that is of interest [11]. Note that these
+definitions cannot accommodate more than one potential outcome,
+such as the vector (𝑌 0, 𝑌 1), because only one of these outcomes is
+observed for each unit. This is the “fundamental problem of causal
+inference” [17].
+Except in highly constrained, unrealistic conditions, these three
+criteria are pairwise unsatisfiable, regardless of whether they are
+defined with respect to𝑌 or𝑌 0
+[3, 9, 26]
+1
+. Wemust therefore choose
+and justify which criterion we wish to target.
+3.2 Causal fairness criteria
+The counterfactual fairness criteria just described consider poten-
+tial outcomes with respect to a decision 𝐷 . There is a distinct set of
+causally motivated fairness criteria that consider counterfactuals
+of the sensitive feature, or a proxy for the sensitive feature. They
+characterize a decision or prediction as fair if the sensitive feature
+or proxy does not “cause” the decision or prediction, either directly
+or along a prohibited pathway [24, 27, 32, 33, 45, 48]. There is some
+controversy over whether it is meaningful to discuss a counter-
+factual of a feature like race or gender [14, 18, 44]. Additionally,
+1
+See [19] for a set of sufficient conditions under which these unsatisfiability results
+disappear.
+387
+Fairness in Risk Assessment Instruments: Post-Processing to Achieve Counterfactual Equalized Odds FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+satisfying these metrics typically precludes use of most of the fea-
+tures that go into risk assessment, like prior history, which is not
+tenable in practice [11]. Finally, it is not clear that counterfactuals
+of the sensitive feature are useful or appropriate to consider in
+the context of risk assessment. For example, in the child welfare
+setting, workers are compelled to screen in calls whenever a child
+is in danger of neglect or abuse. While it is important to ensure
+that risk is assessed accurately for different groups, it would be
+inappropriate to make screen-in decisions based on what a child’s
+risk of neglect or abuse would be if they had been of a different race
+their whole life, even if such an assessment were possible.
+3.3 Ways of achieving fairness
+There are three broad approaches to developing fair models: (1)
+preprocessing the input data to remove bias [7, 21], (2) constraining
+the learning process (aka “in-processing”) [13, 34, 47], and (3) post-
+processing a model to satisfy fairness constraints [16, 25].
+Our approach can be viewed as belonging to class (3). We refer
+to the predictor that our method returns equivalently as a “post-
+processed” or “derived” predictor. Each approach has advantages
+and disadvantages. Many widely used RAIs are proprietary tools
+developed by for-profit companies, so they are not amenable to
+internal tinkering. Developing new, fair(er) RAIs would be costly
+and perhaps infeasible from a policy perspective. The advantage of
+post-processing in this setting is that it can be applied tomodels that
+are already in use. The predictor that our method returns requires
+access at runtime only to the sensitive feature and the output of the
+existing predictor, so in principle, it could easily be incorporated
+into existing risk assessment pipelines.
+In particular, our approach extends the work of Hardt et al. [16],
+who proposed a method to post-process binary predictors to satisfy
+observational equalized odds (oEO) while minimizing loss with
+respect to observable 𝑌 . Their post-processed predictor is the so-
+lution to a simple linear program. We adapt their method to the
+counterfactual setting, in which the fairness criterion is approx-
+imate cEO and the loss function is weighted classification error
+with respect to 𝑌 0
+. Because 𝑌 0
+is not observable when 𝐷 ≠ 0, we
+require tools from causal inference to solve this problem. Hardt et
+al.’s analysis treats the joint distribution of (𝐴, 𝑆,𝑌 ) as known and
+frames post-processing primarily as an optimization problem. We
+build on their results by not making this assumption and treating
+post-processing as a statistical estimation problem.
+3.4 Why equalized odds?
+When evaluating a predictive system, it seems natural to focus on
+its real-world impact rather than its outputs per se. One desirable
+property of a decision process is the avoidance of disparate im-
+pact. Disparate impact is a legal doctrine enshrined in U.S. law that
+prohibits practices which have an unjustifiable adverse impact on
+people who share a protected characteristic, regardless of discrimi-
+natory intent. By way of shorthand, we will say that if 𝐷 ̸⊥ 𝐴 | 𝑌 0
+,
+then the system exhibits discriminatory disparate impact
+2
+. In recidi-
+vism prediction, for example, this could mean that black defendants
+(𝐴 = 0) who would not recidivate if released (𝑌 0 = 0) are more
+2
+Some authors use “disparate impact” to refer to the criterion 𝑆 ⊥ 𝐴, i.e. independence
+[47].
+likely to be detained pretrial (𝐷 = 1) than white defendants who
+would not recidivate if released (𝐴 = 1, 𝑌 0 = 0).
+In the context of RAIs, decision makers typically have wide
+latitude in how they interpret and act on the risk scores, so con-
+straining the RAI does not enforce fairness with respect to their
+decisions. However, if decision makers, after the introduction of the
+RAI, make their decisions only on the basis of the RAI scores and
+other variables 𝑈 which are independent of the RAI and 𝐴 given
+𝑌 0
+, then counterfactual equalized odds will imply 𝐷 ⊥ 𝐴 | 𝑌 0
+.
+That is, let 𝐷 = 𝑓 (𝑆,𝑈 ) represent the function 𝑓 describing the
+decision process after the RAI 𝑆 is introduced. If cEO is satisfied
+and 𝑈 ⊥ (𝑆,𝐴) | 𝑌 0
+, then it follows that 𝐷 ⊥ 𝐴 | 𝑌 0
+. Even if
+𝑈 ̸⊥ (𝑆,𝐴) | 𝑌 0
+, it is easy to see that if the conditional indepen-
+dence statement nearly holds, or if 𝑓 depends primarily on 𝑆 rather
+than𝑈 , then discriminatory disparate impact can be small.
+No such guarantees hold for predictors satisfying either indepen-
+dence or sufficiency. Chouldechova [9] in particular showed how
+predictors which satisfy sufficiency (predictive parity) are likely
+to yield decisions such that 𝐷 ̸⊥ 𝐴 | 𝑌 ; these arguments are un-
+changed when we substitute𝑌 0
+for𝑌 . Though there is no consensus
+about how to quantify fairness, this is at least one consideration in
+favor of equalized odds.
+4 MOTIVATING EXAMPLE
+Having motivated equalized odds over predictive parity or inde-
+pendence, we now motivate the use of counterfactual rather than
+observational equalized odds.
+Consider a school district that assigns tutors to students who
+are believed to be at risk of academic failure. The school district
+wishes to develop a RAI, 𝑆 , to better identify students who need
+tutors while ensuring that this resource is allocated fairly across
+two levels of the sensitive feature 𝐴. Let 𝐷 ∈ {0, 1} represent the
+decision to assign (1) or not assign (0) a tutor, and let 𝑌 ∈ {0, 1}
+represent academic success (0) or failure (1).
+A cEO predictor 𝑆 satisfies P(𝑆 | 𝑌 0, 𝐴) = P(𝑆 | 𝑌 0), while an
+oEO predictor 𝑆 satisfies P(𝑆 | 𝑌,𝐴) = P(𝑆 | 𝑌 ). Divergence in
+these predictors is driven by the extent to which 𝑌 ≠ 𝑌 0
+in the
+training data. In order to parameterize this divergence, we introduce
+the following definitions.
+Definition 4.1. The need rate for group 𝑎 is P(𝑌 0 = 1 | 𝐴 = 𝑎),
+the probability that a student from group 𝑎 would fail without a
+tutor.
+Definition 4.2. The opportunity rate for group 𝑎 is P(𝐷 = 1 | 𝑌 0 =
+1, 𝐴 = 𝑎), the probability that a student in group 𝑎 who needs a
+tutor receives one.
+Definition 4.3. The intervention strength for group 𝑎 is P(𝑌 1 = 0 |
+𝑌 0 = 1, 𝐴 = 𝑎), the probability that a student in group 𝑎 who would
+fail without a tutor would succeed with a tutor.
+We simulate a simple data generating process in which we allow
+the intervention strength to vary, while constraining it to be equal
+for the two groups. We fix all other parts of the distribution. In
+particular, we set P(𝐴 = 1) = 0.7, set the need rates to 0.4 and 0.2
+for groups 0 and 1, and set the opportunity rates to 0.6 and 0.4. We
+set the probabilities that a tutor is assigned when it is not needed to
+P(𝐷 = 1 | 𝑌 0 = 0, 𝐴 = 0) = 0.3 and P(𝐷 = 1 | 𝑌 0 = 0, 𝐴 = 1) = 0.2.
+388
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Alan Mishler, Edward H. Kennedy, and Alexandra Chouldechova
+This represents a scenario in which the minority group has greater
+need, perhaps due to socioeconomic factors or prior educational
+opportunities, and also is likelier than the majority group to receive
+resources at baseline (prior to the development of the RAI). Finally,
+we set P(𝑌 1 = 0 | 𝑌 0 = 0) = 1, meaning that tutoring never
+increases the risk of failure.
+We consider a hypothetical oEO predictor 𝑆 with fixed false
+positive rate P(𝑆 = 1 | 𝑌 = 0, 𝐴) = P(𝑆 = 1 | 𝑌 = 0) = 0.1
+and false negative rate P(𝑆 = 0 | 𝑌 = 1, 𝐴) = P(𝑆 = 0 | 𝑌 ) =
+0.2. We assume 𝑆 ⊥ 𝑌 0 | 𝐴,𝑌 , as would be the case for example
+when 𝑆 is a high quality predictor of 𝑌 . Figure 1 shows the cTPRs
+for this predictor as a function of intervention strength, relative
+to the baseline opportunity rates for the two groups. When the
+intervention has no effect (strength 0), the cTPRs are equal because
+𝑌 ≡ 𝑌 0
+, so the cTPR and TPR are identical. (Of course, a strength of
+0 means the tutoring is worthless.) For all strength values > 0, the
+cTPR of theminority group is lower than for themajority group. The
+difference in error rates increases as intervention strength increases.
+A cEO predictor avoids this problem by design: the cTPRs for the
+two groups are constrained to be equal.
+This example makes it clear that oEO predictors in general will
+not prevent discriminatory disparate impact, whereas, as discussed
+in section 3.4, counterfactual EO predictors have at least the poten-
+tial to mitigate or avoid it.
+This example also illustrates how oEO predictors can reduce rates
+of appropriate intervention. For example, suppose that decision
+makers, after the introduction of the RAI, set 𝐷 ≡ 𝑆 , i.e. they
+assign tutors precisely to students whom the RAI labels as high risk.
+Then, for any intervention strength > 0.5, the opportunity rate for
+the minority group decreases below baseline: the RAI harms the
+minority group.
+5 AN OPTIMAL FAIR DERIVED PREDICTOR
+Having motivated counterfactual equalized odds, we now develop
+a method to generate predictors which satisfy it.
+5.1 Estimand
+We expand our notation in order to fully describe our problem
+setting. Consider a random vector 𝑍 = (𝐴,𝑋, 𝐷, 𝑆, 𝑌 ) ∼ P, where in
+addition to the binary sensitive feature 𝐴, decision 𝐷 , and outcome
+𝑌 , we have covariates 𝑋 ∈ R𝑝 and a previously trained binary
+predictor 𝑆 ∈ {0, 1}. We require only that 𝑆 is observable; we do
+not require access to its inputs or internal structure. 𝑆 in practice
+could represent a RAI that is already in use, such as a recidivism
+prediction tool. The covariates 𝑋 may or may not overlap with the
+inputs to 𝑆 . Their role in the analysis is to render counterfactual
+quantities identifiable.
+Our target is a derived predictor that satisfies approximate cEO.
+As in the case of observable equalized odds considered by [16], we
+achieve this by randomly flipping 𝑆 with probabilities that depend
+only on 𝑆 and𝐴. Consider a column vector\ = (\0,0, \0,1, \1,0, \1,1) ∈
+[0, 1]4. We define an associated derived predictor 𝑆\ :
+𝑆\ ∼ Bern(\𝐴,𝑆 )
+where \𝐴,𝑆 =
+∑
+𝑎,𝑠∈{0,1}
+1{𝐴 = 𝑎, 𝑆 = 𝑠}\𝑎,𝑠
+0.0 0.2 0.4 0.6 0.8 1.0
+Intervention strength
+0.4
+0.5
+0.6
+0.7
+0.8
+cT
+PR
+ (s
+ol
+id
+ li
+ne
+s)
+Op
+po
+rtu
+ni
+ty
+ ra
+te
+ (d
+as
+he
+d 
+lin
+es
+)
+Group
+0 (minority)
+1 (majority)
+Figure 1: Counterfactual true positive rates (cTPRs; solid
+lines) for a RAI satisfying observational equalized odds
+(oEO), as a function of the intervention strength P(𝑌 1 = 0 |
+𝑌 0 = 1). Dashed lines indicate opportunity rates P(𝐷 = 1 |
+𝑌 0 = 0) prior to the development of the RAI. The more effec-
+tive the tutoring (the higher the intervention strength), the
+worse the RAI is at identifying students who need it, and the
+greater the disparity in its performance between the minor-
+ity and the majority group. When tutoring is more effective,
+the RAI may reduce the appropriate assignment of tutors
+below the baseline opportunity rates.
+In other words, the \𝑎,0 parameters represent conditional probabil-
+ities that 𝑆 flips, while the \𝑎,1 parameters represent conditional
+probabilities that 𝑆 doesn’t flip. Notice that for \̃ = (0, 1, 0, 1), we
+have 𝑆
+\̃
+= 𝑆 : the derived predictor is equal to the input predictor.
+Our target is a loss-optimal fair predictor 𝑆\ ∗ , where the fair-
+ness criterion is approximate cEO. The loss function we consider
+is weighted classification error. For fixed \ , denote the loss
+3
+by
+L(𝑆\ ;𝑤+,𝑤−) = 𝑤+P(𝑌 0 = 0, 𝑆\ = 1) + 𝑤−P(𝑌 0 = 1, 𝑆\ = 0),
+where 𝑤+,𝑤−
+are chosen by the user to capture the relative im-
+portance of false positives and false negatives. (Note that we will
+generally suppress the dependence of L on𝑤+,𝑤−
+.) The estimand
+is
+\∗ ∈ argmin
+\
+L(𝑆\ )
+subject to \ ∈ [0, 1]4
+|Δ+ (𝑆\ ) | ≤ 𝜖+
+|Δ− (𝑆\ ) | ≤ 𝜖−
+where Δ+,Δ−
+are given above in Definition 2.2, and the fairness
+constraints 𝜖+, 𝜖− ∈ [0, 1] are chosen by the user. Setting both these
+constraint parameters to 0 requires cEO to be satisfied exactly, while
+setting them to 1 allows 𝑆\ ∗ to be arbitrarily unfair. Setting 𝜖+ to 0 re-
+gardless of 𝜖− forces 𝑆\ ∗ to satisfy counterfactual equal opportunity;
+see [16] for the observational definition of this criterion.
+3
+We refer to this quantity as “loss” instead of the conventional “risk” in order to avoid
+confusion between risk assessment and the error rate of a predictor.
+389
+Fairness in Risk Assessment Instruments: Post-Processing to Achieve Counterfactual Equalized Odds FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Remark 1. Note that the full vector 𝑍 is required only to estimate
+the parameter \∗ that defines the optimal fair derived predictor.
+Once \∗ has been estimated, the resulting derived predictor requires
+access at runtime only to the sensitive feature 𝐴 and the input
+predictor 𝑆 .
+Since our estimands involve counterfactual quantities, distribu-
+tional assumptions are required in order to equate them to observ-
+able quantities.
+5.2 Identification
+In this subsection we show that the counterfactual error rates and
+loss can be identified under standard causal inference assumptions.
+All the quantities to be identified can be written in terms of the loss
+and the counterfactual error rates of the input predictor 𝑆 . For ease
+of notation, we first define two nuisance parameters that appear
+in the estimand and associated estimators, namely the outcome
+regression and propensity score function. We generally drop the
+arguments from these functions in subsequent usage for the sake
+of conciseness.
+`0 (𝐴,𝑋, 𝑆) = E[𝑌 | 𝐴,𝑋, 𝑆, 𝐷 = 0]
+𝜋 (𝐴,𝑋, 𝑆) = P(𝐷 = 1 | 𝐴,𝑋, 𝑆)
+We make the following standard “no unmeasured confounding”-
+type causal inference assumptions:
+1. (Consistency) 𝑌 = 𝐷𝑌 1 + (1 − 𝐷)𝑌 0
+2. (Positivity) ∃𝛿 ∈ (0, 1) s.t. P(𝜋 (𝐴,𝑋, 𝑆) ≤ 1 − 𝛿) = 1
+3. (Ignorability) 𝑌 0 ⊥ 𝐷 | 𝐴,𝑋, 𝑆
+The consistency assumption means that the outcome observed for
+each individual is precisely the potential outcome corresponding
+to the treatment received. This implies that one person’s treatment
+assignment does not affect another person’s outcomes, meaning, for
+example, that an individual’s recidivism behavior does not depend
+on whether other individuals are detained or released. The posi-
+tivity or overlap assumption requires that within strata of (𝐴,𝑋, 𝑆)
+of measure > 0, individuals have some chance of receiving no in-
+tervention. Finally, the ignorability or no unmeasured confounding
+assumption requires that within strata of (𝐴,𝑋, 𝑆), the treatment
+𝐷 is essentially random with respect to 𝑌 0
+. Satisfying ignorabil-
+ity assumptions typically requires collecting a rich enough set of
+deconfounding covariates. In the present case, even if 𝑋 is low
+dimensional, the ignorability assumption is plausible if the input
+predictor 𝑆 substantially drives decision making, or if it happens to
+be an accurate (if not necessarily fair) predictor of 𝑌 0
+.
+Before giving the identifying expressions for the loss L(𝑆\ ) and
+the error rate differences Δ+,Δ−
+, we give identifying expressions for
+the error rates of the input predictor 𝑆 , which themselves appear
+in the expressions for Δ+,Δ−
+.
+Proposition 1. Under assumptions 1-3, the counterfactual error
+rates of the input predictor 𝑆 are identified as follows:
+cFPR(𝑆, 𝑎) = E[𝑆 (1 − `0)1{𝐴 = 𝑎}]
+E[(1 − `0)1{𝐴 = 𝑎}]
+cFNR(𝑆, 𝑎) = E[(1 − 𝑆)`01{𝐴 = 𝑎}]
+E[`01{𝐴 = 𝑎}]
+Proofs of propositions are given in Appendix A. We now define
+several quantities that appear in the identifying expressions for
+L(𝑆\ ),Δ+
+, and Δ−
+:
+𝛽𝑎,𝑠 = E
+[
+1{𝐴 = 𝑎, 𝑆 = 𝑠}
+(
+𝑤+ − (𝑤+ +𝑤−)`0
+) ]
+, for 𝑎, 𝑠 ∈ {0, 1}
+𝛽 = (𝛽0,0, 𝛽0,1, 𝛽1,0, 𝛽1,1)
+𝛽+ = (1 − cFPR(𝑆, 0), cFPR(𝑆, 0), cFPR(𝑆, 1) − 1, − cFPR(𝑆, 1))
+𝛽− = (− cFNR(𝑆, 0), cFNR(𝑆, 0) − 1, cFNR(𝑆, 1), 1 − cFNR(𝑆, 1))
+Proposition 2. Under assumptions 1-3, the loss and error rates of
+the derived predictor 𝑆\ are identified as:
+L(𝑆\ ) = \𝑇 𝛽 +𝑤−E[`0]
+Δ+ (𝑆\ ) = \𝑇 𝛽+
+Δ− (𝑆\ ) = \𝑇 𝛽−
+Since the term𝑤−E[`0] in the loss is fixed, we can drop it with-
+out changing the minimizer of the loss. We can therefore rewrite
+the estimand as
+\∗ ∈ argmin
+\
+\𝑇 𝛽
+subject to \ ∈ [0, 1]4
+|\𝑇 𝛽+ | ≤ 𝜖+
+|\𝑇 𝛽− | ≤ 𝜖−
+(1)
+In other words, the optimal fair derived predictor is the solution
+to a linear program (LP). We refer to this as the “true LP” since it
+defines the estimand. We now define an estimator \̂ as the solution
+to an “estimated LP.”
+5.3 Estimation
+An estimator for \∗ is derived by computing estimates 𝛽, 𝛽+, 𝛽−
+of
+the true LP coefficients and then solving the resulting estimated
+LP:
+\̂ ∈ argmin
+\
+\𝑇 𝛽
+subject to \ ∈ [0, 1]4
+|\𝑇 𝛽+ | ≤ 𝜖+
+|\𝑇 𝛽− | ≤ 𝜖−
+Any solution \̂ suffices. There are many possible estimators of
+the true LP coefficients. Theorems 1 and 2 below show that the rates
+at which these coefficients are estimated propagate to the loss and
+fairness properties of 𝑆
+\̂
+. Arguably the simplest estimators involve
+plugging in an estimate of the regression function `0. We propose
+instead using doubly robust estimators, which yield faster rates
+of convergence than plugin estimators in general nonparametric
+settings [41, 43].
+For ease of notation, let
+𝜙 =
+1 − 𝐷
+1 − 𝜋
+(𝑌 − `0) + `0
+denote the uncentered efficient influence function for E(𝑌 0), and let
+𝜙 denote an estimate constructed from estimates ̂̀0 and 𝜋 [4, 15, 23,
+42]. To minimize the use of indices, let P𝑛 (𝑓 (𝑍 )) = 𝑛−1
+∑𝑛
+𝑖=1 𝑓 (𝑍𝑖 )
+390
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Alan Mishler, Edward H. Kennedy, and Alexandra Chouldechova
+denote the sample average of any function of 𝑍 . The doubly robust
+estimators for individual coefficients are:
+𝛽𝑎,𝑠 = P𝑛 [1{𝐴 = 𝑎, 𝑆 = 𝑠}(𝑤+ − (𝑤+ +𝑤−)𝜙)] (2)
+cFPR(𝑆, 𝑎) = P𝑛 [1{𝐴 = 𝑎}𝑆 (1 − 𝜙)]
+P𝑛 [1{𝐴 = 𝑎}(1 − 𝜙)]
+(3)
+cFNR(𝑆, 𝑎) = P𝑛 [1{𝐴 = 𝑎}(1 − 𝑆)𝜙]
+P𝑛 [1{𝐴 = 𝑎}𝜙]
+(4)
+These estimates are assembled into the corresponding vectors 𝛽, 𝛽+, 𝛽−
+.
+In order to obtain optimal convergence rates, it is generally nec-
+essary to estimate the nuisance functions ̂̀0 and 𝜋 on one sample
+and then compute the sample mean P𝑛 on an independent sample
+conditional on those estimates. To obtain full sample size efficiency,
+one can swap the folds, repeat the procedure, and average the re-
+sults, an approach that is popularly called cross-fitting [5, 8, 38, 49].
+A 𝑘-fold version of cross-fitting with 𝑘 > 2 is also possible. If ̂̀0 and
+𝜋 are assumed to be sufficiently “well-behaved,” i.e. if they belong
+to Donsker classes, then no such sample splitting is necessary. We
+prefer to avoid this assumption and utilize sample splitting. See
+Appendix C for a schematic of the sample splitting procedure.
+We now show that 𝑆
+\̂
+approaches optimal behavior at rates
+that depend on the rates at which the LP coefficient vectors are
+estimated
+4
+. We define two quantities of interest: the loss gap and
+the excess unfairness, and give accompanying theorems.
+Following standard usage, we say that an estimator𝜓 of a param-
+eter𝜓 is consistent at rate 𝑓 (𝑛) for some real-valued function 𝑓 (𝑛)
+if ∥𝜓 −𝜓 ∥ = 𝑂P (1/𝑓 (𝑛)) for a suitable norm ∥ · ∥. For example, if
+𝑓 (𝑛) =
+√
+𝑛, then we say 𝜓 converges at
+√
+𝑛 rates. We say that an
+estimator converges faster than 𝑓 (𝑛) if ∥𝜓 −𝜓 ∥ = 𝑜P (1/𝑓 (𝑛)).
+Definition 5.1. The loss gap is L(𝑆
+\̂
+) − L(𝑆\ ∗ ), the difference in
+loss between the derived predictor and the optimal derived predic-
+tor.
+We use the term loss gap rather than excess loss to acknowledge
+that the loss of 𝑆
+\̂
+can be less than the loss of 𝑆\ ∗ , if \̂ falls outside
+the true constraints. Of course, this can only occur if 𝑆
+\̂
+violates the
+true fairness constraints, which can happen because the constraints
+are estimated.
+Theorem1. (Loss gap.) Suppose that 𝛽, 𝛽+
+, and 𝛽−
+are all consistent
+at rate 𝑓 (𝑛). Under Assumptions 1-3:
+L(𝑆
+\̂
+) − L(𝑆\ ∗ ) = 𝑂P (1/𝑓 (𝑛))
+Definition 5.2. The excess unfairness of 𝑆
+\̂
+in the cFPR is
+UF
++ (𝑆\ ) := max{| cFPR(𝑆
+\̂
+, 0) − cFPR(𝑆
+\̂
+, 1) | − 𝜖+, 0},
+and the excess unfairness of 𝑆
+\̂
+in the cFNR is
+UF
+− (𝑆\ ) := max{| cFNR(𝑆
+\̂
+, 0) − cFNR(𝑆
+\̂
+, 1) | − 𝜖−, 0}
+Since the estimated constraints should fluctuate around the true
+constraints, it’s possible for 𝑆
+\̂
+to have error rate differences that
+are smaller than 𝜖+, 𝜖−, which motivates bounding these quantities
+below by 0.
+4
+We ignore optimization error, since this is a function of the number of optimization
+iterations and can be made arbitrarily small [6].
+Theorem 2. (Excess unfairness.) Suppose that 𝛽, 𝛽+
+, and 𝛽−
+are all
+consistent at rate 𝑓 (𝑛). Under assumptions 1-3:
+max
+{
+UF
++ (𝑆
+\̂
+),UF− (𝑆
+\̂
+)
+}
+= 𝑂P (1/𝑓 (𝑛))
+Remark 2. (The behavior of \̂ vs. 𝑆
+\̂
+). Without assumptions
+about how the loss and fairness of 𝑆
+\̂
+depend on \̂ , there is no
+guarantee about the rate at which \̂ will approach \∗. This is not a
+concern, however, since the object of interest is not \∗ per se but a
+predictor that behaves like 𝑆\ ∗ .
+5.4 Estimating performance of the derived
+predictor
+Once \̂ has been computed, it is of interest to check both the loss
+L(𝑆
+\̂
+) and the error rate differences Δ+ (𝑆
+\̂
+), Δ− (𝑆
+\̂
+) of the resulting
+derived predictor 𝑆
+\̂
+, for example to understand the performance
+“cost” of fairness and to check whether the procedure successfully
+controlled the error rate differences.
+These estimates should be computed on a test set that is indepen-
+dent of the sample used to estimate \̂ . Within the test set, the same
+sample splitting considerations apply: unless they are assumed to
+belong to Donsker classes, the nuisance parameters ̂̀0 and 𝜋 should
+be estimated on separate folds from the folds used to compute the
+relevant sample means P𝑛 .
+Since the estimators below are conditional on a fixed \̂ , they
+can in fact be applied to any fixed parameter value \ ∈ [0, 1]4. We
+define one additional quantity of interest.
+Definition 5.3. The loss change for a derived predictor 𝑆\ relative
+to an input predictor 𝑆 is Γ(𝑆\ ) = L(𝑆\ ) − L(𝑆).
+We refer to a loss change rather than an increase in loss because
+it is possible for 𝑆\ to have smaller loss that 𝑆 . This is not a typical
+expectation: in fair prediction problems, the set of fair classifiers is
+necessarily smaller than the set of fair and unfair classifiers, so there
+is a fairness-accuracy tradeoff. In the RAI setting, however, since
+predictors are typically trained to predict observable outcomes, their
+performance may be arbitrarily bad with respect to the potential
+outcome 𝑌 0
+. It is therefore not implausible than a derived fair
+predictor could have higher accuracy than the input predictor.
+Once again, we propose using doubly robust estimators. These
+estimators are essentially identical to the estimators of the LP coef-
+ficients used in the previous section.
+L̂(𝑆\ ) = \𝑇 𝛽 +𝑤−P𝑛 (𝜙) (loss)
+Γ̂(𝑆\ ) = (\ − \̃ )𝑇 𝛽 (loss change)cFPR(𝑆\ , 𝑎) = \𝑎,0
+(
+1 − cFPR(𝑆, 𝑎)) + \𝑎,1cFPR(𝑆, 𝑎) (cFPR)cFNR(𝑆\ , 𝑎) = (1 − \𝑎,0)
+(cFNR(𝑆, 𝑎)) + \𝑎,1 (1 − cFNR(𝑆, 𝑎))
+(cFNR)
+Δ̂+ (𝑆\ ) = \𝑇 𝛽+ (error rate difference in cFPR)
+Δ̂− (𝑆\ ) = \𝑇 𝛽− (error rates difference in cFNR)
+where recall \̃ = (0, 1, 0, 1), so that 𝑆
+\̃
+= 𝑆 (i.e., the derived predictor
+is simply the input predictor). Note that the loss estimator adds
+back in the portion of the loss that doesn’t depend on \ and that
+391
+Fairness in Risk Assessment Instruments: Post-Processing to Achieve Counterfactual Equalized Odds FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+we consequently removed from the LP in (1). When the nuisance
+parameter estimators ̂̀0 and 𝜋 are estimated at faster than 𝑛1/4
+rates, these doubly robust estimators are
+√
+𝑛-consistent and asymp-
+totically normal, so we can use the central limit theorem to derive
+asymptotically valid confidence intervals.
+6 RESULTS
+There is no previous method designed to achieve counterfactual
+equalized odds or related fairness criteria that we can compare our
+method to. However, we compare our method to an approach that
+uses plugin estimators for the LP coefficients.
+6.1 Simulations
+We use one set of simulations to illustrate Theorems 1 and 2 and
+another set to explore fairness-performance tradeoffs. We use equal
+misclassification weights𝑤+ = 𝑤− = 1, so that false positives and
+false negatives contribute equally to the loss.
+Each estimation procedure was run 500 times for each sample
+size 𝑛 ∈ {100, 200, 500, 1000, 5000, 20000}. Since `0 is known here,
+the “true” loss and fairness values were computed on a separate
+validation set of size 500,000, using plugin estimators with the true
+`0. These values showed negligible variation over many repetitions.
+6.1.1 Setup. First, we define a pre-RAI data generating process. Us-
+ing this data, we train a predictor 𝑆 to predict observable outcomes
+𝑌 , mirroring how RAIs are typically constructed in practice. We
+then define a post-RAI data generating process, which only differs
+in that the predictor 𝑆 now affects the decisions 𝐷 . This emulates
+the way RAIs are intended to work in practice; for example, a crim-
+inal defendant labeled high-risk (𝑆 = 1) be a RAI might be less
+likely to be released pre-trial (𝐷 = 0) than they would have been
+prior to the introduction of the RAI. The data generating process
+is designed to meet assumptions 1-3, with 𝜋 (𝐷 | 𝐴,𝑋, 𝑆) upper
+bounded at 0.975. It is described fully in Appendix D.
+6.1.2 Theorems 1 and 2. To simulate the estimation of the LP co-
+efficient vectors at a particular rate, we add random noise 𝜖 of
+magnitude 𝑜P (1/𝑛1/4) to the nuisance parameters `0 and 𝜋
+5
+. Note
+that
+√
+𝑛 rates for regression functions cannot be attained in general
+nonparametric settings. These slower rates can be attained in such
+settings, under relatively weak assumptions [43].
+The principal advantage of doubly robust estimators over plugin
+estimators is that they converge at a rate that is like the product of
+the nuisance parameter rates. When ̂̀0 and 𝜋 both converge faster
+than 𝑛1/4, the estimators 𝛽, 𝛽+, 𝛽−
+all converge at
+√
+𝑛 rates, which is
+the fastest rate that can be attained for these parameters in general
+nonparametric settings. Plugin versions of 𝛽, 𝛽+, 𝛽−
+would inherit
+the slow rates of ̂̀0.
+Figure 2 shows the loss L(𝑆
+\̂
+) and the excess unfairness values
+UF
++ (𝑆
+\̂
+), UF− (𝑆
+\̂
+) for the post-processed predictor 𝑆
+\̂
+with fairness
+constraints 𝜖+ = 0.10, 𝜖− = 0.20. As expected, when doubly robust
+estimators are used, the loss and excess unfairness values converge
+at
+√
+𝑛 rates to the lossL(𝑆\ ∗ ) of the optimal derived predictor and 0,
+respectively. When plugin estimators are used, the rates are slower
+than
+√
+𝑛.
+5
+The noise is added on the logit scale to ensure that ̂̀0, 𝜋 remain in [0, 1], and 𝜋 is
+again truncated to 0.975.
+Figure 2: (Illustration of Theorems 1 and 2). Loss L and ex-
+cess unfairness values UF+,UF− for the derived predictor 𝑆
+\̂
+for samples of size 100 to 20,000. Each vertical line repre-
+sents a mean ±1 sd over 500 simulations. Orange horizon-
+tal lines represent the loss of the optimal derived predictor
+𝑆\ ∗ (top left panel) or 0. The top row represents our doubly
+robust (DR) procedure and shows that the loss and excess
+unfairness converge to their target values. The bottom two
+rows represent values from the DR procedure or a plugin
+(PI) procedure, transformed by 𝜓 (𝑆
+\̂
+) ↦→
+√
+𝑛(𝜓 (𝑆
+\̂
+) −𝜓 (𝑆\ ∗ )),
+where𝜓 is L or UF+ or UF−, as appropriate. These rows illus-
+trate that
+√
+𝑛-convergence is only guaranteed for \̂DR: the
+scaled values for \̂DR do not grow in 𝑛, while the scaled val-
+ues for \̂SR begin to diverge.
+6.1.3 Fairness-performance tradeoffs. Figure 3 shows the loss change
+Γ(𝑆\ ∗ ) = L(𝑆\ ∗ ) − L(𝑆) for each point in a grid of fairness con-
+straints 𝜖+, 𝜖−. Here, 𝑆 is the Bayes-optimal predictor of 𝑌 0
+in our
+data generating scenario, meaning 𝑆 (𝐴,𝑋 ) = E[𝑌 0 | 𝐴,𝑋 ]. Since
+any derived predictor necessarily has greater loss than the Bayes-
+optimal predictor, we refer to the loss change here equivalently as
+the performance cost.
+In the data generating process used in the previous section, the
+Bayes-optimal predictor has absolute error rate differences of only
+0.05 (Δ+
+) and 0.04 (Δ−
+), which leaves little room to illustrate the
+potential cost of fairness. For these simulations, therefore, we alter
+the data generating process slightly. (See Appendix D). This results
+in a Bayes-optimal predictor with absolute error rate differences of
+0.23 (Δ+
+) and 0.40 (Δ−
+) and a loss of 0.24, which are plausible values
+for a real predictor.
+As expected, when 𝜖+ ≥ Δ+ (𝑆) or 𝜖− ≥ Δ− (𝑆), the performance
+cost is 0: the input predictor already falls satisfies the fairness
+constraints, so our method simply returns the input predictor. As
+the tolerances tighten towards 0, the performance declines, though
+never substantially. For 𝜖+ = 𝜖− = 0, when the derived predictor
+is constrained to satisfy exact cEO, the loss increases by 0.10, to
+392
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Alan Mishler, Edward H. Kennedy, and Alexandra Chouldechova
+1.
+0
+0.
+9
+0.
+8
+0.
+7
+0.
+6
+0.
+5
+0.
+4
+0.
+3
+0.
+2
+0.
+1
+0.
+09
+0.
+08
+0.
+07
+0.
+06
+0.
+05
+0.
+04
+0.
+03
+0.
+02
+0.
+01 0.
+0
+ǫ+
+0.0
+0.01
+0.02
+0.03
+0.04
+0.05
+0.06
+0.07
+0.08
+0.09
+0.1
+0.2
+0.3
+0.4
+0.5
+0.6
+0.7
+0.8
+0.9
+1.0
+ǫ−
+0.02
+0.04
+0.06
+0.08
+L
+os
+s
+ch
+an
+ge
+Figure 3: (Fairness-performance tradeoffs). Loss change
+Γ(\∗) = L(𝑆\ ∗ ) − L(𝑆) for the Bayes-optimal input predictor
+𝑆 (𝐴,𝑋 ) = E[𝑌 0 | 𝐴,𝑋 ] and \∗ corresponding to different fair-
+ness constraints 𝜖+, 𝜖−. The black area represents fairness
+constraints that are looser than the error rate differences of
+the input predictor (Δ+ (𝑆) = 0.24, Δ− (𝑆) = 0.40), which incur
+no performance cost. The highest performance cost (0.10) oc-
+curs when the error rates differences are both constrained to
+be 0, meaning the derived predictor 𝑆\ satisfies cEO exactly.
+0.34. The different values for Δ+ (𝑆) and Δ− (𝑆) are reflected in the
+differing costs of satisfying fairness along the two axes: the cost of
+controlling Δ+ (𝑆\ ) are lower than the costs of controlling Δ+ (𝑆\ ).
+[46] showed that post-processing can result in predictors with
+poor performance, but it is unclear how likely this is to be a problem
+in practice. While the fairness-accuracy tradeoff naturally depends
+on the data generating process, our example illustrates that fairness
+can in some cases be achieved without substantial performance
+costs.
+6.2 COMPAS data
+We illustrate our method on the COMPAS recidivism dataset gath-
+ered by ProPublica [2, 29]. COMPAS refers to a collection of tools
+designed to assess the risk of recidivism. The dataset comprises
+public arrest records, criminal records, and COMPAS RAI scores
+from Broward County, Florida, spanning 2013–2016. After filtering
+the data in the same manner as [29] and restricting to defendants
+who are labeled African-American (𝐴 = 0) or Caucasian (𝐴 = 1),
+we are left with data for 5278 individuals (3175 African-American,
+2103 Caucasian).
+We utilize the COMPAS scores for general, as opposed to violent,
+recidivism. The scores are given in risk deciles. Since our method
+operates on a binary input predictor 𝑆 , we follow ProPublica and
+set scores of 1-4 to 𝑆 = 0 (“low risk”) and scores of 5-10 to 𝑆 = 1
+(“high risk”). The outcome 𝑌 is recidivism within a two-year time
+period. (See [29] for how recidivism is operationalized.) ProPublica’s
+analysis focuses on the use of COMPAS to inform pretrial release
+decisions. The dataset includes dates in and out of jail but does not
+indicate whether defendants were released pretrial, so we set the
+treatment 𝐷 to 0 if defendants left jail within three days of being
+arrested, and 1 otherwise. This yields 3645 released individuals
+(2158 African-American, 1487 Caucasian) and 1633 incarcerated
+individuals (1017 African-American, 616 Caucasian). Note that this
+threshold is somewhat arbitrary. Florida state law generally requires
+individuals to be brought before a judge for a bail hearing within
+48 hours of arrest, but it may take time for individuals to post bail
+if they are required and able to do so.
+The covariates 𝑋 consist of gender (coded male or female), age
+(coded categorically for < 25, between 25 and 45, and > 45), the
+number of prior crimes, and charge degree (misdemeanor or felony).
+Without consulting with domain experts, it is difficult to assess the
+plausibility of the positivity and ignorability assumptions given
+these covariates. Hence we intend our analysis primarily to be
+illustrative of our method, and we resist drawing strong substantive
+conclusions about COMPAS.
+We weight false positives and false negatives equally, i.e. we set
+𝑤+ = 𝑤− = 1. We randomly split the data into training and test sets
+of equal size. For 𝜖 ∈ {0, 0.01, 0.05, 0.10, 0.20, . . . , 0.90, 1}, we set the
+fairness constraints to 𝜖+ = 𝜖− = 𝜖 , computing the corresponding
+estimate \̂ on the training set and estimating properties of the post-
+processed predictor 𝑆
+\̂
+on the test set. We also estimate properties
+of the binarized COMPAS score 𝑆 on the test set. We use random
+forests to estimate both the propensity scores 𝜋 and the outcome
+regression ̂̀0. To reduce the variance of the estimates, we employ
+5-fold cross-fitting: within the train set, we compute five estimates
+\̂ 𝑗 , 𝑗 = 1, . . . 5, using four folds at a time to estimate the nuisance
+parameters and the held-out fold to compute \̂ 𝑗 . Then \̂ := 1
+5
+∑
+𝑗 \̂ 𝑗 .
+We utilize the test set in an analogous fashion for the remaining
+estimators.
+We also estimate the “predictive change” P(𝑆
+\̂
+≠ 𝑆), the pro-
+portion of predictions that the post-processed predictor flips. A
+point estimate and confidence interval for this quantity can be
+straightforwardly computed via a formula given in Appendix E.
+Table 1 contains estimates and confidence intervals for COM-
+PAS and for the post-processed predictor corresponding to fairness
+constraints of 𝜖+ = 𝜖− = 0.05. The loss for COMPAS is 0.36, and the
+differences in the cFPR and cFNR are -0.24 and 0.16, respectively.
+The signs of these differences are consistent with what ProPub-
+lica found in their analysis with respect to observable 𝑌 : the false
+positive rates are higher for African-American defendants, while
+the false negative rates are higher for Caucasian defendants. The
+post-processing procedure successfully shrinks these differences to
+-0.05 and -0.03, which fall within the target range of [−0.05, 0.05].
+This reduction corresponds to flipping 9% of the COMPAS scores,
+and it incurs an increase in risk of only 0.03.
+The value of \̂ corresponding to 𝑆
+\̂
+here is (0, 0.91, 0.23, 1). The
+0 and the 1 indicate that 𝑆
+\̂
+does not change the COMPAS scores
+for African-American defendants who receive a “low-risk” score or
+Caucasian defendants who receive a “high-risk” score. The scores
+for high-risk African-American defendants are flipped to low-risk
+1 − 0.91 = 9% of the time, while the scores for low-risk Caucasian
+defendants are flipped to high-risk 23% of the time. This has the
+effect of increasing the false positive rate and decreasing the false
+393
+Fairness in Risk Assessment Instruments: Post-Processing to Achieve Counterfactual Equalized Odds FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Figure 4: Convergence of the estimated loss L̂(𝑆
+\̂
+), pre-
+dictive change P̂(𝑆
+\̂
+≠ 𝑆), and error rate differences
+Δ̂+ (𝑆
+\̂
+), Δ̂− (𝑆
+\̂
+), for post-processed versions of the binarized
+COMPAS predictor. Fairness constraints are set to 𝜖+ = 𝜖− = 𝜖
+over a range of values 𝜖. Vertical lines are 95% CIs. Horizon-
+tal orange lines indicate the reference values for COMPAS,
+or 0 in the case of predictive change. The dashed blue lines
+𝑦 = 𝑥 and 𝑦 = −𝑥 , mark the target fairness constraints.
+negative rate for Caucasians, while moving the rates in the opposite
+directions for African-Americans.
+Figure 4 shows the loss, error rate differences, and predictive
+change for fairness constraints ranging from 0 (requiring no gap in
+error rates) to 1 (imposing no fairness constraints). Each constraint
+induces an estimate \̂ and a corresponding post-processed predictor
+𝑆
+\̂
+. The estimated fairness gaps fall along or within the lines𝑦 = ±𝑥 ,
+indicating that each 𝑆
+\̂
+satisfies its target constraints. At the most
+stringent setting of 0, the loss for 𝑆
+\̂
+is approximately 0.40, which
+compares favorably with the estimated baseline loss of 0.36 for
+COMPAS. This 𝑆
+\̂
+flips slightly less than 20% of the scores.
+For 𝜖 > 0.24, the fairness constraints are essentially no longer
+active, since COMPAS itself satisfies these constraints. Indeed, as
+expected, the \̂ values for 𝜖 > 0.24 are all essentially [0, 1, 0, 1],
+meaning that 𝑆
+\̂
+= 𝑆 , and the estimated risk and fairness values all
+fall close to the estimated values for COMPAS. (There is still some
+variation in the estimated values due to randomness in the k-fold
+cross-fitting procedure.)
+These results illustrate that our approach performs as intended
+on a real dataset: if these data were indeed generated from a distribu-
+tion satisfying the identifying assumptions, then our post-processed
+predictor would satisfy approximate counterfactual equalized odds
+while incurring little cost in performance.
+Table 1: Estimates and 95% confidence intervals for the loss
+L, loss change Γ, error rates cFPR and cFNR for groups 0
+and 1, error rate differences Δ+,Δ−, and predictive change
+P(𝑆
+\̂
+≠ 𝑆) for the binarizedCOMPAS predictor 𝑆 and the post-
+processed predictor 𝑆
+\̂
+, with 𝜖+ and 𝜖− set to 0.05.
+𝑆 𝑆
+\̂
+L̂(·) 0.36 (0.32, 0.41) 0.39 (0.35, 0.42)
+Γ̂(·) – 0.03 (0.01, 0.04)cFPR(·, 0) 0.43 (0.36, 0.49) 0.39 (0.33, 0.45)cFPR(·, 1) 0.24 (0.18, 0.31) 0.42 (0.37, 0.47)cFNR(·, 0) 0.30 (0.25, 0.35) 0.36 (0.31, 0.40)cFNR(·, 1) 0.53 (0.46, 0.60) 0.41 (0.35, 0.46)
+Δ̂+ (·) -0.24 (-0.32, -0.15) -0.05 (-0.12, 0.02)
+Δ̂− (·) 0.18 (0.09, 0.28) -0.03 (-0.10, 0.05)
+P̂(· ≠ 𝑆) – 0.09 (0.09, 0.09)
+6.3 Child welfare data
+Cost-sensitive loss functions can drive \̂ to a trivial classifier that al-
+ways predicts one class. We illustrate this phenomenon on a dataset
+representing calls to a child-welfare hotline in Allegheny County,
+Pennsylvania. The data comprises over 30,000 calls and contains
+over 1,000 features. The features describe allegations made in the
+call, assessments of risk made by hotline workers, and features per-
+taining to individuals associated with the call. Workers must decide
+whether to screen in a call, which means opening an investigation
+into the allegations. The baseline decision 𝐷 = 0 is to screen out,
+meaning no investigation takes place. The outcome 𝑌 is re-referral
+to the hotline within a six month period. For further details about
+the child welfare setting and this dataset in particular, see [10, 11].
+Unlike the COMPAS dataset, this dataset does not include a
+previously trained predictor. We therefore first build a predictor
+𝑆 that predicts 𝑌 0
+, and then we post-process 𝑆 . In this setting, we
+have reason to believe that the identification assumptions in section
+5.2 are plausible, once cases with the highest propensity for screen-
+in are removed; see [11]. (RAIs are not necessary or useful for
+cases that are already guaranteed to be screened in.) In order to
+accomplish this filtering, we first build a propensity score model
+using random forests on roughly one third of the data. The model
+appears well-calibrated, so we filter out the approximately 20% of
+the cases with estimated propensity scores greater than 0.99. Note
+that downstream results did not change substantially when these
+cases were left in.
+We then train a classification random forest 𝑆 to predict 𝑌 con-
+ditional on 𝐴,𝑋, 𝐷 = 0, using the same third of the data. Under the
+identifying assumptions, 𝑌 |𝑋,𝐴, 𝐷 = 0 is equal in distribution to
+𝑌 0 |𝐴,𝑋 , so 𝑆 is indeed an estimate of the target 𝑌 0
+. Following rec-
+ommended usage in this setting, we set the classification threshold
+to capture the top 25% riskiest cases [10].
+The predictor 𝑆 has estimated error rate differences and 95%
+confidence intervals of Δ̂+ = −0.02± 0.01 and Δ̂− = 0.09± 0.08. It is
+unsurprising that these differences are small, given that rereferral
+rates are similar for Black (0.24) and White (0.27) cases. (See [9] for
+394
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Alan Mishler, Edward H. Kennedy, and Alexandra Chouldechova
+Figure 5: Cost-sensitive post-processing for the child wel-
+fare predictor over a range of cost ratios, with fairness con-
+straints 𝜖+ = 𝜖− = 0.01. Each column represents a single \̂ ,
+with the four components \𝑎,𝑠 in rows. False positives are
+weighted between 1.25 and 3 times as heavily as false nega-
+tives to the left of the dashed line, and vice versa to the right.
+Extreme cost ratios push the post-processed classifier to a
+trivial classifier that always predicts 0 (to the left of the or-
+ange lines) or 1 (to the right). Between these, post-processing
+essentially returns the input predictor.
+an examination of the relationship between base rates and error
+rates.)
+In order to have nontrivial (active) fairness constraints, we set
+𝜖+ = 𝜖− = 0.01. Figure 5 shows the value of \̂ over a range of
+cost ratios𝑤+/𝑤−
+and𝑤−/𝑤+
+. When false positives are weighted
+more than 1.5 times as heavily as false negatives, post-processing
+returns classifiers that are very close to the simple majority clas-
+sifier 𝑆 (0,0,0,0) ≡ 0. When false negatives are weighted more than
+2 times as heavily as false positives, post-processing returns the
+simple minority classifier 𝑆 (1,1,1,1) ≡ 1. Since the input classifier is
+approximately fair, between those ranges, post-processing returns
+classifiers that are very close to the input classifier 𝑆 = 𝑆 (0,1,0,1) ,
+with only the fourth component \̂1,1 deviating slightly from 1.
+This behavior is expected. Note that a simple majority or minor-
+ity classifier always satisfies counterfactual equalized odds, since
+the error rate differences are 0. Since the post-processed predictor
+only has access at runtime to two binary features, as either false
+positives or false negatives become sufficiently important, one of
+these simple classifiers will at some point become the lowest risk
+option. This is possible in principle when𝑤+
+and𝑤−
+are equal, but
+it is guaranteed as their ratio grows.
+Since this dataset did not include a pretrained predictor of 𝑌 0
+,
+it would be preferable to adopt an in-processing approach, i.e. to
+train a predictor that satisfies the desired fairness constraints in a
+single stage, rather than training an unconstrained predictor and
+then post-processing it. We pursue this task in ongoing work.
+7 DISCUSSION AND CONCLUSION
+In this paper we considered fairness in risk assessment instruments
+(RAIs), which are naturally concerned with potential outcomes
+rather than strictly observable outcomes. We defined the fairness
+criterion approximate counterfactual equalized odds (approximate
+cEO), which allows users to negotiate the tradeoff between fairness
+and performance. We argued that this fairness criterion is likelier
+than other candidate criteria to reduce discriminatory disparate
+impact, which we defined as 𝐷 ̸⊥ 𝐴 | 𝑌 0
+.
+We presented a method to post-process an existing binary predic-
+tor to satisfy approximate cEO using doubly robust estimators, and
+we showed that our method has favorable convergence properties.
+Our rate results translate readily to the post-processing setting of
+[16], in which the outcome of interest is the observable 𝑌 and the
+fairness criterion is (approximate) observational equalized odds.
+Once it is constructed, the post-processed predictor requires ac-
+cess at runtime only to the sensitive feature and the input predictor,
+making it relatively feasible to implement on top of existing RAIs.
+A predictor trained from scratch would be constrained by the set
+of covariates available in deployment, whereas the post-processing
+approach allows researchers to devise a set of suitable deconfound-
+ing covariates and then collect an appropriate dataset on a one-time
+basis.
+In closing, we note that from our perspective, notions of fair-
+ness in predictive systems ought to be subordinate to notions of
+fairness grounded in the actual decisions or events that those sys-
+tems inform, and the impact that those decisions have on people’s
+lives. Though little is currently known about how decision makers
+respond to RAIs, there is some evidence that judges do not have
+much faith in recidivism predictions and that RAIs can have lit-
+tle impact on decisions [20, 40]. As RAIs and the general public’s
+understanding of how they function co-evolve, it is likely that the
+ways in which decision makers respond to them will evolve as well.
+Nevertheless, it seems plausible that some fairness criteria for
+RAIs are likelier than others to lead to increased (un)fairness with
+respect to decisions and outcomes. While this is ultimately an em-
+pirical question, we believe that this kind of consideration ought to
+ground discussions of fairness in RAIs and predictive systems gen-
+erally. As long as there are domains involving high stakes decisions
+that we do not wish to fully automate, RAIs will remain relevant,
+and so will the task of ensuring that they lead to a society that is
+more fair, not less.
+ACKNOWLEDGMENTS
+Edward Kennedy gratefully acknowledges support from NSF DMS
+Grant 1810979. Additionally, we are grateful to the Block Center for
+Technology and Society at Carnegie Mellon University for funding
+this work, and to the Allegheny County Department of Human
+Services for furnishing the child welfare data.
+395
+Fairness in Risk Assessment Instruments: Post-Processing to Achieve Counterfactual Equalized Odds FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+REFERENCES
+[1] Julia Angwin and Jeff Larson. 2016. Bias in Criminal Risk Scores Is
+Mathematically Inevitable, Researchers Say. ProPublica (Dec 2016).
+https://www.propublica.org/article/bias-in-criminal-risk-scores-is-
+mathematically-inevitable-researchers-say
+[2] Julia Angwin, Jeff Larson, Surya Mattu, and Lauren Kirchner. 2016. Machine Bias.
+ProPublica (May 2016). https://www.propublica.org/article/machine-bias-risk-
+assessments-in-criminal-sentencing
+[3] Solon Barocas, Moritz Hardt, and Arvind Narayanan. 2018. Fairness and Machine
+Learning. (2018). http://www.fairmlbook.org
+[4] Peter J. Bickel, Chris A.J. Klaassen Ya’acov Ritov, and JonA.Wellner. 1993. Efficient
+and adaptive estimation for semiparametric models. Johns Hopkins University
+Press, Baltimore.
+[5] Peter J. Bickel and Ya’acov Ritov. 1988. Estimating Integrated Squared Density
+Derivatives : Sharp Best Order of Convergence Estimates. Sankhyā: The Indian
+Journal of Statistics, Series A 50, 3 (1988), 381–393. https://www.jstor.org/stable/
+25050710
+[6] Stephen P. Boyd and Lieven Vandenberghe. 2004. Convex optimization. Cambridge
+University Press.
+[7] Flavio Calmon, Dennis Wei, Bhanukiran Vinzamuri, Karthikeyan Natesan Ra-
+mamurthy, and Kush R Varshney. 2017. Optimized Pre-Processing for Dis-
+crimination Prevention. In Advances in Neural Information Processing Systems
+(Long Beach, CA) (NIPS 2017), I. Guyon, U. V. Luxburg, S. Bengio, H. Wal-
+lach, R. Fergus, S. Vishwanathan, and R. Garnett (Eds.). Curran Associates,
+Inc., 3992–4001. http://papers.nips.cc/paper/6988-optimized-pre-processing-
+for-discrimination-prevention.pdf
+[8] Victor Chernozhukov, Denis Chetverikov, Mert Demirer, Esther Duflo, Christian
+Hansen, Whitney Newey, and James Robins. 2018. Double/debiased machine
+learning for treatment and structural parameters. The Econometrics Journal 21, 1
+(Feb. 2018), C1–C68. https://doi.org/10.1111/ectj.12097
+[9] Alexandra Chouldechova. 2017. Fair prediction with disparate impact: A study
+of bias in recidivism prediction instruments. Big data 5, 2 (2017), 153–163.
+[10] Alexandra Chouldechova, Diana Benavides-Prado, Oleksandr Fialko, and Rhema
+Vaithianathan. 2018. A case study of algorithm-assisted decision making in child
+maltreatment hotline screening decisions. In Proceedings of the 1st Conference
+on Fairness, Accountability and Transparency (Proceedings of Machine Learning
+Research, Vol. 81), Sorelle A. Friedler and Christo Wilson (Eds.). PMLR, New York,
+NY, USA, 134–148. http://proceedings.mlr.press/v81/chouldechova18a.html
+[11] Amanda Coston, AlanMishler, EdwardH. Kennedy, andAlexandra Chouldechova.
+2020. Counterfactual Risk Assessments, Evaluation, and Fairness (FAT* ’20).
+Association for Computing Machinery, New York, NY, USA, 582–593. https:
+//doi.org/10.1145/3351095.3372851
+[12] William Dieterich, Christina Mendoza, and Tim Brennan. 2016. COMPAS Risk
+Scales: Demonstrating Accuracy Equity and Predictive Parity. Technical Report.
+[13] Michele Donini, Luca Oneto, Shai Ben-David, John S Shawe-Taylor, and Massim-
+iliano Pontil. 2018. Empirical Risk Minimization Under Fairness Constraints. In
+Advances in Neural Information Processing Systems 31 (Montréal, Canada) (NeurIPS
+2018), S. Bengio, H. Wallach, H. Larochelle, K. Grauman, N. Cesa-Bianchi, and
+R. Garnett (Eds.). Curran Associates, Inc., 2791–2801. http://papers.nips.cc/paper/
+7544-empirical-risk-minimization-under-fairness-constraints.pdf
+[14] Clark Glymour and Madelyn R. Glymour. 2014. Commentary: Race and sex
+are causes. Epidemiology 25, 4 (2014), 488–490. https://doi.org/10.1097/EDE.
+0000000000000122
+[15] Jinyong Hahn. 1998. On the Role of the Propensity Score in Efficient Semi-
+parametric Estimation of Average Treatment Effects. Econometrica 66, 2 (1998),
+315–331. https://www.jstor.org/stable/2998560
+[16] Moritz Hardt, Eric Price, Eric Price, and Nati Srebro. 2016. Equality of Opportunity
+in Supervised Learning. In Advances in Neural Information Processing Systems 29
+(NIPS 2016), D. D. Lee, M. Sugiyama, U. V. Luxburg, I. Guyon, and R. Garnett (Eds.).
+Curran Associates, Inc., 3315–3323. http://papers.nips.cc/paper/6374-equality-
+of-opportunity-in-supervised-learning.pdf
+[17] Paul W. Holland. 1986. Statistics and Causal Inference. J. Amer. Statist. Assoc. 81,
+396 (1986), 968. http://www.jstor.org/stable/2289069
+[18] Lily Hu and Issa Kohler-Hausmann. 2020. What’s Sex Got to Do with Machine
+Learning?. In Proceedings of the 2020 Conference on Fairness, Accountability, and
+Transparency (Barcelona, Spain) (FAT* ’20). Association for Computing Machin-
+ery, New York, NY, USA, 513. https://doi.org/10.1145/3351095.3375674
+[19] Kosuke Imai and Zhichao Jiang. 2020. Principal Fairness for Human and Algo-
+rithmic Decision-Making. (2020). arXiv:2006.01770 [cs.CY] https://arxiv.org/abs/
+2005.10400
+[20] Melissa Jonnson. 2018. The Influence of Risk Assessment Evidence on Judicial
+Sentencing Decisions. Master’s thesis. http://summit.sfu.ca/item/18704
+[21] Faisal Kamiran and Toon Calders. 2012. Data preprocessing techniques for
+classification without discrimination. Knowledge and Information Systems 33, 1
+(2012), 1–33. http://doi.org/10.1007/s10115-011-0463-8
+[22] Michael Kearns, Aaron Roth, and Zhiwei Steven Wu. 2017. Meritocratic Fairness
+for Cross-Population Selection. In Proceedings of the 34th International Conference
+on Machine Learning (Proceedings of Machine Learning Research, Vol. 70), Doina
+Precup and YeeWhye Teh (Eds.). PMLR, International Convention Centre, Sydney,
+Australia, 1828–1836. http://proceedings.mlr.press/v70/kearns17a.html
+[23] Edward H. Kennedy. 2016. Semiparametric Theory and Empirical Processes in
+Causal Inference. In Statistical Causal Inferences and Their Applications in Public
+Health Research, Hua He, Pan Wu, and Ding-Geng (Din) Chen (Eds.). Springer,
+141–167. https://doi.org/10.1007/978-3-319-41259-7_8
+[24] Niki Kilbertus, Mateo Rojas Carulla, Giambattista Parascandolo, Moritz Hardt,
+Dominik Janzing, and Bernhard Schölkopf. 2017. Avoiding Discrimination
+through Causal Reasoning. In Advances in Neural Information Processing Systems
+30 (Long Beach, CA) (NIPS 2017), I. Guyon, U. V. Luxburg, S. Bengio, H. Wallach,
+R. Fergus, S. Vishwanathan, and R. Garnett (Eds.). Curran Associates, Inc., 656–
+666. http://papers.nips.cc/paper/6668-avoiding-discrimination-through-causal-
+reasoning.pdf
+[25] Michael P. Kim, Amirata Ghorbani, and James Zou. 2019. Multiaccuracy: Black-
+Box Post-Processing for Fairness in Classification. In Proceedings of the 2019
+AAAI/ACM Conference on AI, Ethics, and Society (Honolulu, HI, USA) (AIES ’19).
+Association for Computing Machinery, New York, NY, USA, 247–254. https:
+//doi.org/10.1145/3306618.3314287
+[26] Jon Kleinberg, Sendhil Mullainathan, andManish Raghavan. 2017. Inherent Trade-
+Offs in the Fair Determination of Risk Scores. In 8th Innovations in Theoretical
+Computer Science Conference (ITCS 2017) (Leibniz International Proceedings in
+Informatics (LIPIcs), Vol. 67), Christos H. Papadimitriou (Ed.). Schloss Dagstuhl–
+Leibniz-Zentrum für Informatik, Dagstuhl, Germany, 43:1–43:23. http://doi.org/
+10.4230/LIPIcs.ITCS.2017.0
+[27] Matt J Kusner, Joshua Loftus, Chris Russell, and Ricardo Silva. 2017. Coun-
+terfactual Fairness. In Advances in Neural Information Processing Systems 30
+(NIPS 2017), I. Guyon, U. V. Luxburg, S. Bengio, H. Wallach, R. Fergus, S. Vish-
+wanathan, and R. Garnett (Eds.). Curran Associates, Inc., 4066–4076. http:
+//papers.nips.cc/paper/6995-counterfactual-fairness.pdf
+[28] Jeff Larson and Julia Angwin. 2016. Technical Response to Northpointe. ProP-
+ublica (July 2016). https://www.propublica.org/article/technical-response-to-
+northpointe
+[29] Jeff Larson, Surya Mattu, Lauren Kirchner, and Julia Angwin. 2016. How
+We Analayzed the COMPAS Recidivism Algorithm. ProPublica (May
+2016). https://www.propublica.org/article/how-we-analyzed-the-compas-
+recidivism-algorithm.
+[30] Anthony W. Lowenkamp, Flores Kristin, and Bechtel Christopher T. 2016.
+False Positives, False Negatives, and False Analyses: A Rejoinder to Machine
+Bias: There’s Software Used across the Country to Predict Future Crimi-
+nals. And It’s Biased against Blacks. Federal Probation 80, 2 (2016), 38–
+46. https://www.uscourts.gov/federal-probation-journal/2016/09/false-positives-
+false-negatives-and-false-analyses-rejoinder
+[31] Aditya Krishna Menon and Robert C Williamson. 2018. The cost of fairness in
+binary classification. In Proceedings of the 1st Conference on Fairness, Account-
+ability and Transparency (Proceedings of Machine Learning Research, Vol. 81),
+Sorelle A. Friedler and Christo Wilson (Eds.). PMLR, New York, NY, USA, 107–
+118. http://proceedings.mlr.press/v81/menon18a.html
+[32] Razieh Nabi, Daniel Malinsky, and Ilya Shpitser. 2019. Learning Optimal Fair
+Policies. In Proceedings of the 36th International Conference on Machine Learning
+(Proceedings of Machine Learning Research, Vol. 97), Kamalika Chaudhuri and
+Ruslan Salakhutdinov (Eds.). PMLR, 4674–4682. http://proceedings.mlr.press/
+v97/nabi19a.html
+[33] Razieh Nabi and Ilya Shpitser. 2018. Fair Inference on Outcomes. In Proceedings
+of the Thirty-Second AAAI Conference on Artificial Intelligence (New Orleans, LA).
+Association for the Advancement of Artificial Intelligence, 1931–1940. https:
+//aaai.org/ocs/index.php/AAAI/AAAI18/paper/view/16683
+[34] Harikrishna Narasimhan. 2018. Learning with Complex Loss Functions and
+Constraints. In Proceedings of the Twenty-First International Conference on Ar-
+tificial Intelligence and Statistics (Proceedings of Machine Learning Research,
+Vol. 84), Amos Storkey and Fernando Perez-Cruz (Eds.). PMLR, 1646–1654.
+http://proceedings.mlr.press/v84/narasimhan18a.html
+[35] Jerzy Neyman. 1923. Justification of applications of the calculus of probabilities
+to the solutions of certain questions in agricultural experimentation. Excerpts
+English translation (Reprinted). Statist. Sci. 5 (1923), 463–472.
+[36] Ziad Obermeyer, Brian Powers, Christine Vogeli, and Sendhil Mullainathan. 2019.
+Dissecting racial bias in an algorithm used to manage the health of populations.
+Science 366, 6464 (Oct. 2019), 447–453. https://doi.org/10.1126/science.aax2342
+[37] Lisa Rice and Deidre Swesnik. 2012. Discriminatory Effects of Credit Scoring on
+Communities of Color. Suffolk University Law Review 46 (2012), 935.
+[38] James Robins, Lingling Li, Eric Tchetgen, and Aad van der Vaart. 2008. Higher
+order influence functions and minimax estimation of nonlinear functionals. In
+Probability and Statistics: Essays in Honor of David A. Freedman, Deborah Nolan
+and Terry Speed (Eds.). Institute of Mathematical Statistics, Beachwood, Ohio,
+USA, 335–421. https://doi.org/10.1214/193940307000000527
+[39] Donald B Rubin. 2005. Causal Inference Using Potential Outcomes: Design,
+Modeling, Decisions. J. Amer. Statist. Assoc. 100, 469 (March 2005), 322–331.
+https://doi.org/10.1198/016214504000001880
+396
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Alan Mishler, Edward H. Kennedy, and Alexandra Chouldechova
+[40] Megan Stevenson. 2018. Assessing Risk Assessment in Action. Minnesota Law
+Review 103, 1 (2018), 83. https://dx.doi.org/10.2139/ssrn.3016088
+[41] Anastasios A. Tsiatis. 2006. Semiparametric Theory and Missing Data. Springer,
+New York, NY. https://doi.org/10.1007/978-0-387-98135-2
+[42] Mark J. van der Laan and James M. Robins. 2003. Unified Methods for Censored
+Longitudinal Data and Causality. Springer, New York, NY. https://doi.org/10.
+1007/978-0-387-21700-0
+[43] Aad van der Vaart. 2002. Semiparametric Statistics. In Lectures on probability
+theory and statistics (Lecture notes in mathematics, 1781), Pierre Bernard (Ed.).
+Springer, Berlin. https://doi.org/10.1007/b93152
+[44] Tyler J. VanderWeele andWhitney R. Robinson. 2014. On the causal interpretation
+of race in regressions adjusting for confounding and mediating variables. Epi-
+demiology 25, 4 (2014), 473–484. https://doi.org/10.1097/EDE.0000000000000105
+[45] Yixin Wang, Dhanya Sridhar, and David M. Blei. 2019. Equal Opportunity and
+Affirmative Action via Counterfactual Predictions. (2019). arXiv:1905.10870
+http://arxiv.org/abs/1905.10870
+[46] Blake Woodworth, Suriya Gunasekar, Mesrob I. Ohannessian, and Nathan Srebro.
+2017. Learning Non-Discriminatory Predictors. In Proceedings of the 2017 Con-
+ference on Learning Theory (Proceedings of Machine Learning Research, Vol. 65),
+Satyen Kale and Ohad Shamir (Eds.). PMLR, Amsterdam, Netherlands, 1920–1953.
+http://proceedings.mlr.press/v65/woodworth17a.html
+[47] Muhammad Bilal Zafar, Isabel Valera, Manuel Gomez Rodriguez, and Krishna P.
+Gummadi. 2017. Fairness Beyond Disparate Treatment & Disparate Impact:
+Learning Classification without Disparate Mistreatment. In Proceedings of the
+26th International Conference on World Wide Web (Perth, Australia) (WWW ’17).
+International World Wide Web Conferences Steering Committee, Republic and
+Canton of Geneva, CHE, 1171–1180. https://doi.org/10.1145/3038912.3052660
+[48] Junzhe Zhang and Elias Bareinboim. 2018. Fairness in Decision-Making – The
+Causal Explanation Formula. In Proceedings of the Thirty-Second AAAI Conference
+on Artificial Intelligence (New Orleans, LA, 2018). Association for the Advance-
+ment of Artificial Intelligence, 2037–2045. https://www.aaai.org/ocs/index.php/
+AAAI/AAAI18/paper/view/16949/15911
+[49] Wenjing Zheng and van der Laan, Mark. 2010. Asymptotic Theory for Cross-
+validated Targeted Maximum Likelihood Estimation. U.C. Berkeley Division of
+Biostatistics Working Paper Series Working Paper 273 (2010). https://biostats.
+bepress.com/ucbbiostat/paper273/
+A PROOFS OF PROPOSITIONS
+For convenience, we restate our three assumptions.
+1. (Consistency) 𝑌 = 𝐷𝑌 1 + (1 − 𝐷)𝑌 0
+2. (Positivity) ∃𝛿 ∈ (0, 1) : P(𝜋 (𝐴,𝑋, 𝑆) ≤ 1 − 𝛿) = 1
+3. (Ignorability) 𝑌 0 ⊥ 𝐷 | 𝐴,𝑋, 𝑆
+Proof of Proposition 1 (Identification of error
+rates for input predictor 𝑆)
+cFPR(𝑆, 𝑎) = P(𝑆 = 1 | 𝑌 0 = 0, 𝐴 = 𝑎)
+=
+P(𝑆 = 1, 𝑌 0 = 0, 𝐴 = 𝑎)
+P(𝑌 0 = 0, 𝐴 = 𝑎)
+=
+E[𝑆 (1 − 𝑌 0)1{𝐴 = 𝑎}]
+E[(1 − 𝑌 0)1{𝐴 = 𝑎}]
+=
+E[𝑆 (1 − E[𝑌 0 | 𝐴,𝑋, 𝑆, 𝐷 = 0)]1{𝐴 = 𝑎}
+E[(1 − E[𝑌 0 | 𝐴,𝑋, 𝑆, 𝐷 = 0])1{𝐴 = 𝑎}]
+=
+E[𝑆 (1 − `0)1{𝐴 = 𝑎}]
+E[(1 − `0)1{𝐴 = 𝑎}]
+cFNR(𝑆, 𝑎) = P(𝑆 = 0 | 𝑌 0 = 1, 𝐴 = 𝑎)
+=
+P(𝑆 = 0, 𝑌 0 = 1, 𝐴 = 𝑎)
+P(𝑌 0 = 1, 𝐴 = 𝑎)
+=
+E[(1 − 𝑆)𝑌 01{𝐴 = 𝑎}]
+E[𝑌 01{𝐴 = 𝑎}]
+=
+E[(1 − 𝑆)E[𝑌 0 | 𝐴,𝑋, 𝑆, 𝐷 = 0]1{𝐴 = 𝑎}
+E[E[𝑌 0 | 𝐴,𝑋, 𝑆, 𝐷 = 0]1{𝐴 = 𝑎}]
+=
+E[(1 − 𝑆)`01{𝐴 = 𝑎}]
+E[`01{𝐴 = 𝑎}]
+The fourth equality in both derivations uses positivity and ignora-
+bility, and the fifth equality uses consistency.
+Proof of Proposition 2 (Identification of the loss
+and fairness constraints)
+Considering just the first component of the loss, we have:
+(𝑤+)P(𝑆\ = 1, 𝑌 0 = 0) = (𝑤+)E[𝑆\ (1 − 𝑌 0)]
+= (𝑤+)E[E[𝑆\ (1 − 𝑌 0) |𝐴, 𝑆, 𝑋 ]]
+= (𝑤+)E
+{
+E[𝑆\ |𝐴, 𝑆] (1 − E[𝑌 0 |𝐴,𝑋, 𝑆])
+}
+= (𝑤+)E
+{
+\𝐴,𝑆 (1 − E[𝑌 0 |𝐴,𝑋, 𝑆, 𝐷 = 0])
+}
+= (𝑤+)E
+{
+\𝐴,𝑆 (1 − `0)
+}
+where the third equality uses that 𝑆\ only depends on (𝐴, 𝑆), the
+fourth uses the definition of \𝐴,𝑆 and ignorability, and the sixth
+uses consistency. Similar reasoning shows that (𝑤−)P(𝑆 = 0, 𝑌 0 =
+1) = (𝑤−)E
+{
+(1 − \𝐴,𝑆 )`0
+}
+. Combining these, we have
+L(𝑆\ ) : = 𝑤+P(𝑆 = 1, 𝑌 0 = 0) +𝑤−P(𝑆 = 0, 𝑌 0 = 1)
+= E[\𝐴,𝑆 (𝑤+ − (𝑤+ +𝑤−)`0)] + (𝑤−)E[`0]
+= \𝑇 𝛽 + (𝑤−)E[`0]
+We turn now to the fairness constraints. The error rates of the
+derived predictor 𝑆\ depend on the error rates on the input predictor
+𝑆 as follows. Beginning with cFPR(𝑆\ , 𝑎), we have:
+P(𝑆\ = 1 | 𝑌 0 = 0, 𝐴 = 𝑎) =∑
+𝑠∈{0,1}
+P(𝑆\ = 1 | 𝑌 0 = 0, 𝐴 = 𝑎, 𝑆 = 𝑠)P(𝑆 = 𝑠 | 𝑌 0 = 0, 𝐴 = 𝑎)
+=
+∑
+𝑠∈{0,1}
+P(𝑆\ = 1 | 𝐴 = 𝑎, 𝑆 = 𝑠)P(𝑆 = 𝑠 | 𝑌 0 = 0, 𝐴 = 𝑎)
+= \𝑎,0 (1 − cFPR(𝑆, 𝑎)) + \𝑎,1 cFPR(𝑆, 𝑎)
+where the first equality simply involves conditioning on 𝑆 , and the
+second equality uses that 𝑆\ ⊥ 𝑌 0 | 𝐴, 𝑆 . In other words, the false
+positive rate of 𝑆\ depends only on \ and the false positive rate of
+the input predictor 𝑆 . For the cFNR, by similar reasoning, we have:
+P(𝑆\ = 0 | 𝑌 0 = 1, 𝐴 = 𝑎) =
+1 − \𝑎,0 (cFNR(𝑆, 𝑎)) + \𝑎,1 (cFNR(𝑆, 𝑎) − 1)
+The identification statements in the proposition follow by sim-
+ply substituting in the expressions for cFPR(𝑆, 𝑎), cFNR(𝑆, 𝑎) from
+Proposition 1 and rearranging.
+397
+Fairness in Risk Assessment Instruments: Post-Processing to Achieve Counterfactual Equalized Odds FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+B PROOFS OF THEOREMS
+We first introduce two lemmas used in the proofs of the theorems.
+The first lemma gives sufficient conditions under which the opti-
+mal value of an estimated convex problem converges at a particular
+rate 𝑓 (𝑛) to the optimal value of the target convex program. It is a
+adaptation of Theorem 3.5 in Shapiro (1991) that follows immedi-
+ately from Theorems 2.1 and 3.4 in that same paper.
+Lemma 1. (Shapiro, 1991) Let Θ be a compact subset of R𝑘 . Let
+𝐶 (Θ) denote the set of continuous real-valued functions on Θ, with
+ℒ = 𝐶 (Θ) × . . . ×𝐶 (Θ) the 𝑟 -dimensional Cartesian product. Let
+𝜓 (\ ) = (𝜓0, . . . ,𝜓𝑟 ) ∈ ℒ be a vector of convex functions. Consider
+the quantity 𝛼∗ defined as the solution to the following convex
+optimization program:
+𝛼∗ = min
+\ ∈Θ
+𝜓0 (\ )
+subject to𝜓 𝑗 (\ ) ≤ 0, 𝑗 = 1, . . . , 𝑟
+Assume that Slater’s condition holds, so that there is some \ ∈ Θ
+for which the inequalities are satisfied and non-affine inequalities
+are strictly satisfied, i.e.𝜓 𝑗 (\ ) < 0 if𝜓 𝑗 is non-affine. Now consider
+a sequence of approximating programs, for 𝑛 = 1, 2, . . .:
+𝛼𝑛 = min
+\ ∈Θ
+𝜓0𝑛 (\ )
+subject to𝜓 𝑗𝑛 (\ ) ≤ 0, 𝑗 = 1, . . . , 𝑟
+with 𝜓𝑛 (\ ) :=
+(
+𝜓0𝑛, . . . ,𝜓𝑟𝑛
+)
+∈ ℒ. Assume that 𝑓 (𝑛) (𝜓𝑛 − 𝜓 )
+converges in distribution to a random element𝑊 ∈ ℒ for some
+real-valued function 𝑓 (𝑛). Then:
+𝑓 (𝑛) (𝛼𝑛 − 𝛼0) ⇝ 𝐿
+for a particular randomvariable𝐿. It follows that𝛼𝑛−𝛼0 = 𝑂P (1/𝑓 (𝑛)).
+Lemma 2. Let b,𝑊 be constant vectors and b̂𝑛,𝑊𝑛 be random
+variables, with b − b̂𝑛 = 𝑂P (1/𝑓 (𝑛)) for some real-valued 𝑓 (𝑛). If,
+for all 𝑀 > 0, P(∥𝑊 −𝑊𝑛 ∥ > 𝑀) ≤ P(∥b − b̂𝑛 ∥ > 𝐶𝑀) for some
+constant 𝐶 , then𝑊 −𝑊𝑛 = 𝑂P (1/𝑓 (𝑛)).
+Proof. For any 𝜖 > 0, there exists some 𝑀𝜖 > 0 such that
+P(𝑓 (𝑛)∥b − b̂𝑛 ∥ > 𝑀𝜖 ) < 𝜖 for all 𝑛 large enough. Set 𝑀 = 𝑀𝜖/𝐶 .
+Then P(𝑓 (𝑛)∥𝑊 −𝑊𝑛 ∥ > 𝑀) < 𝜖 for all 𝑛 large enough. □
+B.1 Theorem 1 (loss gap)
+We expand the loss by introducing the term 𝛽𝑇 \̂ , which is the
+quantity that is minimized in the course of computing \̂ . We proceed
+by splitting the loss into two terms and showing that each of those
+terms is 𝑂P (1/𝑓 (𝑛)).
+Proof. The loss gap can be expanded as follows:
+L(𝑆
+\̂
+) − L(𝑆\ ∗ ) = 𝛽𝑇 \̂ − 𝛽𝑇 \∗
+=
+(
+𝛽𝑇 \̂ − 𝛽𝑇 \̂
+)
+︸          ︷︷          ︸
+(1)
++
+(
+𝛽𝑇 \̂ − 𝛽𝑇 \∗
+)
+︸           ︷︷           ︸
+(2)
+For term (1), we have
+\̂𝑇
+(
+𝛽 − 𝛽
+)
+≤ ∥\̂ ∥∥𝛽 − 𝛽 ∥
+≤ 2∥𝛽 − 𝛽 ∥
+= 𝑂P (1/𝑓 (𝑛))
+where the first line uses Cauchy-Schwarz, the second line follows
+from the fact that \̂ ∈ [0, 1]4, and the third line follows by as-
+sumption. For term (2), we rely on Lemma 1. Note that we can
+write
+L(𝑆\ ∗ ) = min
+\ ∈Θ
+𝜓0 (\ )
+subject to𝜓 𝑗 (\ ) ≤ 0, 𝑗 = 1, . . . , 𝑟
+L̂(𝑆
+\̂
+) = min
+\ ∈Θ
+𝜓0 (\ )
+subject to𝜓 𝑗 (\ ) ≤ 0, 𝑗 = 1, . . . , 𝑟
+with Θ = [0, 1]4, and
+𝜓 (\ ) = (L, Δ+ − 𝜖+, −Δ+ − 𝜖+, Δ− − 𝜖−, −Δ− − 𝜖−)
+𝜓 (\ ) = (L̂, Δ̂+ − 𝜖+, −Δ̂+ − 𝜖+, Δ̂− − 𝜖−, −Δ̂− − 𝜖−)
+where for brevity we omit the argument 𝑆\ to the loss L and the er-
+ror rate differences Δ+,Δ−
+. Since these are linear programs, Slater’s
+condition is satisfied. (We assume the LPs are feasible.) By assump-
+tion, each of the estimators in 𝜓 (\ ) converges at rate 𝑓 (𝑛), so
+𝑓 (𝑛)
+(
+𝜓 (\ ) −𝜓 (\ )
+)
+converges to some (unknown) random variable.
+(We rule out pathological cases in which this does not happen.) Per
+Lemma 1, it follows that 𝛽𝑇 \̂−𝛽𝑇 \∗ = L̂(𝑆
+\̂
+)−L(𝑆\ ∗ ) = 𝑂P (1/
+√
+𝑛).
+The sum of the two terms in the loss gap is therefore also
+𝑂P (1/
+√
+𝑛). □
+B.2 Theorem 2 (excess unfairness)
+The proof relies on Lemma 2 and the convergence of the estimated
+LP coefficient vectors 𝛽+, 𝛽−
+. When 𝛽+, 𝛽−
+are close to 𝛽+, 𝛽−
+, the
+excess unfairness must be small for any \ ∈ Θ = [0, 1]4, including
+of course \̂ .
+Proof. We have
+P
+(
+UF
++ (𝑆
+\̂
+) > 𝛿 or UF
+− (𝑆
+\̂
+) > 𝛿
+)
+≤ P
+(
+|\𝑇 𝛽+ | − |\𝑇 𝛽+ | > 𝛿 or |\𝑇 𝛽− | − |\𝑇 𝛽− | > 𝛿
+for some \ ∈ [0, 1]4
+)
+≤ P
+(
+|\𝑇 𝛽+ − \𝑇 𝛽+ | > 𝛿 or |\𝑇 𝛽− − \𝑇 𝛽− | > 𝛿
+for some \ ∈ [0, 1]4
+)
+≤ P
+(
+∥\ ∥ · ∥𝛽+ − 𝛽+∥ > 𝛿 or ∥\ ∥ · ∥𝛽− − 𝛽−∥ > 𝛿
+for some \ ∈ [0, 1]4
+)
+398
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Alan Mishler, Edward H. Kennedy, and Alexandra Chouldechova
+≤ P
+(
+2∥𝛽+ − 𝛽+∥ > 𝛿 or 2∥𝛽− − 𝛽−∥ > 𝛿
+)
+≤ P
+(
+2∥𝛽+ − 𝛽+∥ > 𝛿
+)
++ P
+(
+2∥𝛽− − 𝛽−∥ > 𝛿
+)
+= P
+(
+∥𝛽+ − 𝛽+∥ > 𝛿/2
+)
++ P
+(
+∥𝛽− − 𝛽−∥ > 𝛿/2
+)
+where the third inequality uses Cauchy-Schwartz, the fourth uses
+that \ ∈ [0, 1]4 =⇒ ∥\ ∥ ≤ 2, and the fifth uses the union bound.
+(The norm here is the Euclidean norm.) The reasoning in the first
+inequality is as follows: if UF
++ (𝑆
+\̂
+) > 𝛿 , then |\̂𝑇 𝛽+ | − |\̂𝑇 𝛽+ | > 𝛿 ,
+since \̂𝑇 𝛽+ ≤ 𝜖+ by construction. A necessary condition, then, is
+that |\𝑇 𝛽+ | − |\𝑇 𝛽+ | > 𝛿 for some \ ∈ [0, 1]4.
+It follows from Lemma 2 that
+max
+{
+UF
++ (𝑆
+\̂
+),UF− (𝑆
+\̂
+)
+}
+= 𝑂P (1/𝑓 (𝑛))
+□
+C SAMPLE SPLITTING
+A training sample, Dtrain, is used to estimate \̂ , while a separate
+sample Dtest is used to estimate the risk and fairness properties
+of the derived predictor 𝑆
+\̂
+conditional on \̂ . Within each sample,
+separate folds are used to estimate the nuisance parameters `0 and
+𝜋 and the target parameters.
+The following schematic illustrates this procedure. 𝑘-fold cross
+fitting can be used within each sample to recover full sample size
+efficiency. For convenience, we assume that each of the four samples
+is of size 𝑛, though our results require only that each sample is𝑂 (𝑛).
+Dtrain
+Dnuis
+train
+Dtarget
+train︸            ︷︷            ︸̂̀0, 𝜋 ︸            ︷︷            ︸
+\̂
+Dtest
+Dnuis
+test
+Dtarget
+test︸            ︷︷            ︸̂̀0, 𝜋 ︸            ︷︷            ︸
+Properties of 𝑆
+\̂
+D SIMULATIONS: DATA GENERATING
+PROCESS
+The data generating process used in section 6.1.2 to illustrate Theo-
+rems 1 and 2 is as follows, for data 𝑍 = (𝐴,𝑋, 𝑆, 𝐷,𝑌 0, 𝑌 1, 𝑌 ).
+P(𝐴 = 1) = 0.3
+𝑋 | 𝐴 ∼ N(𝐴 ∗ (1,−0.8, 4, 2)𝑇 , 𝐼4)
+Ppre (𝐷 = 1 | 𝐴,𝑋 ) = min{0.975, expit((𝐴,𝑋 )𝑇 (0.2,−1, 1,−1, 1))}
+Ppost (𝐷 = 1 | 𝐴,𝑋, 𝑆) = min{0.975, expit((𝐴,𝑋, 𝑆)𝑇 (0.2,−1, 1,−1, 1, 1))}
+P(𝑌 0 = 1 | 𝐴,𝑋 ) = expit((𝐴,𝑋 )𝑇 (−5, 2,−3, 4,−5))
+P(𝑌 1 = 1 | 𝐴,𝑋 ) = expit((𝐴,𝑋 )𝑇 (1,−2, 3,−4, 5))
+𝑌 = (1 −𝐴)𝑌 0 +𝐴𝑌 1
+where 𝐼4 denotes the 4×4 identity matrix and N denotes a Gaussian
+distribution. The predictor 𝑆 (𝐴,𝑋 ) is trained using random forests.
+The pre-RAI decision making process doesn’t depend on 𝑆 ; the
+post-RAI process does.
+For the simulations used in section 6.1.3 to illustrate fairness-
+performance tradeoffs, the distribution is identical except that
+P(𝑌 0 = 1 | 𝐴,𝑋 ) = expit((𝐴,𝑋 )𝑇 (−4, 0.4, 0.6, 0.8,−1)).
+E ESTIMATING PREDICTIVE CHANGE
+The predictive change P(𝑆
+\̂
+≠ 𝑆), which is referred to in section
+6.2, represents the proportion of input predictions that the post-
+processed predictor 𝑆
+\̂
+flips. It can be estimated as follows:
+P̂(𝑆
+\̂
+≠ 𝑆) = P𝑛
+{
+P
+(
+𝑆
+\̂
+≠ 𝑆 |𝐴, 𝑆
+)}
+=
+P𝑛
+
+∑
+𝑎∈{0,1}
+[
+\𝑎,01{𝐴 = 𝑎, 𝑆 = 0} + (1 − \𝑎,1)1{𝐴 = 𝑎, 𝑆 = 1}
+]
+Since this is a sample average, confidence intervals can be derived
+via the central limit theorem.
+F NOTATION
+399
+Fairness in Risk Assessment Instruments: Post-Processing to Achieve Counterfactual Equalized Odds FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Input data
+𝑍 = (𝐴,𝑋, 𝐷, 𝑆, 𝑌 ) ∼ P Sensitive feature 𝐴, covariates 𝑋 , decision (treatment, interven-
+tion) 𝐷 , input predictor 𝑆 , outcome 𝑌
+Derived predictor
+𝑆\ ∼ Bern(\𝐴,𝑆 ) Predictor derived from 𝑆
+\𝑎,𝑠 = P(𝑆\ = 1 | 𝐴 = 𝑎, 𝑆 = 𝑠) Conditional probability that defines 𝑆\
+\𝐴,𝑆 =
+∑
+𝑎,𝑠∈{0,1} 1{𝐴 = 𝑎, 𝑆 = 𝑠}\𝑎,𝑠 RV that takes value \𝑎,𝑠 with probability P(𝐴 = 𝑎, 𝑆 = 𝑠)
+\ = (\0,0, \0,1, \1,0, \1,1)𝑇 Optimization parameter
+\̃ = (0, 1, 0, 1) The value such that 𝑆
+\̃
+= 𝑆
+Nuisance parameters
+𝜋 = 𝜋 (𝐴,𝑋, 𝑆) = P(𝐷 = 1 | 𝐴,𝑋, 𝑆) Propensity score for the decision
+`0 = `0 (𝐴,𝑋, 𝑆, 𝐷) = E[𝑌 | 𝐴,𝑋, 𝑆, 𝐷 = 0] Outcome regression
+𝜙 = 1−𝐷
+1−𝜋 (𝑌 − `0) + `0 Uncentered influence function for 𝐸 [𝑌 0]
+Loss parameters
+𝑤+,𝑤−
+Weights on the false positive and false negative rates
+𝛽𝑎,𝑠 = E[1{𝐴 = 𝑎, 𝑆 = 𝑠}(𝑤+ − (𝑤+ +𝑤−)`0)] A coefficient in the loss, for 𝑎, 𝑠 ∈ {0, 1}
+𝛽 = (𝛽0,0, 𝛽0,1, 𝛽1,0, 𝛽1,1)𝑇 Vector of loss coefficients
+L(𝑆\ ) = 𝑤+P(𝑆\ = 1, 𝑌 0 = 0) +𝑤−P(𝑆\ = 0, 𝑌 0 = 1) Loss of 𝑆\ , equivalent to \
+𝑇 𝛽 +𝑤−E[`0]
+Γ(𝑆\ ) loss change L(𝑆\ ) − L(𝑆)
+Fairness parameters
+cFPR(𝑆\ , 𝑎) = P(𝑆\ = 1 | 𝑌 0 = 0, 𝐴 = 𝑎) Counterfactual FPR for 𝑆\ for group 𝑎
+cFNR(𝑆\ , 𝑎) = P(𝑆\ = 0 | 𝑌 0 = 1, 𝐴 = 𝑎) Counterfactual FNR for 𝑆\ for group 𝑎
+𝛽+ = (1 − cFPR(𝑆, 0), cFPR(𝑆, 0), cFPR(𝑆, 1) − 1, − cFPR(𝑆, 1))
+Coefficients defining the fairness constraints
+𝛽− = (− cFNR(𝑆, 0), cFNR(𝑆, 0)−1, 𝑐𝐹𝑁𝑅(𝑆, 1), 1−cFNR(𝑆, 1))
+Δ+ (𝑆\ ) = \𝑇 𝛽+ = cFPR(𝑆\ , 0) − cFPR(𝑆\ , 1) Error rate differences of the predictor 𝑆\ in the cFPR
+Δ− (𝑆\ ) = \𝑇 𝛽− = cFNR(𝑆\ , 0) − cFNR(𝑆\ ) Error rate differences of the predictor 𝑆\ in the cFNR
+𝜖+, 𝜖− Fairness constraints on Δ+
+and Δ−
+UF
++ (𝑆\ ) = max( | Δ+ (𝑆\ ) | −𝜖+, 0) Excess unfairness in the cFPR
+UF
+− (𝑆\ ) = max( | Δ− (𝑆\ ) | −𝜖−, 0) Excess unfairness in the cFNR
+Optimal fair derived predictor
+argmin\ L(𝑆\ ) s.t. |Δ+ (𝑆\ ) | ≤ 𝜖+, |Δ− (𝑆\ ) | ≤ 𝜖− Parameter defining the optimal fair derived predictor 𝑆\ ∗
+400

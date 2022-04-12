@@ -1,0 +1,1076 @@
+One Label, One Billion Faces: Usage and Consistency of Racial
+Categories in Computer Vision
+Zaid Khan
+Northeastern University
+khan.za@northeastern.edu
+Yun Fu
+Northeastern University
+yun.fu@ece.neu.edu
+ABSTRACT
+Computer vision is widely deployed, has highly visible, society-
+altering applications, and documented problems with bias and rep-
+resentation. Datasets are critical for benchmarking progress in fair
+computer vision, and often employ broad racial categories as popu-
+lation groups for measuring group fairness. Similarly, diversity is
+often measured in computer vision datasets by ascribing and count-
+ing categorical race labels. However, racial categories are ill-defined,
+unstable temporally and geographically, and have a problematic
+history of scientific use. Although the racial categories used across
+datasets are superficially similar, the complexity of human race
+perception suggests the racial system encoded by one dataset may
+be substantially inconsistent with another. Using the insight that
+a classifier can learn the racial system encoded by a dataset, we
+conduct an empirical study of computer vision datasets supplying
+categorical race labels for face images to determine the cross-dataset
+consistency and generalization of racial categories. We find that
+each dataset encodes a substantially unique racial system, despite
+nominally equivalent racial categories, and some racial categories
+are systemically less consistent than others across datasets. We
+find evidence that racial categories encode stereotypes, and exclude
+ethnic groups from categories on the basis of nonconformity to
+stereotypes. Representing a billion humans under one racial cat-
+egory may obscure disparities and create new ones by encoding
+stereotypes of racial systems. The difficulty of adequately convert-
+ing the abstract concept of race into a tool for measuring fairness
+underscores the need for a method more flexible and culturally
+aware than racial categories.
+CCS CONCEPTS
+• Social and professional topics → Race and ethnicity; • Com-
+puting methodologies→ Computer vision.
+KEYWORDS
+datasets, bias, fairness, faces, computer vision, race
+ACM Reference Format:
+Zaid Khan and Yun Fu. 2021. One Label, One Billion Faces: Usage and
+Consistency of Racial Categories in Computer Vision. In ACM Conference
+on Fairness, Accountability, and Transparency (FAccT ’21), March 3–10, 2021,
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than the
+author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or
+republish, to post on servers or to redistribute to lists, requires prior specific permission
+and/or a fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+© 2021 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+https://doi.org/10.1145/3442188.3445920
+Virtual Event, Canada. ACM, New York, NY, USA, 11 pages. https://doi.org/
+10.1145/3442188.3445920
+1 INTRODUCTION
+Datasets are a primary driver of progress in machine learning and
+computer vision, and each dataset reflects human values. Many of
+the most visible applications of computer vision require datasets
+consisting of human faces: face recognition[12], kinship[40], demo-
+graphic estimation [15], emotion recognition [50], and generative
+modeling [26]. The datasets driving face-centric computer vision
+often come with racial annotations of identity, expressed as a race
+category assigned to each face. Racial categories are also prevalent
+in the field of fair computer vision, which aims to increase the
+conformity of computer vision systems to human notions and ideas
+of fairness. However, little attention is given to the validity, con-
+struction, or stability of these categories despite their contentious
+origins and problematic history of scientific use.
+Although these categories are given equivalent names across
+datasets (e.g., Black, White, etc), how equivalent are they? If different
+datasets have substantially different concepts of race, progress in
+reducing bias against a group as measured on one dataset is unlikely
+to transfer to another. Extreme agreement between the datasets
+could be likewise troubling: race is an abstract, fuzzy notion, and
+highly consistent representations of a racial group across datasets
+could be indicative of stereotyping or reification of the physical
+characteristics of race. Our work is the first to empirically study
+category bias, consistency, and generalization in the context of
+racial categories and fair computer vision. Specifically, we quantify
+the degree to which fair computer vision datasets agree on what
+a racial category consists of, who belongs to it, how strongly they
+belong to it, and how consistent these categories are across datasets.
+It is tempting to believe fairness can be purely mathematical
+and independent of the categories used to construct groups, but
+measuring the fairness of systems in practice, or understanding the
+impact of computer vision in relation to the physical world, neces-
+sarily requires references to groups which exist in the real world,
+however loosely. Datasets attempt to encode these social groupings
+- commonly racial categories - through an assignment of racial la-
+bels to faces so that group fairness [48] can be measured. Group
+fairness aims to equalize a metric such as accuracy across groups
+defined by a protected characteristic, such as racial categories.
+Our work is related in spirit to Hanna et.al, [18] as well as Ben-
+thall andHaynes [5], who both critique the usage of racial categories
+from the perspective of critical race theory. We draw on Scheurman
+et.al’s [42] survey of identity classification schemes, definitions,
+and annotation methods in computer vision. Our work is heavily
+inspired by Torrallba and Efros [47], who similarly use an ensemble
+of classifiers to empirically study category bias and generalization
+587
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Zaid Khan and Yun Fu
+Lowest AgreementHighest Agreement Label
+Black
+Asian
+White
+South 
+Asian
+Figure 1: Classifiers trained on fair computer vision datasets agree strongly about the race of some individuals, while disagree-
+ing about others. Racial stereotypes can be seen in the patterns of agreement and disagreement. For example, classifiers were
+most likely to agree about the race of a individual labeled White by a dataset annotator if the individual was blond.
+in the context of general object detection and image classification
+datasets.
+We identify the emergence of a standard racial classification
+scheme, and use four fair computer vision datasets which imple-
+ment the scheme to study the consistency of the racial categories
+and the bias of fair computer vision datasets. We hand-collect an
+additional, small scale dataset to study how ethnic groups fit into
+the stereotypes of racial categories encoded into datasets. Our con-
+tributions can be summarized as follows:
+(1) We develop a method to empirically study the generalization
+and consistency of racial categories across datasets.
+(2) We quantify the generalization and consistency of the racial
+systems encoded in four commonly used fair CV datasets.
+(3) We study how strongly each racial category is represented
+by a stereotypical presentation unique to each dataset, and
+who those stereotypes include and exclude.
+(4) We determine the degree to which the racial systems in fair
+computer vision datasets are self-consistent.
+(5) We investigate how strongly individuals in biometric datasets
+are ascribed a racial category, and find systematic differences.
+Every facial image dataset that uses racial categories encodes
+a racial system - a set of rules and heuristics for assigning racial
+categories based on facial features. We use a classifier trained on the
+faces and racial labels in a dataset as an approximation of the racial
+system of the dataset. By training a classifier for each dataset, we ob-
+tain an ensemble of classifiers, each of which has learned the racial
+system of the dataset it was trained on. By asking each classifier in
+the ensemble to predict a racial category for the same face, the racial
+systems of each dataset can be directly interrogated and compared.
+We use such an ensemble as the basis for our experiments.
+The results are intriguing, and we argue that they show racial
+categories may simply be unreliable as indicators of identity. We
+find that some racial categories are much more consistently defined
+than others, and datasets seem to systematically encode stereotypes
+of racial categories. Our work also opens up concerns about the
+ability of these racial categories to represent the diversity of human
+faces.We show that some ethnic groups are excluded from the racial
+category that they "should" belong to given the straightforward
+interpretation of those racial categories. We critique and highlight
+further problems with racial categories in the context of cross-
+cultural validity and impact on ethnic minorities.
+2 RELATED LITERATURE
+2.1 Critical Appraisals of Race in ML
+Historically, the computer vision community has not engaged with
+critical perspectives on race, typically treating racial categories
+as commonsense concepts. Benthall and Haynes [5] highlight the
+instability of racial categories and argue that racial categories have
+been historically used for stigmatizing individuals, and using racial
+categories for fairness risks reifying those racial categories and
+reproducing inequity. In [18], Hanna, et.al call attention to the
+multidimensionality of race and the need to critically assess and
+justify the choice of racial categories and schemes. Monea [33]
+catalogues racially problematic incidents in computer vision history
+and highlights the hypervisbility and reliance on skin color in racial
+classification schemes.
+2.2 Dataset Audits
+The literature on dataset bias reveals problems endemic to machine
+learning as a whole, which are only magnified by the complexities
+of racial identity. Our approach and exposition is heavily inspired
+by [47], who used an ensemble of classifiers to study dataset bias
+and cross-dataset generalization in commonly used datasets for
+object detection and classification, noting substantial differences in
+the representation of nominally similar categories across datasets.
+We draw on the survey of computer vision datasets in [42], who
+enumerate the diverse and ill-defined array of racial classification
+schemes and definitions in computer vision datasets. Geiger et.al
+[16] find significant variability in the quality of human annotations
+in a case study of papers on tweet classification.
+2.3 Racial Classification, Ancestry, Genetics
+Recent advances in population genetics have allowed researchers
+to interrogate the validity of race from the perspective of genetics
+and ethnicity. The science of ancient DNA has shown that most
+modern day human populations are relatively recent mixtures of
+588
+One Label, One Billion Faces: Usage and Consistency of Racial Categories in Computer Vision FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+more ancient populations [30] who do not fit into modern day
+racial categories. In addition, contemporary human populations
+have been shaped by repeated admixture events [21] resulting in
+large-scale gene flow between populations widely separated by
+geography. Although there are geographically structured difference
+in genes and correlations between traditional concepts of race and
+geography, there is substantial genetic overlap between traditional
+racial groups [25], invalidating the treatment of races as discrete,
+disjoint groups.
+2.4 Soft Biometrics
+The field of soft biometrics encompasses notions of identity and
+traits which are not unique to an individual, but carry information
+meaningful to society for identification. Canonical examples of soft
+biometrics are kinship [40], age [8], gender [53], and demographic
+information [15]. The line of work most relevant to our work is
+coarse-grained demographic estimation, which aims to predict a
+broad racial category for a face. One of the primary challenges in
+soft biometrics is that observed traits may not reflect the ground
+truth of identity: for example, a person can look much younger than
+they are, or two individuals may look like sisters due to similarity
+in appearance.
+2.5 Cognitive & Social Perspectives
+Despite the treatment of race as a commonsense, natural kind, re-
+search has shown that specialized race perception is unlikely to be
+an evolved trait or a byproduct of reasoning about natural kinds
+[10]. Edgar et.al [13] demonstrate that race estimations in medical
+records are less consistent for some racial categories than others.
+Pirtle and Brown [29] draw attention to the mental health conse-
+quences of inconsistent racial identification on individuals, and
+pinpoint Hispanic and Indigenous Americans as two groups who
+are often perceived inconsistently relative to African and European
+Americans.
+2.6 Algorithmic Fairness & Datasets
+Group fairness [48] is one of the most easily understood formal
+notions of fairness, and maps neatly to legal notions of fairness by
+aiming to equalize a metric across groups, which are often defined
+by protected characteristics such as race. A vibrant ecosystem of
+datasets has sprung up to support evaluations of group fairness.
+Some of most prominent of these are datasets which supply cat-
+egorical race labels, such as FairFace [28], BFW [41], RFW [49],
+and LAOFIW [2] using compatible racial categories. Other datasets,
+such as PPB [7] and Diversity in Faces [32], use phenotype anno-
+tations in lieu of racial categories. Audits of algorithms, APIs, and
+software [39],[17],[27] have found statistically significant dispari-
+ties in performance across groups and have been critical to bringing
+racial disparities to light.
+3 RACIAL CATEGORIES
+3.1 Usage in Fair Computer Vision
+Racial categories are used without being defined or only loosely
+and nebulously defined [42] - researchers either take the existence
+and definitions of racial categories as a given that does not have
+to be justified, or adopt a "I know it when I see it" approach to
+racial categories. Given that the categories are allusions to both
+geographic origin and physical characteristics, it is understandable
+that deeper discussion of these categories is avoided because it veers
+into unpleasant territory. This leads to myriad systems of racial
+classifications and terminology - some of debatable coherence, such
+as grouping together "people with ancestral origins in Sub-Saharan
+Africa, India, Bangladesh, Bhutan, among others" [34], and others
+which could be considered offensive, such as "Mongoloid".
+Racial categories are used to define groups of interest in fair
+machine learning because these categories are believed to reflect
+social groups in the real world. While Benthall and Haynes [5]
+highlight issues with the usage of racial categories themselves -
+recommending their replacement - Hanna et.al [18] argue that
+racial categories cannot be ignored, as individuals are affected by
+the racial category others believe them to be.
+The construction of large-scale, fair computer vision datasets
+typically involves collecting a large number of face images, either
+from an established dataset or web scraping, and then ascribing
+a racial category to each of the collected faces. Scheurman et.al.,
+[42] detail the myriad racial categories and classification schemes
+used in computer vision, but we identify and focus on a commonly
+used set of racial categories: East Asian, South Asian, White, and
+Black. Occasionally, these categories are referred to by different
+names - (e.g., Indian instead of South Asian). These categories are
+partially based on US Census categories and visual distinctness of
+the categories [28] and believed to "encompass enough of the global
+population to be useful" [15].
+Crucially, the annotation processes for computer vision datasets
+largely involve a "moment of identification" by the annotators [42],
+in which the annotators ascribe a racial label onto an individual
+based on their physical characteristics. This is different from data
+collection regimes in other domains, where racial labels may be
+provided by individuals themselves. However, the annotation of
+observed race in computer vision datasets provides a unique oppor-
+tunity to study the social construction of race and race perception.
+3.2 Specific Problems with Racial Categories
+We identify four specific problems with the usage of racial cate-
+gories. First, racial categories are ill-defined, arbitrary and implicitly
+tied loosely to geographic origin. Second, given that racial cate-
+gories are implicitly references to geographic origin, their extremely
+broad, continent-spanning construction would result in individuals
+with drastically different appearances and ethnic identities being
+grouped incongruously into the same racial category if the racial
+categories were interpreted literally. Thus racial categories must be
+understood both as references to geographic origin as well as phys-
+ical characteristics. Third, racial categories conspicuously erase
+differences between ethnic groups and group billions of people into
+one category. Fourth, a system of identity in which a face is assigned
+a singular racial category is incapable of expressing a substantial
+proportion of human diversity and variation.
+3.2.1 Racial Categories Are Badly Defined. The Indian/South Asian
+category presents an excellent example of the pitfalls of racial
+categories. If the Indian category refers only to the country of
+India, it is obviously arbitrary - the borders of India represent the
+589
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Zaid Khan and Yun Fu
+partitioning of a colonial empire on political grounds. Therefore, it
+is reasonable to take the Indian category as representing the entirety
+of the Indian subcontinent, or South Asia. This presents another
+set of problems, as expanding the region we consider the "home" of
+a racial category also expands our borders, and introduces another,
+larger set of shared borders along which populations should be
+visually indistinguishable due to proximity, admixture, and shared
+culture.
+3.2.2 Naive Interpretations of Racial Categories Are Incongruous.
+Because racial categories are defined with respect to, and largely
+correspond with geographic regions, they include populations with
+a wide range of phenotypical variation, from those most steretotyp-
+ical of a racial category to racially ambiguous individuals or those
+who may appear to be of a different observed race altogether. As
+an example, the South Asian racial category should include popu-
+lations in Northeast India, who may exhibit traits which are more
+common in East Asia. However, including individuals which ap-
+pear East Asian in a racial category distinct from East Asian would
+violate the common, lay understanding of racial categories.
+3.2.3 Racial Categories Erase Ethnic Differences and Identity. Racial
+categories are continent-spanning groupings. Every racial category
+subsumes hundreds of ethnic groups with distinct languages, cul-
+tures, separation in space and time, and phenotypes. Ethnic groups
+even span racial lines [35] and racial categories can fractionalize
+ethnic groups, placing some members in one racial category, and
+others in a different category. Evaluations of fairness which only
+use racial categories cannot quantify bias against individual ethnic
+groups, and ascribing a privileged identity to a member of an un-
+derprivileged group could result in individual harm by algorithmic
+intervention.
+3.2.4 Racial Categories Aren’t Expressive Enough. The often em-
+ployed, standard set of racial categories (Asian, Black, White, South
+Asian) which we study in this paper is, at a glance, incapable of
+representing a substantial number of humans. It obviously excludes
+indigenous peoples of the Americas, and it is unclear where the
+hundreds of millions of people who live in the Near East, Middle
+East, or North Africa should be placed. One can consider extending
+the number of racial categories used, but racial categories will al-
+ways be incapable of expressing multiracial individuals, or racially
+ambiguous individuals. National origin or ethnic origin can be uti-
+lized, but the borders of countries are often the results of historical
+circumstance and don’t reflect differences in appearance, and many
+countries are not racially homogeneous.
+3.3 Reasons to Expect Inconsistency
+The four datasets we consider all have racial categories which are
+nominally equivalent: East Asian, South Asian, White, and Black.
+We chose to exclude datasets from our analysis that use obviously
+different racial categories , such as DemogPairs [24]. We expect
+to find inconsistency between these nominally equivalent racial
+categories for several reasons. First, despite the commonsense belief
+in racial categories, there are differences in how individuals perceive
+race. Second, the huge population size of racial categories means
+that samples in datasets drawn from the racial categories may
+represent drastically different faces due to the difference between
+sample size and population size.
+3.3.1 Inconsistent Human Race Perception. The self-identification
+of humans affects [14] [38] how they classify the race of others. In
+addition, human observers are notably less congruent when iden-
+tifying [22][29] faces from non-White or non-Black backgrounds.
+Telles [46] found that observers were more consistent when as-
+sessing the race of lighter-skinned individuals than darker skinned
+individuals. Taken together, these facts paint a picture of a hu-
+man annotator whose racial system for assigning race to a face
+depends substantially on the background of the annotator and is
+more variable for individuals with some characteristics than others.
+3.3.2 Large, Heterogeneous Populations. Even if all annotators had
+the same set of rules for mapping facial traits to racial categories,
+each dataset must represent racial categories consisting of several
+billion people with tens of thousands of faces. The small size of
+these samples relative to the heterogeneity, diversity, and size of
+populations being sampled implies that each dataset may contain
+faces drawn from parts of the population which were not sampled
+in other race datasets. Thus, even in the unlikely case that annota-
+tors subscribe to the same racial system, nominally similar racial
+categories may contain different faces.
+4 EXPERIMENTS
+Our approach is based heavily on Torralba and Efros [47], who use
+an ensemble of classifiers to study dataset bias by testing how well
+nominally equivalent categories generalize from one dataset to the
+next. We broadly follow Torralba and Efros’s approach, though we
+focus on consistency between classifiers as well as accuracy against
+the "true" labels of a dataset. The key insight of this approach
+is that a sufficiently powerful classifier trained on a dataset will
+capture the heuristics and rules used by the dataset creators or
+annotators to assign a class to an image, and these classifiers can
+then be compared to quantify the degree of difference between the
+classification systems in a dataset.
+In the first experiment, we train the ensemble of classifiers and
+measure cross dataset generalization. In the second experiment,
+we split each dataset into 3 equal-sized, disjoint subsets and train
+a new classifier on each disjoint part to gain insight into the self-
+consistency of each dataset and the effect of dataset size on the
+ability to represent a racial category. In the third experiment, we
+use the predictions from the classifier ensemble to investigate how
+strongly individuals with multiple pictures are associated to a racial
+category In the fourth we study category bias in datasets from a
+different perspective by using a dataset of ethnic groups to examine
+stereotypes learnt by the ensemble of classifiers.
+4.1 Preliminaries
+4.1.1 Datasets. We use four fair computer vision datasets: FairFace
+[28], BFW [41], RFW [49], and LAOFIW [2]. These datasets were
+chosen for several reasons. First, they encode nominally equivalent
+categories: White, Black, East Asian, and South Asian. Second,
+FairFace, BFW, and RFW are all built from widely used, large-scale
+computer vision datasets. FairFace is built from YFCC-100M, BFW
+is built from VGG2, and RFW from MSCeleb-1M. All four of the
+590
+One Label, One Billion Faces: Usage and Consistency of Racial Categories in Computer Vision FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Table 1: Cross-Dataset Generalization of Racial Categories
+Source Dataset Target Dataset Generalization
+Classifier Faces Identities BFW FairFace LAOFIW RFW Self Others Change
+BFW 20000 800 0.903 0.641 0.714 0.811 0.903 0.722 -20.0%
+FairFace 71781 71781 0.779 0.857 0.782 0.870 0.857 0.810 -5.48%
+LAOFIW 9906 9906 0.830 0.644 0.809 0.820 0.809 0.765 -5.44%
+RFW 40573 11400 0.895 0.748 0.781 0.930 0.930 0.808 -13.1%
+datasets have impacted the field of fair ML, either by their use as
+benchmarks, or by revealing new inequalities between populations.
+BFW and RFW are deep - they have multiple photos per individual,
+while FairFace and LAOFIW have only one photo per individual,
+except for incidental duplicates.
+Other datasets, such as DivFace [34] or DemogPairs [24], use
+custom, nominally incompatible racial categories and/or mix mul-
+tiple source datasets. Datasets like 10K US Adult Faces [4] have
+not been explicitly targeted towards the fair computer vision com-
+munity and contain image modifications which make them easily
+distinguishable. Finally, all of the selected datasets are large enough
+to support the training of a modern CNN for classification. This
+is not the case for some older datasets, which contain only a few
+hundred images.
+4.1.2 Classifier Ensemble. Our key insight is that an image-based
+classifier, if trained on the racial categories in a dataset, can learn the
+system of rules the annotators of the dataset used to assign a racial
+category to a face. By training multiplier classifiers - one for each
+dataset - we obtain an ensemble of classifiers, each having learned
+the racial system encoded by their source dataset. By comparing
+the predictions of these classifiers, we can quantify how different
+the racial system in each dataset is. We use a 50-layer ResNet[19], a
+commonly used backbone for deep vision tasks, as our base classifier.
+The ResNets use pretrained weights from ImageNet[11], and are
+implemented in PyTorch [37]. To set the learning rate, we use the
+one-cycle policy [43] using the implementation in [23].
+4.1.3 Preprocessing. Tomitigate spurious differences between datasets,
+we performed a standard preprocessing in face recognition [31] by
+aligning the faces in each dataset using the keypoints detected by an
+MTCCN [52] so the left eye lies at (0.35 ×𝑤, 0.35 ×ℎ), while simul-
+taneously rotating and rescaling the image to (𝑤 = 256, ℎ = 256) so
+that the eyes are level and the distance between the eyes is the same
+in all images, thus ensuring all images have the same dimensions,
+and contain faces of the same scale. FairFace separates the "Asian"
+category into "East Asian" and "Southeast Asian" - we combine this
+into one category.
+4.1.4 Metrics. To measure cross-dataset generalization, we use
+the standard notion of accuracy. To measure the consistency of
+predictions made by multiple classifiers, we use the Fleiss-^ score,
+a standard measure of inter-annotator agreement [3] applicable
+to multiple annotators. Conceptually, the Fleiss-^ score is amount
+of agreement between the annotators beyond that expected by
+chance. Interpretation of the Fleiss-^ score can be difficult in abso-
+lute terms, so we typically restrict ourselves to comparing Fleiss-^
+scores relative to one another.
+4.2 Cross-Dataset Generalization
+4.2.1 Setup. To understand how well the racial categories from
+one dataset generalize to another, we construct an ensemble of
+classifiers, C = {𝐶𝐵𝐹𝑊 ,𝐶𝐹𝑎𝑖𝑟𝐹𝑎𝑐𝑒 ,𝐶𝑅𝐹𝑊 ,𝐶𝐿𝐴𝑂𝐹𝐼𝑊 }. Each classi-
+fier is trained on a different source dataset, and all datasets use a
+common set of a racial categories:R = {Black,white, asian, indian},
+and each face in the dataset comes annotated with a racial category
+from R. Each classifier is trained to predict a racial category 𝑟 ∈ R,
+given a face. The training set is constructed for each classifier by
+using 80% of the faces in the source dataset of the classifier, and
+using the remaining 20% as a validation set. As a concrete example,
+the 𝐶𝐹𝑎𝑖𝑟𝐹𝑎𝑐𝑒 classifier would be trained using 80% of the faces in
+FairFace, thus learning the heuristics used by the dataset creators
+to assign a racial category to a face.
+The classifiers were trained with the standard categorical cross-
+entropy loss. Due to the usage of pretrained weights and a one-
+cycle learning rate policy [43], only a small number of iterations
+were sufficient for model convergence: 40 iterations for RFW and
+FairFace, and 25 for LAOFIW and BFW.
+4.2.2 Results. The results are reported in Table 1 as accuracy scores.
+All classifiers displayed similar generalization performance, sug-
+gesting that there is significant overlap and a core set of rules for
+assigning racial categories to a face that is shared among all datasets.
+Notably, final accuracy reached by each classifier on the validation
+set varies significantly, but the absolute difference between the
+generalization performance of different datasets is small. In some
+sense, the easiest racial rulesets were encoded by BFW and RFW,
+as the BFW and RFW classifiers showed the highest performance
+on their validation sets. This could be due to the fact that BFW and
+RFW contain multiple images per identity.
+4.2.3 Label Noise and Learning. We note that looking only at the
+accuracy of each classifier to conclude it has insufficiently learned
+the rules used by the annotators of the dataset is misleading. The
+classifier only has the cropped faces available, and cannot use con-
+textual information used by the annotator to make racial decisions.
+For example, research has shown that humans use cues like ed-
+ucation level to make determinations of race [46], which can be
+inferred from clothing or image context. In the context of the clas-
+sification problem faced by the model, these phenomena can be
+interpreted as label noise, and deep learning models are incredibly
+robust to noisy labels [51] and can learn meaningful rules even in
+591
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Zaid Khan and Yun Fu
+the presence of high label noise. Furthermore, it is possible that
+each dataset contains inconsistencies within itself. To give a con-
+crete example, the annotators may have assigned a racial label to
+a face, and then assigned a different racial label to an extremely
+similar face due to contextual information or human error. We turn
+next to an investigation of the self-consistency of each dataset.
+4.3 Self-Consistency
+The drop in cross-dataset generalization of racial categories can be
+explained by three reasons. First, different annotators may have
+conflicting racial systems - they have assigned different racial labels
+to similar faces, the classifiers have learnt that, and so the classifiers
+disagree. Second, the rules for assigning race to a face may not be
+covered by the training data of the classifier. In other words, the
+face is out of distribution [20], and the classifier has never seen
+a similar face. This is very likely to happen in the case of BFW,
+which contains only 800 different identities. Third, the rules for
+assigning racial categories to a face might simply be inconsistent or
+unlearnable, in which case the classifier would just be memorizing.
+The reasonably high generalization performance of each classifier
+indicates this is unlikely to be the case.We conduct an experiment to
+provide insight into whether racial systems encoded by the datasets
+are significantly different and conflicting, or whether the source of
+the conflict is differences in the data distributions of each dataset.
+4.3.1 Conflicting Racial Systems or Data Distributions? A face
+may be perceived as Asian by one person, but Indian by another.
+This would correspond to classifiers making conflicting predictions
+about an individuals race because the underlying datasets define
+race differently for that individual. In the second scenario, the indi-
+vidual the classifiers are asked to classify is not similar to any face
+present in the classifiers’ training datasets. This is possible because
+the datasets are sampling from populations consisting of billions
+of individuals, but are limited to a sample size multiple orders of
+magnitudes smaller than the population. As a result, it is possible
+that the classifiers only disagree because the underlying datasets do
+not contain any faces similar to the face being considered.
+4.3.2 Setup. To gain insight into whether we are seeing conflict-
+ing racial systems or the result of dataset size and facial distribu-
+tion differences, we devise the following experiment. We create
+a self-ensemble for each dataset by splitting each dataset into 3
+disjoint subsets, and training a classifier on each subset. BFW and
+RFW, contain multiple images per person and are split so that
+no person appears in multiple splits. Training protocols remain
+the same. We then evaluate the consistency of each self-ensemble
+against the ensemble of classifiers trained on the whole datasets
+C = {𝐶𝐵𝐹𝑊 ,𝐶𝐹𝑎𝑖𝑟𝐹𝑎𝑐𝑒 ,𝐶𝑅𝐹𝑊 ,𝐶𝐿𝐴𝑂𝐹𝐼𝑊 }.
+To evaluate the consistency of each self-ensemble, we predict a
+race label for each face in a target dataset using the self-ensemble.
+Because each self-ensemble contains 3 classifiers, each trained on a
+different subset of the source dataset, this results in 3 predictions for
+every face in the target dataset. We can then obtain the consistency
+of the self-ensemble predictions using the Fleiss-^ score measuring
+inter-annotator agreement. A similar procedure is followed for the
+mixed ensemble C trained on the whole datasets.
+4.3.3 Results. The results can be seen in Table 2. With the excep-
+tion of LAOFIW, the predictions of each self-ensemble are more con-
+sistent than the predictions of the mixed/whole ensemble C trained
+on the whole datasets in Section 4.2. Despite a significant drop in
+the training set size (-66%), the consistency of the self-ensembles on
+average is higher than the consistency of the mixed/whole ensem-
+bles. We interpret this as evidence that arbitrary subsets of each
+dataset (except LAOFIW), even if much smaller than the whole
+dataset, are large enough to encode generally consistent rules for
+assigning racial categories to faces, and suggests that we are seeing
+conflicts in rules for assigning racial labels to a face rather than
+disagreements caused by out of distribution problems.
+4.4 Distribution of Racial Disagreements
+The cross-dataset generalization and self-consistency experiments
+have shown that racial systems of datasets are self-consistent and in-
+consistency is caused by conflicting racial systems between datasets.
+However, the distribution of inconsistency is still unclear. Are some
+racial categories less consistent and stable across datasets than oth-
+ers, and if so, is the source of the inconsistency largely random
+variations, or it systematic? We can analyze this question using
+biometric datasets like BFW and RFW, which contain multiple pic-
+tures per individual. If inconsistency is random, we expect to see
+a large number of individuals who each have a small number of
+photos in which the classifier ensemble C disagrees about their
+race. If inconsistency is systematic, we expect to see a a substantial
+number of individuals who have a large number of photos in which
+the classifier ensemble C disagrees about their race.
+4.4.1 Setup. We use the BFW and RFW datasets, along with the
+classifier ensemble C = {𝐶𝐵𝐹𝑊 ,𝐶𝐹𝑎𝑖𝑟𝐹𝑎𝑐𝑒 ,𝐶𝑅𝐹𝑊 ,𝐶𝐿𝐴𝑂𝐹𝐼𝑊 }. We
+obtain a racial category prediction for each face in BFW and RFW.
+This results in 4 predictions for each image, as there are four classi-
+fiers in the classifier ensemble. We then calculate the label homo-
+geneity of each individual, which is the fraction of predictions in
+which the most frequently predicted racial category is present. For
+example, an individual with 25 photos would receive a total of 100
+predictions, 4 for each image. If the most frequently predicted label
+was white, and white was predicted 90 times, the label homogene-
+ity would be 90
+100 = 0.9. Simply put, label homogeneity is another
+number to describe how strongly the classifiers saw an individual
+as belonging to a racial category.
+4.4.2 Results. All racial categories, across both BFW and RFW had
+a substantial number of individuals with very high label homo-
+geneity, meaning the classifier ensemble strongly identified them
+with the racial category the annotators labeled them as (Figure 2).
+All racial categories also had a substantial number of individuals
+with low label homogeneity, indicating the classifiers systemati-
+cally disagreed on the race of the individual, and disagreements are
+not random. Label homogeneity was much higher for individuals
+labeled Black than individuals labeled White or South Asian. This
+is surprising, as there is no a priori reason to expect that identi-
+fication of a Black individual is easier than that of another racial
+category. We suspect that datasets either define Blackness very
+strictly, or have a narrow concept of being Black that is consistent
+across datasets.
+592
+One Label, One Billion Faces: Usage and Consistency of Racial Categories in Computer Vision FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Table 2: Self-consistency, reported as Fleiss-^ scores.
+Self-Ensemble Consistency Average Consistencies Percent Changes
+Target Dataset BFW FairFace LAOFIW RFW Whole/Mixed Self-Ensembles Consistency Train Set Size
+BFW - 0.7 0.626 0.823 0.673 0.716 +6.35% -66%
+FairFace 0.615 - 0.485 0.689 0.549 0.596 +8.62% -66%
+LAOFIW 0.754 0.819 - 0.754 0.709 0.776 +9.4% -66%
+RFW 0.774 0.828 0.636 - 0.727 0.746 +2.61% -66%
+South Asian
+Figure 2: Datasets agree strongly on who is Black, as seen by the large fraction of individuals labeled Black who have high
+homogeneity in their predicted labels. Compare to South Asian or White categories, in which a large fraction of individuals
+exhibit low homogeneity in their predicted labels, meaning classifiers often disagreed on their racial category.
+Table 3: Cross-Dataset Consistency of Racial Categories. Re-
+flecting Fig. 2, Black is the most consistently defined cate-
+gory across datasets. All numbers are Fleiss-^ scores.
+Racial Category BFW FairFace LAOFIW RFW Avg
+Black 0.79 0.67 0.76 0.9 0.78
+Asian 0.81 0.58 0.78 0.75 0.73
+White 0.54 0.44 0.75 0.73 0.615
+South Asian 0.73 0.6 0.62 0.63 0.645
+Gap 50% 52.3% 25.8% 42.0% 26.9%
+4.5 Consistency of Racial Categories
+To understand which racial categories are most stable and least
+stable across datasets, we measure the consistency of the classifier
+ensemble C = {𝐶𝐵𝐹𝑊 ,𝐶𝐹𝑎𝑖𝑟𝐹𝑎𝑐𝑒 ,𝐶𝑅𝐹𝑊 ,𝐶𝐿𝐴𝑂𝐹𝐼𝑊 } per racial cat-
+egory for each dataset. We use the Fleiss-^ score as the metric of
+consistency.
+4.5.1 Results. Themost stable and consistent category across datasets
+was Black as seen in Table 3. The least stable was White, followed
+closely by South Asian. In general, the Asian and Black categories
+were much more stable than the South Asian and White categories
+by a substantial margin. The faces in the Black category of RFW
+were the most consistently percieved with a Fleiss-^ = 0.9. The
+faces in the Asian category of BFW were second most consistently
+percieved, with a Fleiss-^ = 0.81. The faces in the White category
+of FairFace were the least consistently percieved, with a Fleiss-
+^ = 0.44, much lower than any other category in any dataset.
+4.6 Ethnicity and Stereotypes
+The previous experiments paint a picture in which some racial
+categories are much more consistent across datasets than others.
+593
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Zaid Khan and Yun Fu
+All the racial categories are equally ill-defined, so it is surprising
+that in practice, datasets are very consistent about who goes in the
+Black category or the Asian category relative to their inconsistency
+about the South Asian and White categories. We hypothesize that
+datasets simply include a more diverse set ofWhite and South Asian
+faces, compared to their limited conception of Asian and Black faces.
+To investigate this idea, we collect a dataset of ethnic groups. For
+each geographic region tied to a racial category, we select two
+ethnic groups originating from that geographic region, taking care
+to select groups which are significantly separated from each other
+by geography in the hope that this will maximize differences in
+phenotypic traits.
+4.6.1 Dataset. We obtain all images from the web by hand to en-
+sure quality. We draw on three sources for images: lists of pub-
+lic figures such as sportspeople and politicians, pictures taken at
+ethnicity-specific festivals, and images taken by travel photogra-
+phers in which ethnicity of the subjects is explicitly noted and
+geolocation data matches the targeted region. We download the
+images, detect, crop, align, and resize the faces following in the
+procedure in 4.1.1. The ethnicities collected, and the number of
+images collected, are summarized in Table 4.
+4.6.2 Setup. Following the procedure in 4.5, we use the classifier
+ensemble C trained in 4.2, to predict a racial category for every face
+in every ethnic group. We then obtain Fleiss-^ scores for the ensem-
+ble predictions for each ethnic group. This is the same procedure
+as 4.5, except we group by ethnicity instead of racial category. We
+also count the most frequently predicted racial category for each
+ethnic group, which we summarize in Fig. 4.6.3.
+4.6.3 Results. The most consistently perceived ethnic groups are
+Iceland and Korean, on which the classifier ensemble C agreed
+almost perfectly. The least consistently perceived ethnic group was
+Balochi, with a Fleiss-^ score much lower than the others. The
+results fit into a clear pattern, visible in Fig. 4.6.3. The classifier
+ensemble agrees on the racial categorization of some ethnic groups
+very strongly, on others, it disagrees very strongly. We interpret the
+appearance of such an effect along ethnic lines to be evidence that
+racial categories in dataset are partly based on racial stereotypes,
+and the high level of consistency shown by the classifier ensemble
+C on the Black and Asian category is partly a result of all tested
+datasets containing images for those categories which conform
+to a common stereotype. The Black racial category is the most
+consistent across all datasets, with a Fleiss-^ = 0.78. However, we
+argue that this is not because it is easier to identify individuals who
+are Black, but because datasets contain a narrow conception of who
+is Black and lack sufficient ethnic diversity. When presented with a
+ethnic group who is likely not racialized adequately due to lack of
+representation in datasets (Ethiopian), but originates from Africa
+and could be considered Black by based on geographic origin, the
+classifier ensemble is very inconsistent.
+5 DISCUSSION
+Our goal was to understand how each dataset constructs racial
+categories by assigning racial labels to faces, how consistent and
+similar the constructed categories are across datasets, and the beliefs
+Table 4: Consistency and sample sizes for tested ethnicities.
+Ethnicity Faces Region Consistency (Fleiss-^)
+Ethiopian 49 East Africa 0.58
+Gambian 46 West Africa 0.89
+Sardinian 36 Southern Europe 0.49
+Icelandic 27 Northern Europe 0.94
+Balochi 27 Western South Asia 0.35
+Bengali 47 Eastern South Asia 0.7
+Korean 34 East Asia 0.96
+Filipino 32 South East Asia 0.47
+Low High
+Consistency of Perception
+Sardinian
+Balochi
+Ethiopian
+Filipino Korean
+Gambian
+Bengali
+Icelandic
+𝜅 = 0.49
+𝜅 = 0.35
+𝜅 = 0.59
+𝜅 = 0.47 𝜅 = 0.96
+𝜅 = 0.89
+𝜅 = 0.70
+𝜅 = 0.94
+Mode Label 
+White (𝜅 = 0.62)
+Mode Label 
+South Asian (𝜅 = 0.65)
+Mode Label 
+Black (𝜅 = 0.78)
+Mode Label 
+Asian (𝜅 = 0.78)
+Figure 3: Some ethnicities fit into racial stereotypes of
+datasets, others don’t. Displayed are the average faces of
+each ethnicity used for experiments, alongside their most
+frequently predicted racial category and Fleiss-^ scores.
+they encode about who belongs to a racial category, and how clearly
+they belong to a racial category.
+5.1 Experimental Results
+The training of the classifier ensemble C was uneventful. The most
+surprising conclusion is perhaps that no dataset clearly outper-
+formed the others in its ability to encode racial categories that
+generalize to others. Another interesting result is that the number
+of identities, or unique individuals, in a dataset is much more im-
+portant for encoding generalizable racial categories than the sheer
+number of images.
+We then moved onto measuring the self-consistency of the racial
+assignments in each dataset. Intuitively, one would expect the
+datasets to be self consistent if a classifier is able to learn gen-
+eralizable concepts from the dataset. Seen in this light, the result
+that the datasets are self-consistent is not surprising. However, it
+is interesting that despite severely reducing the amount of faces
+and identities available to each member of a self-ensemble due to
+splitting the dataset, each self-ensemble members manages to learn
+concepts of race that are substantially more similar to its cohorts
+in the self-ensemble than to the concepts of race learned by classi-
+fiers trained on other datasets. This strongly suggests that the rules
+annotators use to assign a racial category to a face are relatively
+simple, and subsequently brittle when it comes to novel faces like
+ethnicities unrepresented in the training set.
+594
+One Label, One Billion Faces: Usage and Consistency of Racial Categories in Computer Vision FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+After self-consistency was established, we undertook a closer
+examination of whether inconsistency in racial identification is
+systematic, or largely due to random variations. If inconsistency in
+racial identification was largely due to random variations, many of
+our findings would be uninteresting. However, we found that every
+racial category contained members who were strongly identified
+as belonging to that category - they had very few or no images
+on which the classifiers disagreed about the race of the individ-
+ual - and we found that every racial category contained members
+on which the classifiers strongly disagreed by making conflicting
+racial assignments to their pictures. This result is particularly im-
+portant: it shows that individuals, represented in BFW and RFW
+by a set of pictures depicting the individual, are systematically the
+subject of racial disagreements. In the alternative case, individuals
+pictures would be the subjects of racial disagreements, with the
+disagreed-upon and agreed-upon images uniformly spread across
+individuals. Another interesting consequence of this experiment
+is that classifiers showed relatively high agreement on individu-
+als labeled as Black, compared to the high levels of disagreement
+seen for individuals labeled as South Asian or White. There is no
+intrinsic reason why this should be so, and our hypothesis is that
+all datasets include and recognize a very specific type of person
+as Black - a stereotype - while having more expansive and less
+consistent definitions for other racial categories.
+To gain more insight into how ethnicity and stereotypes inter-
+play in forming racial categories, we conduct our final experiment,
+which involves testing our classifier ensemble on the faces of mem-
+bers belonging to specifically chosen ethnic groups. The results
+are particularly illuminating. Despite the small size, we observed
+a large difference in the consistency of racial perception across
+ethnic groups. It is possible to explain some of the results purely
+probabilistically - blonde hair is relatively uncommon outside of
+Northern Europe, so blond hair is a strong signal of being from
+Northern Europe, and thus, belonging to the White category. The
+others are more difficult to explain. It is not so obvious why the
+Filipino sample is not consistently seen as Asian while the Korean
+sample is. The Ethiopian sample vs the Gambian sample is perhaps
+the most interesting, and can explain some of the other results we
+have seen. Ethiopia is in East Africa, and most of the African dias-
+pora in the United States consist of individuals fromWest or Central
+Africa [6]. If the datasets are biased towards images collected from
+individuals in the United States, then East Africans may not be
+included in the datasets, which results in high disagreement on the
+racial label to assign to Ethiopians relative to the low disagreement
+on the Black racial category in general.
+5.2 A Clear and Present Danger
+Racial categories and systems are localized in space and time. The
+meaning of White has shifted over time [45] in the United States.
+An individual who is Black in the United States may not be Black in
+Brazil [46]. A racial system that "makes sense" in the United States
+may not in other parts of the world. It may not "make sense" a few
+years into the future. However, algorithms and datasets have the
+power to shape society and social processes, just as they are shaped
+by society. Already, demographic estimation algorithms using racial
+categories are being deployed for advertising [36]. Advertising has
+the power to shape preferences, desires, and dreams - and it is easy
+to envision a future in which people are algorithmically offered
+different dreams and products based on their race. Minorities in the
+United States are already the target of harmful advertising [9], and
+the potential for discrimination in online advertising [44] has been
+noted.
+Racial categories and systems are fundamentally created by hu-
+mans, and embedded in a cultural context. The encoding of racial
+categories in datasets, which are then used to train and evaluate al-
+gorithms, removes the racial categories from their cultural context,
+and turns them into concrete, reified categories. Datasets commonly
+build on other datasets (all but one of the datasets studied in this
+work do so), and so potentially reproduce and amplify the biases
+of their predecessors. Divorced from their relativity and cultural
+context, packaged into neat, concrete disjoint sets, racial categories
+take on an independent, real existence. Privileged, wealthy, indus-
+trialized countries in which most AI research is conducted have the
+benefit of being the primary producers of datasets, and package
+their racial systems into datasets. Effectively, this is a potentially
+dangerous form of cultural export, and eventually, the exported
+racial systems will take on a validity outside of their cultural con-
+text, with potentially dangerous consequences.
+Our experiments with ethnic stereotypes illustrate and under-
+score the fact that racial categories are not a homogenous mass.
+Having demographic equality in the form of racial categories in a
+dataset does not mean a dataset is diverse, because not all White,
+Indian, Black, or Asian people are the same. A dataset can have
+equal amounts of individuals across racial categories, but exclude
+ethnicities or individuals who don’t fit into stereotypes. The rise
+of generative models and the controversies that have followed as
+a lack of diversity [1] present another example of this effect. An
+image superresolution model, when provided low resolution pic-
+tures of minorities as input, sometimes turned them into White
+faces. This was due to imbalances in the underlying training set:
+it contained mostly White faces. However, "fixing" datasets by de-
+mographic balancing misses subtleties. Suppose the underlying
+dataset was demographically balanced with respect to racial cate-
+gories in the way computer vision datasets are, and we provided it
+a low resolution picture of an Ethiopian or a Baloch. It may erase
+their ethnic identity but could produce an image belonging to the
+"correct" racial category as output. This may be a dubious fix.
+6 CONCLUSION
+We empirically study the representation of race through racial
+categories in fair computer vision datasets, and analyze the cross-
+dataset generalization of these racial categories, as well as their
+cross-dataset consistency, stereotyping, and self-consistency. We
+find that some categories are more consistently represented than
+others, but all racial categories transfer across dataset boundaries.
+Furthermore, we find evidence that racial categories rely on stereo-
+types and exclude ethnicities or individuals who do not fit into those
+stereotypes. We find systematic differences in how strongly individ-
+uals in biometric datasets are ascribed a racial category. We point
+out the dangers and pitfalls of using racial categories in relation to
+diversity and fairness.
+595
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Zaid Khan and Yun Fu
+REFERENCES
+[1] [n.d.]. Lessons from the PULSE Model and Discussion. https://thegradient.pub/
+pulse-lessons/
+[2] Mohsan Alvi, Andrew Zisserman, and Christoffer Nellåker. [n.d.]. Turning a
+Blind Eye: Explicit Removal of Biases and Variation from Deep Neural Network
+Embeddings. In Computer Vision – ECCV 2018 Workshops, Laura Leal-Taixé and
+Stefan Roth (Eds.). Lecture Notes in Computer Science, Vol. 11129. Springer
+International Publishing, 556–572. https://doi.org/10.1007/978-3-030-11009-
+3_34
+[3] Ron Artstein. [n.d.]. Inter-Annotator Agreement. In Handbook of Linguistic
+Annotation, Nancy Ide and James Pustejovsky (Eds.). Springer Netherlands, 297–
+313. https://doi.org/10.1007/978-94-024-0881-2_11
+[4] Wilma A. Bainbridge, Phillip Isola, and Aude Oliva. [n.d.]. The Intrinsic Memo-
+rability of Face Photographs. 142, 4 ([n. d.]), 1323–1334. https://doi.org/10.1037/
+a0033872
+[5] Sebastian Benthall and Bruce D. Haynes. [n.d.]. Racial Categories in Ma-
+chine Learning. ([n. d.]), 289–298. https://doi.org/10.1145/3287560.3287575
+arXiv:1811.11668
+[6] Katarzyna Bryc, Eric Y. Durand, J. Michael Macpherson, David Reich, and
+Joanna L. Mountain. [n.d.]. The Genetic Ancestry of African Americans, Lati-
+nos, and European Americans across the United States. 96, 1 ([n. d.]), 37–53.
+https://doi.org/10.1016/j.ajhg.2014.11.010
+[7] Joy Buolamwini and Timnit Gebru. [n.d.]. Gender Shades: Intersectional Accuracy
+Disparities in Commercial Gender Classification. ([n. d.]), 15.
+[8] Shixing Chen, Caojin Zhang, and Ming Dong. [n.d.]. Deep Age Estimation: From
+Classification to Ranking. 20, 8 ([n. d.]), 2209–2222. https://doi.org/10.1109/
+TMM.2017.2786869
+[9] Sandee LaMotte CNN. [n.d.]. Billions Spent on Ads Encouraging Minority Youth
+to Drink Unhealthy Sugar-Laden Beverages. https://www.cnn.com/2020/06/23/
+health/soda-targets-minority-youth-wellness/index.html
+[10] Leda Cosmides, John Tooby, and Robert Kurzban. [n.d.]. Perceptions of Race. 7,
+4 ([n. d.]), 173–179. https://doi.org/10.1016/S1364-6613(03)00057-3
+[11] J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li, and L. Fei-Fei. 2009. ImageNet: A
+Large-Scale Hierarchical Image Database. In CVPR09.
+[12] Zhengming Ding, Yandong Guo, Lei Zhang, and Yun Fu. [n.d.]. Generative One-
+Shot Face Recognition. ([n. d.]). arXiv:1910.04860 [cs] http://arxiv.org/abs/1910.
+04860
+[13] Heather J. H. Edgar, Shamsi Daneshvari, Edward F. Harris, and Philip J. Kroth.
+[n.d.]. Inter-Observer Agreement on Subjects’ Race and Race-Informative Char-
+acteristics. 6, 8 ([n. d.]), e23986. https://doi.org/10.1371/journal.pone.0023986
+[14] Cynthia Feliciano. [n.d.]. Shades of Race: How Phenotype and Observer Charac-
+teristics Shape Racial Classification. 60, 4 ([n. d.]), 390–419. https://doi.org/10.
+1177/0002764215613401
+[15] Siyao Fu, Haibo He, and Zeng-Guang Hou. [n.d.]. Learning Race from Face: A
+Survey. 36, 12 ([n. d.]), 2483–2509. https://doi.org/10.1109/TPAMI.2014.2321570
+[16] R. Stuart Geiger, Kevin Yu, Yanlai Yang, Mindy Dai, Jie Qiu, Rebekah Tang, and
+Jenny Huang. [n.d.]. Garbage In, Garbage Out? DoMachine Learning Application
+Papers in Social Computing Report Where Human-Labeled Training Data Comes
+From? ([n. d.]). https://doi.org/10.1145/3351095.3372862 arXiv:1912.08320 [cs]
+[17] Patrick Grother, Mei Ngan, and Kayee Hanaoka. [n.d.]. Face Recognition Vendor
+Test Part 3:: Demographic Effects. , NIST IR 8280 pages. https://doi.org/10.6028/
+NIST.IR.8280
+[18] Alex Hanna, Emily Denton, Andrew Smart, and Jamila Smith-Loud. [n.d.]. To-
+wards a Critical Race Methodology in Algorithmic Fairness. ([n. d.]). https:
+//doi.org/10.1145/3351095.3372826 arXiv:1912.03593 [cs]
+[19] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. [n.d.]. Deep Residual
+Learning for Image Recognition. ([n. d.]). arXiv:1512.03385 [cs] http://arxiv.org/
+abs/1512.03385
+[20] Matthias Hein, Maksym Andriushchenko, and Julian Bitterwolf. [n.d.]. Why
+ReLU Networks Yield High-Confidence Predictions Far Away from the Training
+Data and How to Mitigate the Problem. ([n. d.]). arXiv:1812.05720 [cs, stat]
+http://arxiv.org/abs/1812.05720
+[21] G. Hellenthal, G. B. J. Busby, G. Band, J. F. Wilson, C. Capelli, D. Falush, and S.
+Myers. [n.d.]. A Genetic Atlas of Human Admixture History. 343, 6172 ([n. d.]),
+747–751. https://doi.org/10.1126/science.1243518
+[22] Melissa R. Herman. [n.d.]. Do You SeeWhat I Am?: How Observers’ Backgrounds
+Affect Their Perceptions of Multiracial Faces. 73, 1 ([n. d.]), 58–78. https:
+//doi.org/10.1177/0190272510361436
+[23] Jeremy Howard and Sylvain Gugger. [n.d.]. Fastai: A Layered API for Deep
+Learning. ([n. d.]). arXiv:2002.04688 [cs, stat] http://arxiv.org/abs/2002.04688
+[24] Isabelle Hupont and Carles Fernández. [n.d.]. DemogPairs: Quantifying the
+Impact of Demographic Imbalance in Deep Face Recognition. In 2019 14th IEEE
+International Conference on Automatic Face Gesture Recognition (FG 2019) (2019-
+05). 1–7. https://doi.org/10.1109/FG.2019.8756625
+[25] Lynn B Jorde and Stephen P Wooding. [n.d.]. Genetic Variation, Classification
+and ’Race’. 36, S11 ([n. d.]), S28–S33. https://doi.org/10.1038/ng1435
+[26] Tero Karras, Timo Aila, Samuli Laine, and Jaakko Lehtinen. [n.d.]. Progres-
+sive Growing of GANs for Improved Quality, Stability, and Variation. ([n. d.]).
+arXiv:1710.10196 [cs, stat] http://arxiv.org/abs/1710.10196
+[27] K. S. Krishnapriya, Kushal Vangara, Michael C. King, Vitor Albiero, and Kevin
+Bowyer. [n.d.]. Characterizing the Variability in Face Recognition Accuracy
+Relative to Race. ([n. d.]). arXiv:1904.07325 [cs] http://arxiv.org/abs/1904.07325
+[28] Kimmo Kärkkäinen and Jungseock Joo. [n.d.]. FairFace: Face Attribute Dataset
+for Balanced Race, Gender, and Age. ([n. d.]). arXiv:1908.04913 [cs] http://arxiv.
+org/abs/1908.04913
+[29] Whitney N. Laster Pirtle and Tony N. Brown. [n.d.]. Inconsistency within Ex-
+pressed and Observed Racial Identifications: Implications for Mental Health
+Status. 59, 3 ([n. d.]), 582–603. https://doi.org/10.1177/0731121415602133
+[30] Iosif Lazaridis, Nick Patterson, Alissa Mittnik, Gabriel Renaud, Swapan Mallick,
+Karola Kirsanow, Peter H. Sudmant, Joshua G. Schraiber, Sergi Castellano,
+Mark Lipson, Bonnie Berger, Christos Economou, Ruth Bollongino, Qiaomei
+Fu, Kirsten I. Bos, Susanne Nordenfelt, Heng Li, Cesare de Filippo, Kay Prüfer,
+Susanna Sawyer, Cosimo Posth, Wolfgang Haak, Fredrik Hallgren, Elin For-
+nander, Nadin Rohland, Dominique Delsate, Michael Francken, Jean-Michel
+Guinet, Joachim Wahl, George Ayodo, Hamza A. Babiker, Graciela Bailliet,
+Elena Balanovska, Oleg Balanovsky, Ramiro Barrantes, Gabriel Bedoya, Haim
+Ben-Ami, Judit Bene, Fouad Berrada, Claudio M. Bravi, Francesca Brisighelli,
+George B. J. Busby, Francesco Cali, Mikhail Churnosov, David E. C. Cole, Daniel
+Corach, Larissa Damba, George van Driem, Stanislav Dryomov, Jean-Michel
+Dugoujon, Sardana A. Fedorova, Irene Gallego Romero, Marina Gubina, Michael
+Hammer, Brenna M. Henn, Tor Hervig, Ugur Hodoglugil, Aashish R. Jha, Sena
+Karachanak-Yankova, Rita Khusainova, Elza Khusnutdinova, Rick Kittles, Toomas
+Kivisild, William Klitz, Vaidutis Kučinskas, Alena Kushniarevich, Leila Laredj,
+Sergey Litvinov, Theologos Loukidis, Robert W. Mahley, Béla Melegh, Ene
+Metspalu, Julio Molina, Joanna Mountain, Klemetti Näkkäläjärvi, Desislava Ne-
+sheva, Thomas Nyambo, Ludmila Osipova, Jüri Parik, Fedor Platonov, Olga Po-
+sukh, Valentino Romano, Francisco Rothhammer, Igor Rudan, Ruslan Ruizbakiev,
+Hovhannes Sahakyan, Antti Sajantila, Antonio Salas, Elena B. Starikovskaya,
+Ayele Tarekegn, Draga Toncheva, Shahlo Turdikulova, Ingrida Uktveryte, Olga
+Utevska, René Vasquez, Mercedes Villena, Mikhail Voevoda, Cheryl A. Winkler,
+Levon Yepiskoposyan, Pierre Zalloua, Tatijana Zemunik, Alan Cooper, Cristian
+Capelli, Mark G. Thomas, Andres Ruiz-Linares, Sarah A. Tishkoff, Lalji Singh,
+Kumarasamy Thangaraj, Richard Villems, David Comas, Rem Sukernik, Mait
+Metspalu, Matthias Meyer, Evan E. Eichler, Joachim Burger, Montgomery Slatkin,
+Svante Pääbo, Janet Kelso, David Reich, and Johannes Krause. [n.d.]. Ancient Hu-
+man Genomes Suggest Three Ancestral Populations for Present-Day Europeans.
+513, 7518 ([n. d.]), 409–413. https://doi.org/10.1038/nature13673
+[31] Weiyang Liu, Yandong Wen, Zhiding Yu, Ming Li, Bhiksha Raj, and Le Song.
+[n.d.]. SphereFace: Deep Hypersphere Embedding for Face Recognition. In 2017
+IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (Honolulu,
+HI, 2017-07). IEEE, 6738–6746. https://doi.org/10.1109/CVPR.2017.713
+[32] Michele Merler, Nalini Ratha, Rogerio S. Feris, and John R. Smith. [n.d.]. Diversity
+in Faces. ([n. d.]). arXiv:1901.10436 [cs] http://arxiv.org/abs/1901.10436
+[33] Alexander Monea. [n.d.]. Race and Computer Vision. ([n. d.]), 19.
+[34] Aythami Morales, Julian Fierrez, Ruben Vera-Rodriguez, and Ruben Tolosana.
+[n.d.]. SensitiveNets: Learning Agnostic Representations with Application to
+Face Images. ([n. d.]), 1–1. https://doi.org/10.1109/TPAMI.2020.3015420
+[35] Brian K. Obach. [n.d.]. Demonstrating the Social Construction of Race. 27, 3
+([n. d.]), 252. https://doi.org/10.2307/1319325 arXiv:1319325
+[36] Parmy Olson. [n.d.]. The Quiet Growth of Race-Detection Software Sparks
+Concerns Over Bias. ([n. d.]). https://www.wsj.com/articles/the-quiet-growth-
+of-race-detection-software-sparks-concerns-over-bias-11597378154
+[37] Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory
+Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, Alban Des-
+maison, Andreas Kopf, Edward Yang, Zachary DeVito, Martin Raison, Alykhan
+Tejani, Sasank Chilamkurthy, Benoit Steiner, Lu Fang, Junjie Bai, and Soumith
+Chintala. 2019. PyTorch: An Imperative Style, High-Performance Deep Learning
+Library. In Advances in Neural Information Processing Systems 32, H. Wallach,
+H. Larochelle, A. Beygelzimer, F. d'Alché-Buc, E. Fox, and R. Garnett (Eds.). Cur-
+ran Associates, Inc., 8024–8035. http://papers.neurips.cc/paper/9015-pytorch-
+an-imperative-style-high-performance-deep-learning-library.pdf
+[38] Kristin Pauker and Nalini Ambady. [n.d.]. Multiracial Faces: How Categorization
+Affects Memory at the Boundaries of Race. 65, 1 ([n. d.]), 69–86. https://doi.org/
+10.1111/j.1540-4560.2008.01588.x
+[39] P Jonathon Phillips. [n.d.]. An Other-Race Effect for Face Recognition Algorithms.
+([n. d.]), 13.
+[40] Joseph P. Robinson, Zaid Khan, Yu Yin, Ming Shao, and Yun Fu. [n.d.]. Families In
+Wild Multimedia (FIW-MM): A Multi-Modal Database for Recognizing Kinship.
+([n. d.]). arXiv:2007.14509 [cs] http://arxiv.org/abs/2007.14509
+[41] Joseph P Robinson, Gennady Livitz, Yann Henon, Can Qin, Yun Fu, and Samson
+Timoner. 2020. Face recognition: too bias, or not too bias?. In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops. 0–1.
+[42] Morgan Klaus Scheuerman, Kandrea Wade, Caitlin Lustig, and Jed R. Brubaker.
+[n.d.]. How We’ve Taught Algorithms to See Identity: Constructing Race and
+596
+One Label, One Billion Faces: Usage and Consistency of Racial Categories in Computer Vision FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Gender in Image Databases for Facial Analysis. 4 ([n. d.]), 1–35. Issue CSCW1.
+https://doi.org/10.1145/3392866
+[43] Leslie N. Smith. [n.d.]. A Disciplined Approach to Neural Network Hyper-
+Parameters: Part 1 – Learning Rate, Batch Size, Momentum, and Weight Decay.
+([n. d.]). arXiv:1803.09820 [cs, stat] http://arxiv.org/abs/1803.09820
+[44] Till Speicher, Muhammad Ali, Giridhari Venkatadri, Filipe Nunes Ribeiro, George
+Arvanitakis, Fabrício Benevenuto, Krishna P Gummadi, Patrick Loiseau, and
+Alan Mislove. [n.d.]. Potential for Discrimination in Online Targeted Advertising.
+([n. d.]), 15.
+[45] Rogelio Sáenz, David G. Embrick, and Néstor P. Rodríguez (Eds.). [n.d.]. The
+International Handbook of the Demography of Race and Ethnicity. International
+Handbooks of Population, Vol. 4. Springer Netherlands. https://doi.org/10.1007/
+978-90-481-8891-8
+[46] Edward E. Telles. [n.d.]. Racial Ambiguity among the Brazilian Population. 25, 3
+([n. d.]), 415–441. https://doi.org/10.1080/01419870252932133
+[47] Antonio Torralba and Alexei A. Efros. [n.d.]. Unbiased Look at Dataset Bias.
+In CVPR 2011 (Colorado Springs, CO, USA, 2011-06). IEEE, 1521–1528. https:
+//doi.org/10.1109/CVPR.2011.5995347
+[48] Sahil Verma and Julia Rubin. [n.d.]. Fairness Definitions Explained. In Proceedings
+of the International Workshop on Software Fairness - FairWare ’18 (Gothenburg,
+Sweden, 2018). ACM Press, 1–7. https://doi.org/10.1145/3194770.3194776
+[49] Mei Wang, Weihong Deng, Jiani Hu, Xunqiang Tao, and Yaohai Huang. [n.d.].
+Racial Faces in the Wild: Reducing Racial Bias by Information Maximization
+Adaptation Network. In 2019 IEEE/CVF International Conference on Computer
+Vision (ICCV) (Seoul, Korea (South), 2019-10). IEEE, 692–702. https://doi.org/10.
+1109/ICCV.2019.00078
+[50] Stefanos Zafeiriou, Dimitrios Kollias, Mihalis A. Nicolaou, Athanasios Papaioan-
+nou, Guoying Zhao, and Irene Kotsia. [n.d.]. Aff-Wild: Valence and Arousal
+‘In-the-Wild’ Challenge. In 2017 IEEE Conference on Computer Vision and Pattern
+Recognition Workshops (CVPRW) (Honolulu, HI, USA, 2017-07). IEEE, 1980–1987.
+https://doi.org/10.1109/CVPRW.2017.248
+[51] Chiyuan Zhang, Samy Bengio, Moritz Hardt, Benjamin Recht, and Oriol Vinyals.
+[n.d.]. UnderstandingDeep Learning Requires Rethinking Generalization. ([n. d.]).
+arXiv:1611.03530 [cs] http://arxiv.org/abs/1611.03530
+[52] Kaipeng Zhang, Zhanpeng Zhang, Zhifeng Li, and Yu Qiao. [n.d.]. Joint Face
+Detection and Alignment Using Multitask Cascaded Convolutional Networks.
+23, 10 ([n. d.]), 1499–1503. https://doi.org/10.1109/LSP.2016.2603342
+[53] Gökhan Özbulak, Yusuf Aytar, and Hazım Kemal Ekenel. [n.d.]. How Trans-
+ferable Are CNN-Based Features for Age and Gender Classification? ([n. d.]).
+arXiv:1610.00134 [cs] http://arxiv.org/abs/1610.00134
+597

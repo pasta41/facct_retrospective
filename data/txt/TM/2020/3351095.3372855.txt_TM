@@ -1,0 +1,128 @@
+
+Several recent advancements in Machine Learning involve black-
+box models: algorithms that do not provide human-understandable
+explanations in support of their decisions. This limitation ham-
+pers the fairness, accountability and transparency of these models;
+the field of eXplainable Artificial Intelligence (XAI) tries to solve
+this problem providing human-understandable explanations for
+black-box models. However, healthcare datasets (and the related
+learning tasks) often present peculiar features, such as sequential
+data, multi-label predictions, and links to structured background
+knowledge. In this paper, we introduceDoctor XAI, a model-agnostic
+explainability technique able to deal with multi-labeled, sequential,
+ontology-linked data. We focus on explaining Doctor AI, a multi-
+label classifier which takes as input the clinical history of a patient
+in order to predict the next visit. Furthermore, we show how exploit-
+ing the temporal dimension in the data and the domain knowledge
+encoded in the medical ontology improves the quality of the mined
+explanations.
+CCS CONCEPTS
+• Computing methodologies → Artificial intelligence; Ma-
+chine learning; • Applied computing → Health care infor-
+mation systems.
+KEYWORDS
+explainable artificial intelligence, machine learning, healthcare data
+ACM Reference Format:
+Cecilia Panigutti, Alan Perotti, and Dino Pedreschi. 2020. Doctor XAI: An
+ontology-based approach to black-box sequential data classification explana-
+tions . In Conference on Fairness, Accountability, and Transparency (FAT* ’20),
+January 27–30, 2020, Barcelona, Spain. ACM, New York, NY, USA, 11 pages.
+https://doi.org/10.1145/3351095.3372855
+1 INTRODUCTION
+The recent availability of large amounts of electronic health records
+(EHRs) provides an opportunity for low-cost access to rich longitu-
+dinal clinical data. EHRs are usually noisy, sparse, fragmented, have
+* AP acknowledges partial support from Research Project "Casa Nel Parco" (POR FESR
+14/20 - CANP - Cod. 320 - 16 - Piattaforma Tecnologica "Salute e Benessere") funded
+by Regione Piemonte in the context of the Regional Platform on Health and Wellbeing
+and from Intesa Sanpaolo Innovation Center. The funders had no role in study design,
+data collection and analysis, decision to publish, or preparation of the manuscript.
+Permission to make digital or hard copies of part or all of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for third-party components of this work must be honored.
+For all other uses, contact the owner/author(s).
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Copyright held by the owner/author(s).
+ACM ISBN 978-1-4503-6936-7/20/02.
+https://doi.org/10.1145/3351095.3372855
+high dimensionality and nonlinear relationships among variables
+[48]. The ability of Deep Learning techniques [26] to model such
+highly nonlinear relationships enables them to have good predictive
+performance without the need for feature engineering. This has
+led to many successful applications of such technologies to clinical
+tasks based on EHR data [42, 49]. Deep Learning techniques have
+been proven useful for information extraction from clinical notes
+[21], patients and medical concept representation learning [35],
+outcome prediction [9, 12, 29, 38, 42] and new phenotype discovery
+[8, 25]. Some of these works focus on developing predictive models
+able to forecast any future diagnosis. Most of these models take as
+input the clinical history of the patient and output the set of future
+diagnoses [9, 31]. This kind of versatile models, able to tackle mixed
+scenarios, can be extremely useful in day-to-day clinical practice.
+However, the complexity of Deep Learning models hinders the
+straightforward understanding of the rationale behind their deci-
+sions [20]. This lack of interpretability prevents the deployment
+of such models in real-world healthcare scenarios. For instance, it
+was proven that biases in the data [7] and adversarial examples
+[15] can easily mislead such black-boxes. Furthermore, being able
+to understand the reasoning behind the model’s predictions would
+increase the healthcare professionals’ trust in such a technology
+and would increase its acceptance and use [14]. Recently, being
+able to explain the reasoning behind machine learning decisions
+also became a legal requirement prescribed by Art. 22 of the GDPR
+(General Data Protection Regulation) [34]. Indeed, GDPR requires
+the data processor to provide to the data subject meaningful in-
+formation about the logic involved, as well as the significance and
+the envisaged consequences of such processing for the data subject in
+case of a decision based solely on automated processing which might
+produce legal effects concerning him or her1.
+In this paper, we introduce Doctor XAI, a novel explainability
+technique able to deal with multi-labeled, sequential, ontology-
+linked data. Doctor XAI is a post-hoc interpretability method that
+focuses on local explanations, i.e., it explains the rationale behind
+the classification of a single data point. It is also model-agnostic, as
+it produces explanations whose computation is not based on the
+black-box inner parameters or structure. In this regard, Doctor XAI
+is similar to other black-box-agnostic techniques [17, 36, 39, 40].
+However, to the best of our knowledge, ours is the first agnostic
+XAI technique applicable to sequential and ontology-linked data
+classification. The mining of sequential data is of pivotal impor-
+tance in healthcare since this format is how typically the clinical
+history of the patient is represented. Furthermore, the presence of
+an ontology associated with the data is widespread in the medical
+and biological fields [5, 43]. Given a patient whose clinical history
+classification needs an explanation, Doctor XAI first generates a
+1Art. 13 paragraph 2f, Art. 14 paragraph 2g, Art. 15 paragraph 1h
+local synthetic neighborhood around the selected patient exploiting
+the semantic information encoded in the ontology and uses the
+black-box model to label it. Then it transforms the clinical history
+of such synthetic patients into a format suitable to train a decision
+tree. This transformation allows taking the sequential nature of
+the data into account. Finally, Doctor XAI trains a decision tree on
+the labeled synthetic neighborhood, and it extracts an explanation
+in the form of a decision rule. We applied Doctor XAI to explain
+the decisions of Doctor AI [9], a recurrent neural network which
+takes as input patients’ sequential EHR data and predicts the next
+visit set of diagnoses. We compared the quality of the explana-
+tions provided by Doctor XAI against those of the same technique
+without the ontological information. We show how exploiting the
+semantic information encoded in the ontology increases the per-
+formance of the explainability technique across all the evaluated
+metrics. We want to highlight that, even if our system deals by
+design with sequential, multi-labeled, ontology-based data, none of
+these features is strictly necessary: Doctor XAI can be used with
+datasets displaying any combination of the three aforementioned
+features, by exploiting only the corresponding specific modules.
+The contribution of this paper is twofold:
+• We propose an agnostic explainability technique able to
+tackle the sequential data classification explanation problem.
+• We show how exploiting the semantic information present
+in the medical ontology increases the quality of explanation.
+The paper is structured as follows: Section 2 reviews related work
+on the topics of explainable artificial intelligence, machine learning
+for sequential healthcare data and ontology use inmachine learning;
+Section 3 introduces the algorithmic building blocks of our XAI
+technique as well as the pipeline as a whole; Section 4 presents
+experimental setups and results; Section 5 ends the paper with the
+conclusions and directions for future work.

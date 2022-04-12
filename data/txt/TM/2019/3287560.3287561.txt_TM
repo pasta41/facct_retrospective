@@ -1,0 +1,284 @@
+
+A popular methodology for building binary decision-making classi-
+fiers in the presence of imperfect information is to first construct a
+calibrated non-binary “scoring" classifier, and then to post-process
+this score to obtain a binary decision. We study various fairness (or,
+error-balance) properties of this methodology, when the non-binary
+scores are calibrated over all protected groups, and with a variety
+of post-processing algorithms. Specifically, we show:
+First, there does not exist a general way to post-process a cal-
+ibrated classifier to equalize protected groups’ positive or nega-
+tive predictive value (PPV or NPV). For certain "nice" calibrated
+classifiers, either PPV or NPV can be equalized when the post-
+processor uses different thresholds across protected groups. Still,
+when the post-processing consists of a single global threshold across
+all groups, natural fairness properties, such as equalizing PPV in a
+nontrivial way, do not hold even for "nice" classifiers.
+Second, when the post-processing stage is allowed to defer on
+some decisions (that is, to avoid making a decision by handing off
+some examples to a separate process), then for the non-deferred
+decisions, the resulting classifier can be made to equalize PPV,
+NPV, false positive rate (FPR) and false negative rate (FNR) across
+the protected groups. This suggests a way to partially evade the
+impossibility results of Chouldechova and Kleinberg et al., which
+preclude equalizing all of these measures simultaneously. We also
+∗
+The order of authors is alphabetical and does not convey any information on the
+authors’ relative contributions. The authors are thankful for the helpful feedback of
+the anonymous reviewers. The full version of this paper can be found at [3].
+†
+Member of CPIIS. Supported by NSF awards 1413920 & 1801564, ISF award 1523/14.
+‡
+Supported by NSF award CNS-1413920, the 2018 Facebook Fellowship, and MIT’s
+RSA Professorship and Fintech Initiative.
+§
+Supported by NSF award CCF-1617730, CCF-1650733, and ONR N00014-12-1-0999.
+¶
+Supported by NSF award CCF-1665252 and NSF award DMS-1737944.
+∥
+Supported by the Clare Boothe Luce Graduate Research Fellowship and NSF award
+1414119.
+∗∗
+Supported in part by NSF awards IIS-1447700 and AF-1763786 and a Sloan Foundation
+Research Award.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+https://doi.org/10.1145/3287560.3287561
+present different deferring strategies and show how they affect the
+fairness properties of the overall system.
+We evaluate our post-processing techniques using the COMPAS
+data set from 2016.
+CCS CONCEPTS
+• Computing methodologies → Machine learning.
+KEYWORDS
+algorithmic fairness, classification, post-processing
+ACM Reference Format:
+Ran Canetti, Aloni Cohen, Nishanth Dikkala, Govind Ramnarayan, Sarah
+Scheffler, and Adam Smith. 2019. From Soft Classifiers to Hard Decisions:
+How fair can we be?. In FAT* ’19: Conference on Fairness, Accountability, and
+Transparency (FAT* ’19), January 29–31, 2019, Atlanta, GA, USA. ACM, New
+York, NY, USA, 10 pages. https://doi.org/10.1145/3287560.3287561
+1 INTRODUCTION
+The concept of fairness is deeply ingrained in our psyche as a
+fundamental, essential ingredient of Human existence. Indeed the
+perception of fairness, broadly construed as accepting each others’
+equal right for well being, is arguably one of the most basic tenets
+of cooperative societies of individuals in general.
+However, as fundamental as this concept may be, it is also elusive:
+different cultures have developed very different notions of fairness
+and equality among individuals, subject to religious, ethical, and
+social beliefs; in particular, the intricate interplay between fairness
+and justice is often left to subjective interpretation.
+In the context of decision processes, fairness is further compli-
+cated by the fact that decisions are often made with incomplete
+information and limited resources. These two factors have become
+increasingly prominent as society grows and decision processes
+become more complex and algorithmic.
+One way that researchers are responding to these growing con-
+cerns is by attempting to formulate precise notions for fairness
+of decisions processes, e.g. [5, 7, 12]. While these notions do not
+intend to capture the complexities of the ethical, socio-economic, or
+religious aspects of fairness, they do consider the fairness aspects of
+statistical decision-making processes with incomplete information.
+Essentially, these notions accept the fact that a decision process
+with incomplete information will inevitably make errors relative
+to the desired full-information notion (which is treated as a given),
+and provide guidelines on how to “balance the errors fairly” across
+individuals or groups of individuals. These definitions have proven
+to be meaningful and eye opening; in particular, it has been demon-
+strated that some very naturalmeasures of “fair distribution of error”
+are mutually inconsistent: No decision mechanism with incomplete
+information can satisfy all, except in trivial cases [4, 12].
+Faced with this basic impossibility, we aim to better understand
+the process of decision making with incomplete information, and
+propose ways to relax the known measures so as to regain feasibil-
+ity.
+Specifically, we concentrate on the task of post-processing a
+calibrated soft classifier to obtain a binary decision, under group
+fairness constraints, for the case of several disjoint protected groups.
+That is, we consider the following two-stage mechanism. The
+first stage consists of constructing a classifier Ŝ that outputs for
+each individual x a score s ∈ [0, 1] that is related to the chance that
+x has property B. The only requirement we make of Ŝ is group-wise
+calibration: For each group д and for each s ∈ [0, 1], the fraction
+of individuals in д that get score s and have the property, out of
+all individuals in д that get score s , is s . The second stage takes as
+input the output s = Ŝ(x) of the first stage and the group to which
+x belongs, and outputs a binary decision, interpreted as its guess at
+whether x has property B.
+The first stage is aimed at gathering information and providing
+the best accuracy possible, with only minimal regard to fairness (i.e
+only group-wise calibration). The second stage extracts a decision
+from the information collected in the first stage, while making sure
+that the errors are distributed “fairly.”
+To further focus our study, we take the first stage as a given
+and concentrate on the second. That is, we consider the problem of
+post-processing the scores given by the calibrated soft classifier Ŝ
+into binary predictions. A representative example is a judge making
+a bail decision based on a score provided by a software package.
+Following [4, 9], we consider the following four performance mea-
+sures for the resulting binary classifier: the positive predictive value
+(PPV), namely the fraction of individuals that have the property
+among all individuals that the classifier predicted to have the prop-
+erty; The false positive rate (FPR), namely the fraction of individuals
+that were predicted to have the property among all individuals that
+don’t have the property; The negative predictive value (NPV) and
+false negative rate (FNR), which are defined analogously. Ideally,
+we would like to equalize each one of the four measures across the
+groups, i.e. the measure will have the same value when restricted
+to samples from each group. Unfortunately, however, we know
+that this is impossible in general [4, 12]. This leads us to a broad
+question that motivates our work:
+Under what conditions can we post-process a cali-
+brated soft classifier’s outputs so that the resulting
+hard classifier equates a subset of {PPV,NPV, FNR, FPR}
+across a set of protected groups? How can we balance
+these conflicting goals?
+Results: Post-Processing With Thesholds. In a first set of results we
+consider the properties obtained by post-processing via a “thresh-
+old” mechanism. Naively, a threshold post-processing mechanism
+would return 1 for individual x whenever the calibrated score s(x) is
+above some fixed threshold, and return 0 otherwise. We somewhat
+extend this mechanism by allowing the post-processor “fine-tune”
+its decision by choosing the output probabilistically whenever the
+result of the soft classifier is exactly the threshold.
+We first observe that the popular and natural pos-t-procesing
+method of using a single threshold across all groups has some
+inherent deficiency: No such mechanism can in general guarantee
+equality of either PPV or NPV across the protected groups.
+We then show that, when using different thresholds for the
+different groups, one can equalize either PPV or NPV (but not both)
+across the two groups, assuming the profile of Ŝ has some non-
+degeneracy property.
+The combination of the impossibility of single threshold and the
+possibility of per-group threshold also stands in contrast to the be-
+lief that a soft classifier that is calibrated across both groups allows
+“ignoring” group-membership information in any post-processing
+decision [14]. Indeed, the conversion to a binary decision “loses
+information” in different ways for the two groups, and so group
+membership becomes relevant again after post-processing.
+Results: Adding deferrals. For the second set of results we con-
+sider post-processing strategies that do not always output a decision.
+Rather, with some probability the output is ⊥, or “I dont know",
+which means that the decision is deferred to another (hopefully
+higher quality, even if more expensive) process. Let us first present
+our technical results and then discuss potential interpretations and
+context.
+The first strategy is a natural extension of the per-group thresh-
+old: we use two thresholds per group, returning 1 above the right
+threshold, 0 below the left threshold, and ⊥ between the thresholds.
+We show that there always exists a way to choose the thresholds
+such that, conditioned on the decision not being ⊥, both the PPV
+and NPV are equal across groups.
+Next we show a family of post-processing strategies where, con-
+ditioned on the decision not being ⊥, all four quantities (PPV, NPV,
+FPR, FNR) are equal across groups.
+All strategies in this family have the following structure: Given
+an individual x , the strategy first makes a randomized decision
+whether to defer on x , where the probability depends on Ŝ(x) and
+the group membership of x . If not deferred, then the decision is
+made via another post-processing technique.
+One method for determining the probabilities of deferral is to
+make sure that the profiles of scores returned by the calibrated soft
+classifier, conditioned on not deferring, is equal for the two groups
+(That is, let ps ,д denote the probability, restricted to group д, that an
+element gets score s conditioned on not deferring. Then for any s ,
+we choose deferral probabilities so that ps ,д1 = ps ,д2 .) The resulting
+classifier can then be post-processed in any group-blind way (say,
+via a single threshold mechanism as described above).
+Of course, the fact that all four quantities are equalized con-
+ditioned on not deferring does not, in and of itself, provide any
+guarantees regarding the fairness properties of the overall decision
+process —which includes also the downstream decision mechanism.
+For one, it would be naive to simply assume that fairness “composes”
+[8]. Furthermore, the impossibility of [4, 12] says that the overall
+decision-making process cannot possibly equalize all four measures.
+However, in some cases one can provide alternative (non-statistical)
+justification for the fairness of the overall process: For instance, if
+the downstream decision process never errs, the overall process
+might be considered “procedurally fair.” We present more detailed
+reflections on our deferral-based approach in Section 6.
+We note that deferring was considered in machine learning in a
+number of contexts, including the context of fairness-preservation
+[13]. In these works, the classifier typically defers only when its
+confidence regarding some decision is low. By contrast, we use
+deferrals in order to “equalize” the probability mass functions of
+the soft classifier over the two groups, which may involve deferring
+on individuals for whom there is higher confidence. Furthermore,
+our framework allows for a wide range of deferral strategies which
+might be used to promote additional goals. Pursuing alternate strate-
+gies for deferral is an interesting direction for future work.
+Experimental results. We demonstrate the validity of our method-
+ology on the Broward county dataset with COMPAS scores made
+public by ProPublica [1]. Indeed, it has been shown that the COM-
+PAS scoring mechanism is an approximately calibrated soft clas-
+sifier. We first ran our two-threshold post-processing mechanism
+and obtained a binary decision algorithm which equalizes both PPV
+and NPV across Caucasians and African-Americans.
+We then ran our post-processing mechanism with deferrals to
+equalize all four of PPV, NPV, FPR, FNR across the two groups,
+with three different methods for deciding how to defer: In the first
+method, decisions are deferred only for Caucasians; in the second,
+decisions are deferred only for African Americans; in the third
+method, decisions are deferred for an equal fraction of Caucasians
+and of African Americans. This fraction is precisely equal to the
+statistical (total variation) distance between the profiles of scores
+produced by the soft classifier on the two groups. More details
+about the results are given in Section 5.
+1.1 Related work
+We briefly describe the works most closely related to ours, though
+both the list of works and their summaries are inevitably too short.
+Our work fits in a research program on group fairness notions
+following the work of Chouldechova [4] and Kleinberg et al. [12].
+Our work considers the notions of calibration as formalized in [16]
+and those of PPV, NPV, FPR, and FNR from [4] and [12].
+The power of post-processing calibrated scores into decisions
+using threshold classifiers in the context of fairness has been pre-
+viously studied by Corbett-Davies, Pierson, Feller, Goel, and Huq
+[6]. As in our work, they show that it is feasible to equalize certain
+statistical fairness notions across groups using (possibly different)
+thresholds. They additionally show that these thresholds are in
+some sense optimal. Whereas [6] focuses on statistical parity, condi-
+tional statistical parity, and false positive rate, our most comparable
+results consider PPV. In our work, we further show that in some
+cases thresholds fail to equalize both PPV and NPV (called predictive
+parity by [4]), unless we also allow our post-processor to defer on
+some inputs. Our work also studies methods of post-processing
+that are much more powerful than thresholding, especially when
+allowing deferrals.
+Using deferrals to promote fairnesswas also considered by Zemel,
+Madras, and Pitassi [13]. Specifically they consider how deferring on
+some inputs may promote a combination of accuracy and fairness,
+especially when taking explicit account of the downstream decision
+maker. They make use of two-threshold deferring post-processors
+like those discussed in Section 4. [13] takes a more experimental
+approach and focuses on minimizing the “disparate impact,” a mea-
+sure of total difference in classification error between groups, while
+maximizing accuracy. One important difference between our works
+is that Madras et al. distinguish between “rejecting” and “deferring.”
+Rejecting is oblivious as to properties of the downstream decision
+maker, while deferring tries to counteract the biases of the decision
+maker. Our work considers only the former notion, but uses the
+term "defer" instead of "reject."
+Our work inherits both the strengths and weakness of the group
+fairness research program. The clear definitions and goals of group
+fairness have have catalyzed the field and caused rapid progress:
+early infeasibility results [4, 12], positive results for complex and
+intersecting collections of groups [10, 11], and extensions to the
+basic model—including [13, 14] and this work. The formalization
+of group fairness has fostered precise discussion and greater un-
+derstanding, including of its shortcomings. Group fairness notions
+have been criticized for not fully capturing the complex social goals
+that motivate our community’s interest in fairness: failure to com-
+pose [8], failure to adequately capture people’s wellbeing [5], and
+failure to prevent against certain social evils [7]. However, we are
+optimistic that improving our understanding of group fairness will
+contribute to the successful study of algorithmic fairness generally.

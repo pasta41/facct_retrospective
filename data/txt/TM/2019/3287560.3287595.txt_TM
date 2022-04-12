@@ -1,0 +1,173 @@
+
+Recent advances in deep learning have achieved impressive gains
+in classification accuracy on a variety of types of data, including
+images and text. Despite these gains, however, concerns have been
+raised about the calibration, robustness, and interpretability of
+these models. In this paper we propose a simple way to modify
+any conventional deep architecture to automatically provide more
+transparent explanations for classification decisions, as well as an
+intuitive notion of the credibility of each prediction. Specifically, we
+draw on ideas from nonparametric kernel regression, and propose
+to predict labels based on a weighted sum of training instances,
+where the weights are determined by distance in a learned instance-
+embedding space. Working within the framework of conformal
+methods, we propose a new measure of nonconformity suggested
+by our model, and experimentally validate the accompanying the-
+oretical expectations, demonstrating improved transparency, con-
+trolled error rates, and robustness to out-of-domain data, without
+compromising on accuracy or calibration.
+CCS CONCEPTS
+• Computing methodologies → Supervised learning.
+KEYWORDS
+interpretability, credibility, conformal methods
+ACM Reference Format:
+Dallas Card1, Michael Zhang2, and Noah A. Smith2,3. 2019. Deep Weighted
+Averaging Classifiers. In FAT* ’19: Conference on Fairness, Accountability,
+and Transparency, January 29–31, 2019, Atlanta, GA, USA. ACM, New York,
+NY, USA, 10 pages. https://doi.org/10.1145/3287560.3287595
+1 INTRODUCTION
+For any domain involving complex, structured, or high-dimensional
+data, deep learning has rapidly become the dominant approach for
+training classifiers. Although deep learning is somewhat vaguely
+defined, we will use it here to refer to any architecture which makes
+a prediction based on the output of a function involving a series of
+linear and non-linear transformations of the input representation.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+https://doi.org/10.1145/3287560.3287595
+While the details of these transformations differ by domain (for
+example, two-dimensional convolutions are often used for images,
+whereas sequential models with attention are more common for
+text), most models for binary or multiclass classification include
+a final softmax layer to produce a properly normalized probabil-
+ity distribution over the label space. In this paper, we explore an
+alternative to the softmax, yielding what we call a deep weighted
+averaging classifier (DWAC), and evaluate its potential to deliver
+equally accurate predictions, while offering greater transparency,
+interpretability, and robustness.1
+Despite the success of deep learning as a framework, concerns
+have been raised about the properties of deep models [48]. In ad-
+dition to typically requiring large amounts of labeled data and
+computational resources, the parameters tend to be relatively diffi-
+cult to interpret, compared to more traditional (e.g., linear) methods.
+In addition, some deep models tend to be poorly calibrated relative
+to simpler models, despite being more accurate [14]. Finally, careful
+evaluation and an explosion of work on adversarial examples have
+demonstrated that many deep models are more brittle than test-set
+accuracies would suggest [12, 15, 37, 41].
+Particularly in light of recent controversy and legislation, such
+as the General Data Protection Regulation (GDPR) in Europe, there
+has been rapidly growing interest in developing more interpretable
+models, and in finding ways to provide explanations for predictions
+made by machine learning systems. Although there is currently
+an active debate in the field about how best to conceptualize and
+operationalize these terms [11, 13], recent research has broadly
+fallen into two camps. Some work has focused on models that are
+inherently interpretable, such that an explanation for a decision
+can be given in terms that are easily understood by humans. This
+category includes classic models that can easily be simulated by
+humans, such as decision lists, as well as sparse linear models,
+where the prediction is based on a weighted sum of features [6, 24,
+29, 49, 50, 56]. Other work, meanwhile, has focused on developing
+methods to provide explanations that approximate the true inner
+workings of more complex models, in a way that provides some
+utility to the user or developer of a model beyond what is attainable
+through more direct means [2, 27, 30, 42–44, 46].
+In this paper, we propose a method which, like those in the
+former category, offers an explanation that is transparent (in that
+the complete explanation is in terms of a weighted sum of training
+instances), but also explore ways to approximate this explanation by
+using only a subset of the relevant instances. While this approach
+retains some of the inherent complexity of typical deep models
+(in that it is still difficult to explain why the model has weighted
+1Our implementation is available at https://github.com/dallascard/DWAC
+the training instances as it has for a particular test instance), the
+mechanism behind the prediction is far more transparent than
+softmax-based models, and the individual instance weights provide
+a way for a user to examine the basis of the prediction, and evaluate
+whether or not the model is doing something reasonable. Similarly,
+while looking at the nearest neighbors of a test point is a commonly-
+used heuristic to attempt to understand what a model is doing, that
+approach is only an approximation for models which map each
+instance directly to a vector of probabilities.
+There is, of course, a long history in machine learning of making
+predictions directly in terms of training instances, including nearest
+neighbor methods [9], kernel methods, including support vector
+machines [5, 8], and transductive learners more broadly [52]. The
+main novelty here is to adapt any existing deep model to make
+predictions explicitly in terms of the training data using only a
+minor modification to the model architecture, and arguing for and
+demonstrating the advantages offered by this approach.
+As we will describe in more detail below, we propose to learn
+a function which maps from the input representation to a low-
+dimensional vector representation of each input. Predictions on
+new instances are then made in terms of a weighting of the label
+vectors of the training instances, where the weights are a function
+of the distance from the instance to be evaluated to all training
+instances, in the low-dimensional space. This is closely related
+to a long line of past work on metric learning [3, 10, 23, 58, 60],
+but rather than trying to optimize a particular notion of distance
+(such as Mahalanobis distance), we make use of a fixed distance
+function, and allow the architecture of standard deep models to
+do the equivalent work for us. This idea is also related to models
+which use neural networks to learn a similarity function for specific
+applications, such as face recognition [7] or text similarity [33];
+here we show how this is a more generally applicable way to train
+models, and we emphasize the connection to interpretability.
+Such an approach comes with distinct advantages:
+(1) A precise explanation of why the model makes a specific
+prediction (label or probability) can be given in terms of a
+subset of the training examples, rank ordered by distance.
+Moreover, the weight on each training instance implicitly
+captures the degree to which the model views the two in-
+stances as similar. The explanation is thus given in terms of
+exemplars or prototypes, which have been shown to be an
+effective approach to interpretability [18].
+(2) In §5.3, we show that, in many cases, a very small subset of
+training instances can be used to provide an approximate
+explanation with high fidelity to the complete explanation.
+(3) In addition, it is possible to choose the size of the learned
+output representation so as to trade off between performance
+and interpretability. For example, we can use a lower dimen-
+sional output representation if we wish to make it easy to
+directly visualize the embedded training data.
+(4) Even in cases where revealing the training data is not feasible,
+it is possible to provide an explanation purely in terms of
+weights and labels. Although this does not reveal the way in
+which a new instance is viewed (by the model) as similar to
+past examples, it sill provides a quantifiable notion of how
+unusual the new example is. The form of our model suggests
+a natural metric of nonconformity, and in §3.4, we formalize
+this using the notion of conformal methods, describing how
+the relevant distances can be used to either provide bounds
+on the error rate (for data drawn from the same distribution),
+or robustness against outliers.
+(5) Finally, although this model does entail a slight cost in terms
+of increased computational complexity, the difference in
+terms of speed and memory requirements at test time can
+be minimized by pre-computing and storing only the low-
+dimensional representation of the training data (from the
+final layer of the model). The cost during training will in
+most cases be dominated by the other parts of the network,
+and it is still possible to train such models on large datasets
+without difficulty. Moreover, in our experiments, this choice
+seemingly involves no loss in accuracy or calibration.
+Our deep weighted averaging classifiers (DWACs) are ide-
+ally suited to domains where it is possible to directly inspect the
+training data, such as controlled settings like social science research,
+medical image analysis, or managing customer feedback. In these
+domains, DWACs can create a more transparent and interpretable
+version of any successfully developed deep learning architecture.
+Although the advantages are diminished in domains where privacy
+is a concern, presenting information solely in terms of weights and
+labels still provides a useful way to quantify the credibility of a
+prediction, even without allowing direct inspection of the original
+training data.

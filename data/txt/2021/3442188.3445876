@@ -1,0 +1,996 @@
+Group Fairness: Independence Revisited
+Tim Räz
+Institute of Philosophy
+University of Bern
+Switzerland
+Institute of Biomedical Ethics and History of Medicine
+University of Zürich
+Switzerland
+tim.raez@posteo.de
+ABSTRACT
+This paper critically examines arguments against independence, a
+measure of group fairness also known as statistical parity and as
+demographic parity. In recent discussions of fairness in computer
+science, some have maintained that independence is not a suitable
+measure of group fairness. This position is at least partially based
+on two influential papers (Dwork et al., 2012, Hardt et al., 2016)
+that provide arguments against independence. We revisit these
+arguments, and we find that the case against independence is rather
+weak. We also give arguments in favor of independence, showing
+that it plays a distinctive role in considerations of fairness. Finally,
+we discuss how to balance different fairness considerations.
+CCS CONCEPTS
+• Social andprofessional topics→User characteristics; •Com-
+puting methodologies→ Machine learning; • Applied comput-
+ing → Arts and humanities.
+KEYWORDS
+fairness, independence, statistical parity, demographic parity, suffi-
+ciency, separation, affirmative action, accuracy
+ACM Reference Format:
+Tim Räz. 2021. Group Fairness: Independence Revisited. In Conference on
+Fairness, Accountability, and Transparency (FAccT ’21), March 3–10, 2021,
+Virtual Event, Canada. ACM, New York, NY, USA, 9 pages. https://doi.org/
+10.1145/3442188.3445876
+1 INTRODUCTION
+Measures of group fairness have become an important topic in
+computer science after the publication of the ProPublica article
+“Machine Bias” [1]. ProPublica found that the risk assessment tool
+COMPAS is biased against black people in having unbalanced false
+positive and false negative rates. This is intuitively unfair. The en-
+suing debate mostly focused on the contrast between the measure
+implicitly used by ProPublica, now known as separation, and other
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than the
+author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or
+republish, to post on servers or to redistribute to lists, requires prior specific permission
+and/or a fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+© 2021 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+https://doi.org/10.1145/3442188.3445876
+measures, in particular a measure known as sufficiency. However,
+a third measure of group fairness, independence, also known as
+statistical parity or demographic parity, has been viewed more criti-
+cally. Some computer scientists seem to think that independence
+is not a suitable measure of group fairness [3, 12]; others maintain
+that while independence is adequate in some contexts, it leads to
+undesirable consequences in others [4, 17]. The critical stance of
+computer scientist with respect to independence appears to be at
+least partially based on two influential papers [7, 8] that provide
+arguments against independence. Here we revisit and critically
+examine these arguments, and we find that the case against inde-
+pendence as opposed to other measures of group fairness is rather
+weak.
+We first introduce measures of group fairness and their most
+important properties (section 2). In particular, we introduce the
+concept of conservative fairness measures, which allows us to clar-
+ify the relation between fairness and accuracy. We then examine
+the arguments against independence (section 3). We find that, first,
+arguments against independence proposed in [7] equally apply to
+other measures of group fairness such as sufficiency and separa-
+tion, and should therefore not be taken to apply to independence
+specifically. Second, we argue that arguments against independence
+proposed in [8] are flawed in making unwarranted assumptions
+about conservative fairnessmeasures such as sufficiency and separa-
+tion. We prove that sufficiency and separation are not incrementally
+conservative, which means that these measures are not necessarily
+preserved if we increase the accuracy of a predictor. We then state
+arguments in favor of independence (section 4), finding that inde-
+pendence captures aspects of fairness not covered by sufficiency
+and separation. Finally, we discuss how to balance different fairness
+considerations (section 5).
+2 FAIRNESS MEASURES: DEFINITIONS AND
+PROPERTIES
+This section introduces and discusses the most important measures
+of group fairness, formulates these measures for the case of binary
+variables, and discusses other relevant fairness measures, setting
+the stage for the discussion in later sections.
+2.1 Definitions of Group Fairness
+Here we state the most important group fairness measures, fol-
+lowing the discussion in [2]. These measures are formulated using
+random variables 𝑌 , 𝑅, 𝐴; all measures we consider correspond
+to statistical properties of these variables. The variables have the
+1
+129
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Tim Räz
+following interpretation: 𝑌 is the “true label”, i.e., the characteristic
+that we want to predict; 𝑅 is the prediction, which can be the output
+of an algorithm; 𝐴 is the characteristic indicating group member-
+ship, i.e., the property with respect to which we investigate fairness.
+In the context of supervised learning, we have access to 𝑌 through
+labeled data. We will mostly focus on binary variables. Also, we
+will assume that a prediction 𝑅 leads to a corresponding decision.
+Let us illustrate this setup using the example of college admis-
+sions. College students of different genders apply for college; a
+prediction about their suitability is made based on the application
+documents. In this case, the value of 𝑌 corresponds to the actual
+suitability of a student applying for college. 𝑌 is known if the data
+in question is historical, and the value of𝑌 can be determined based
+on whether a student actually obtained a degree or not (or a differ-
+ent operationalization of ‘suitable applicant’). 𝑅 corresponds to the
+prediction whether or not a student should be admitted to college
+based on the application documents. 𝐴 corresponds to the gender
+of applicants, which we assume to be binary for simplicity’s sake.
+To formulate fairness measures, we will use the following no-
+tation: Two random variables 𝑋,𝑌 are independent if 𝑃 (𝑋,𝑌 ) =
+𝑃 (𝑋 ) ·𝑃 (𝑌 ); we will write this as𝑋 ⊥ 𝑌 . Two random variables𝑋,𝑌
+are conditionally independent given 𝑍 if 𝑃 (𝑋 | 𝑌, 𝑍 ) = 𝑃 (𝑋 | 𝑍 );
+we will write this as 𝑋 ⊥ 𝑌 | 𝑍 .
+Definition 1. The measure of indepencende is satisfied if 𝑅 ⊥ 𝐴.
+Independence, also known as statistical parity and demographic
+parity, means that the prediction 𝑅 does not depend on 𝐴. If inde-
+pendence is satisfied, a prediction is statistically balanced between
+different groups, in that members of the different groups get predic-
+tions at the same rate. In the case of college admissions, this means
+that an equal proportion of men and women applying for college
+are predicted to be suitable applicants.
+Definition 2. The measure of sufficiency is satisfied if 𝑌 ⊥ 𝐴 | 𝑅.
+Sufficiency means that, given the prediction, the true label is
+independent of the group. The idea is that the prediction 𝑅 contains
+all the information about the true label, so the sensitive character-
+istic is not needed; in other words, the prediction 𝑅 is sufficient
+for 𝑌 . In the case of college admissions, this means that an equal
+proportion of men and women predicted to be suitable applicants
+are actually suitable applicants.1
+Definition 3. The measure of separation is satisfied if 𝑅 ⊥ 𝐴 | 𝑌 .
+Separation means that, given the true label, the prediction is
+independent of the group. The idea is that the prediction 𝑅 can only
+vary with respect to different groups𝐴 insofar as this is justified by
+the true label𝑌 ; see [2]. In the case of college admissions, this means
+that an equal proportion of suitable men and women applying for
+admission are predicted to be suitable applicants.
+2.2 Properties and Relations
+In this section, we discuss some important properties of the fairness
+measures introduced above. The discussion follows [2]; see the
+appendix for proofs. First, the accuracy of a predictor 𝑅 is the degree
+1Sufficiency is closely related to calibration. Calibration means that the predicted store
+reflects the true score. Calibration and sufficiency are equivalent up to reparametriza-
+tion, cf. [2, p. 52].
+to which it agrees with the true label 𝑌 ; a perfect predictor is a
+predictor that completely agrees with the true label, i.e., 𝑌 = 𝑅.
+Next, we state an important property that is shared by sufficiency
+and separation, but not by independence.
+Proposition 4. If we have a perfect predictor, then sufficiency and
+separation hold.
+Independence,𝑅 ⊥ 𝐴, is not, in general, compatible with a perfect
+predictor: independence and perfect predictors are only compatible
+if the true label is evenly distributed between groups, i.e., if we have
+𝑌 ⊥ 𝐴, which is not the case in general. Proposition 4 motivates a
+definition that will be important in the following. It is a distinction
+between different kinds of group fairness measures:
+Definition 5. A fairness measure is conservative if the measure is
+necessarily satisfied in the case of a perfect predictor. Otherwise, a
+fairness criterion is non-conservative.
+Fairness measures are called conservative because, in the case
+of a perfect predictor, they do not force us to change anything to
+obtain fairness, i.e., they conserve the status quo.2 Proposition 4
+shows that both sufficiency and separation are conservative fairness
+criteria; meanwhile, independence is not. Note that the reverse
+implication of proposition 4 is false. The following proposition
+provides a characterization of when sufficiency and separation
+holds in some cases of non-perfect predictors:
+Proposition 6. If the joint distribution of (𝐴,𝑌, 𝑅) is positive for
+all values, then sufficiency and separation hold at the same time
+iff. 𝐴 is independent of the joint distribution of 𝑌 and 𝑅, i.e., if
+𝐴 ⊥ (𝑌, 𝑅).
+This proposition is important because it tells us when sufficiency
+and separation hold under reasonable circumstances such as a non-
+vanishing joint distribution.
+The notion of a conservative fairness measure is very strong
+and of limited practical relevance, because predictors are hardly
+ever perfect in practice. To overcome this limitation, we can define
+a broader notion of conservativeness and investigate if relevant
+fairness measures are conservative on this notion:
+Definition 7. A fairness measure is incrementally conservative if
+the degree to which the measure is satisfied does not decrease if
+we increase the accuracy of the predictor.
+Are the fairness measures we considered above conservative
+according to this broader notion? Unfortunately, this is not the case.
+In the appendix, the following proposition is proved:
+Proposition 8. Sufficiency and separation are not incrementally
+conservative fairness measures.
+This means that if these two measures are satisfied by a certain
+(non-perfect) predictor, and we increase the accuracy of that pre-
+dictor, it can happen that the improved predictor no longer satisfies
+the two measures. Thus, the property of conservativeness does
+not imply incremental conservativeness; it is not necessarily the
+case that if we increase the accuracy of a predictor, a conservative
+fairness measure is preserved.
+2The notion of a conservative fairness measure used here is related to the concept of
+conservative justice [14, Sec. 2.1.] insofar as the latter notion concerns the preservation
+of (factual) practices; however, the notion of conservativeness proposed here does not
+concern the preservation of norms as required by conservative justice.
+2
+130
+Group Fairness: Independence Revisited FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+2.3 Confusion Matrices
+In this section, we discuss group fairness measures in the case of
+binary prediction 𝑅, ground truth 𝑌 , and characteristic 𝐴, using
+so-called confusion matrices. Confusion matrices make it easier to
+formulate and reason about these measures in concrete applications.
+The discussion in this section draws on more thorough expositions
+of confusion matrices and their characteristics in [3, 13].
+Assume we have collected statistical information for binary 𝑌
+and 𝑅, for example, historical records of college success 𝑌 , as well
+as the binary prediction for admission 𝑅. The prediction 𝑅 can
+be positive or negative, and for either outcome, it can match the
+true label 𝑌 (𝑎 = # of true positives, 𝑑 = # of true negatives) or be
+mistaken (𝑏 = # of false positives, 𝑐 = # of false negatives). Based
+on these records, we can compile a confusion matrix:
+true label (Y)
+positive negative total
+prediction (R) positive 𝑎 𝑏 𝑎 + 𝑏
+negative 𝑐 𝑑 𝑐 + 𝑑
+total 𝑎 + 𝑐 𝑏 + 𝑑 𝑁
+On this basis, we can define some important statistics of confu-
+sion matrices:
+• Accuracy: 𝑎+𝑑
+𝑁
+• Positive Predictive Value (PPV): 𝑎
+𝑎+𝑏
+• Negative Predictive Value (NPV): 𝑑
+𝑐+𝑑
+• False Positive Rate (FPR): 𝑏
+𝑏+𝑑
+• False Negative Rate (FNR): 𝑐
+𝑎+𝑐
+From here on, we assume that we have observed sufficiently
+many cases such that the observations (relative frequencies) in our
+tables approximately match the “true probabilities”. Now, in order
+to formulate fairness measures for confusion matrices, we need one
+matrix for each of two groups 𝑝, 𝑞 (values of the random variable
+𝐴):
+truth (Y)
++ –
+pred. (R) + 𝑎 𝑏
+– 𝑐 𝑑
+Table 1: Group A=p
+truth (Y)
++ –
+pred. (R) + 𝑎′ 𝑏 ′
+– 𝑐 ′ 𝑑 ′
+Table 2: Group A=q
+Based on this, the three group fairness measures defined in the
+previous section can be formulated in terms of statistics of these
+two confusion matrices:
+Proposition 9. For binary variables𝑌, 𝑅,𝐴, independence is equiv-
+alent to: 𝑎+𝑏
+𝑁
+= 𝑎′+𝑏′
+𝑁 ′ .
+Proposition 10. For binary variables 𝑌, 𝑅,𝐴, sufficiency holds iff.
+both groups have the same positive predictive value (PPV), i.e.,
+𝑎
+𝑎+𝑏 = 𝑎′
+𝑎′+𝑏′ and the same negative predictive value (NPV), i.e.,
+𝑑
+𝑐+𝑑 = 𝑑′
+𝑐′+𝑑′ .
+Proposition 11. For binary variables 𝑌, 𝑅,𝐴, separation holds iff.
+both groups have the same false positive rate (FPR), i.e., 𝑏
+𝑏+𝑑 = 𝑏′
+𝑏′+𝑑′
+and false negative rate (FNR), ie, 𝑐
+𝑎+𝑐 = 𝑐′
+𝑎′+𝑐′ .
+2.4 Other Kinds of Fairness
+In this section, we discuss kinds of fairness that are not group fair-
+ness measures, but that will play an important role in our discussion
+below. The group fairness measures introduced above are obser-
+vational measures, i.e., they can be measured based on data that
+are typically available: In may cases, we have access to labeled data
+(𝑌 ), a predictive model (𝑅), and labels or a different kind of access
+to the sensitive characteristic of individuals, (𝐴). However, there
+are other kinds of fairness considerations that are not measurable
+in terms of these quantities.
+Kamishima et al. [10] propose to distinguish three different kinds
+of fairness. The first kind, prejudice, subsumes the notions of group
+fairness discussed above. The second kind, underestimation, is due
+to the fact that a model may be unfair due to the finiteness of
+training data. The definition of the third kind, negative legacy, is
+particularly important:
+Definition 12. Negative legacy is unfairness due to unfair sampling
+or labeling in the training data.
+Kamishima et al. provide the following example of negative
+legacy: “[I]f a bank has been unfairly rejecting the loans of the
+people who should have been approved, the labels in the training
+data would become unfair. This problem is serious because it is
+hard to detect and correct” (Ibid., p. 646). Kamishima et al. note that
+the problem can be overcome to a certain extent if an independent
+set of fairly labeled training data is available.
+A further notion of fairness that is relevant is individual fairness,
+which can be defined as follows:
+Definition 13. (Informal) Individual fairness is the requirement
+that a fair predictor should treat similar individuals similarly, i.e.,
+their predictions should be similar.3
+Individual fairness is in tension with group fairness measures
+under certain conditions because group fairness defines fairness in
+terms of (average) properties of group members, which usually does
+not do justice to some individual properties of group members. In
+particular, if the comparison of individuals uses fine-grained infor-
+mation such as a score or utility, it is possible to violate individual
+fairness while complying with some measure of group fairness. We
+will see examples of this below. Finally, note that individual fairness
+seem to be the fairness measure that is most closely related to the
+philosophical concept of justice, cf. [14, Sec. 1.1.]
+3 ARGUMENTS AGAINST INDEPENDENCE
+SCRUTINIZED
+In this section, we examine arguments against independence from
+the computer science literature. When following the debate, one
+can get the impression that independence is somehow flawed or
+unsuitable as a measure for group fairness. The goal of this section
+3The notion is due to [7]. Formally, we canmake individual fairness precise by replacing
+the informal notion of “similarity” with two metrics, which capture how similar or
+close individuals and their predictions are. To do this, we need a metric 𝑑 between
+individuals 𝑥, 𝑦 ∈ 𝐼 , and a metric 𝐷 between distributions of predictions 𝑀𝑥,𝑀𝑦
+of individuals, where 𝑀 is a map from individuals 𝐼 to distributions of predictions.
+To enforce individual fairness, we now require that the distance between individuals
+should limit the distance between the distribution of predictions, i.e., we should have
+𝐷 (𝑀𝑥,𝑀𝑦) ≤ 𝑑 (𝑥, 𝑦) for 𝑥, 𝑦 ∈ 𝐼 . This is a so-called Lipschitz condition.
+3
+131
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Tim Räz
+is to revisit and critically examine important arguments against
+independence.
+3.1 Dwork et al.: The Argument From
+Gerrymandering
+The most important paper credited with showing that indepen-
+dence is not a suitable fairness concept is [7]. We will reexamine
+the arguments in this paper and argue that, first, it is not clear
+whether Dwork et al. wish to reject independence, and second, that
+the arguments made by Dwork et al. should not be construed as
+arguments against independence, but more broadly as arguments
+against group fairness in general.
+First, let us examine whether Dwork et al. wish to simply reject
+independence. Note that Dwork et al. call independence “statistical
+parity”. In the introduction, Dwork et al. write: “we demonstrate
+[the inadequacy of statistical parity] as a notion of fairness through
+several examples in which statistical parity is maintained, but from
+the point of view of an individual, the outcome is blatantly unfair.”
+(p. 2) This sounds like an outright rejection. However, later in the
+paper, Dwork et al. write that “statistical parity is insufficient as
+a general notion of fairness.” (p. 7) This suggest that Dwork et al.
+merely want to argue that independence (statistical parity) is not a
+logically sufficient condition for fairness, which is a much weaker
+claim than the claim that it should be rejected tout court. What
+is more, the paper investigates to what extent individual fairness
+implies, or helps satisfy, independence, whichwould be unnecessary
+if independence should be outright rejected. Thus, Dwork et al.
+merely caution against independence as the sole arbiter of fairness.
+Now let us examine the arguments against independence in [7,
+Sec. 3.1] more closely. The arguments take the form of three exam-
+ples, in which the adoption of independence has undesirable con-
+sequences, in that independence holds, but individuals are treated
+unfairly, that is, individual fairness is violated. The first example,
+‘Reduced Utility’, shows that independence does not ensure that the
+most suitable candidates from different group are selected. In the
+example, an organization hires people from two groups 𝑝, 𝑞 ∈ 𝐴.
+It is possible for the organization to comply with independence
+while, out of ignorance, choosing the least qualified members of
+group 𝑝 and the best qualified members of group 𝑞. This reduces the
+utility of the organization, and it also violates individual fairness,
+because similar members of the two groups are treated differently.
+To make it concrete, assume we have two individuals 𝑥 ∈ 𝑝 and
+𝑦 ∈ 𝑞, both similarly qualified, and while 𝑦 is hired, 𝑥 is not hired;
+thus two individuals who are similar are not treated similarly. The
+second example, ‘Self-fulfilling Prophecy’, has the same structure
+as the first example, but the unqualified members of 𝑝 are now ma-
+liciously chosen for the purpose of justifying future discrimination
+of members of 𝑝 . The third example, ‘Subset Targeting’, is based
+on the fact that independence does not ensure a fair choice within
+groups, in that it does not require that the most deserving members
+of a group get to see a relevant job ad. This implies, once more, a
+violation of individual fairness.
+Are these examples by Dwork et al. sufficient to reject indepen-
+dence as a criterion of group fairness? We grant that independence
+can decrease utility, if utility depends on the degree of accuracy,
+because independence does not depend on 𝑌 , and thus also not
+on accuracy, i.e., how well 𝑌 and 𝑅 match. The three examples
+discussed by Dwork et al. are all based on the fact that indepen-
+dence only requires that an equal proportion of two groups get
+classified in a certain way, but does not further specify how indi-
+viduals within these groups have to be distributed with respect to
+𝑌 . As a consequence, independence does not, in general, guarantee
+individual fairness.
+We thus grant that these examples are valid in substance. How-
+ever, this is not sufficient to reject independence as opposed to
+other measures of group fairness such as separation and sufficiency,
+because similar arguments can be directed against these other mea-
+sures. Our argumentative strategy is to make a tu quoque argument:
+If one accepts these arguments against independence, then one also
+has to accept similar arguments against sufficiency and separation.
+We will now give a first example of gerrymandering [11] with
+separation, in which an employer manipulates statistics so as to
+realize an unequal treatment of groups, while maintaining separa-
+tion.
+Example 14. Gerrymandering With Separation: A malicious em-
+ployer makes hiring decisions. There are two groups, 𝑝 and 𝑞, for
+which separation has to be enforced. The employer has a prefer-
+ence for people from group 𝑞. Assume that the employer has made
+provisional hiring decisions that satisfy separation, and a confusion
+matrix according to these hiring decisions has been compiled, cf.
+tables 1 and 2. The confusion matrices satisfy separation, which
+implies that we have 𝑎
+𝑎+𝑐 = 𝑎′
+𝑎′+𝑐′ . Assume further that the employer
+has a reservoir of 𝑧 qualified candidates from group 𝑞 that do not
+appear in the statistic of the confusion matrix. The employer can
+now hire candidates from that reservoir, as long as an appropriate
+proportion of qualified candidates is rejected, i.e., the employer
+creates a division 𝑧 = 𝑧+ + 𝑧− into qualified people hired 𝑧+ and
+qualified people rejected 𝑧−, such that 𝑎′+𝑧+
+𝑎′+𝑐′+𝑧 = 𝑎′
+𝑎′+𝑐′ . The new con-
+fusion matrices are unchanged except for the entries 𝑎′ → 𝑎′ + 𝑧+
+and 𝑐 ′ → 𝑐 ′ +𝑧−, which means that the matrices still satisfy separa-
+tion, as can be easily verified. However, this hiring practice seems
+to be intuitively unfair towards group 𝑝 (and the qualified people
+from the reservoir 𝑧 who are rejected); it can also violate individual
+fairness because equally suitable candidates from group 𝑝 are not
+even considered.
+It could be objected that this example is not analogous to the
+examples by Dwork et al. in that here, the employer has to keep
+part of the statistic “off the book”, and add it later. However, the
+examples by Dwork et al. also make the assumption that there is
+additional information not captured by the variables relevant to
+independence. It is important to note that this (malicious) hiring
+practice would not be possible in the case of independence, because
+in the example, the employer drives up the number of employees
+from group 𝑞, without raising the numbers in the other group, and
+independence enforces exact balance between groups.
+Let us give a second example, with a different structure. This is
+an example for gerrymandering with sufficiency and separation.
+Example 15. Gerrymandering With Sufficiency and Separation:
+Assume that an employer has made provisional hiring decisions
+and compiled two confusion matrices. Assume that the confusion
+matrices for 𝑝 and 𝑞 both do not have any zero entries and that the
+4
+132
+Group Fairness: Independence Revisited FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+two confusion matrices have the same entries if they are normal-
+ized by 𝑁 and 𝑁 ′ respectively; this means that the corresponding
+joint distribution of (𝑌, 𝑅,𝐴) is positive everywhere, and the joint
+distribution of (𝑌, 𝑅) is independent of group membership 𝐴. In
+this case, sufficiency and separation are both satisfied according
+to proposition 6. Now, the employer wants to hurt group 𝑝 . Under
+certain circumstances, this can be done as follows. The employer
+chooses a member 𝑥 of 𝑝 that is a false negative, i.e., 𝑥 should be
+hired, but is not predicted to be hired. If there is a member 𝑥∗ in
+group 𝑝 that is a true positive, i.e., should be hired, and is predicted
+to be hired, and is more suitable for the job than 𝑥 , the malicious
+employer can simply switch the prediction for 𝑥 and 𝑥∗, such that
+𝑥 becomes a true positive and 𝑥∗ becomes a false negative. The two
+confusion matrices are unchanged and thus still satisfy sufficiency
+and separation. However, individual fairness is violated, because
+a less qualified candidate has been chosen over a more qualified
+candidate, which hurts the group.
+Note that this example also works without assuming (malicious)
+intent. The situation described arises naturally if an employer has
+less information about the relative suitability of people from group
+𝑝; the employer would then hire a less than optimal selection of
+candidates from group 𝑝 and thus also not maximize utility. This
+is very similar to the first example by Dwork et al.. We can con-
+clude that examples of gerrymandering that are similar to those
+by Dwork et al., can be constructed for notions of group fairness
+such as separation and sufficiency. Note that other examples of
+gerrymandering for sufficiency and separation can be constructed
+along the lines of the examples given here.
+It could be asked why Dwork et al. did not appreciate that their
+arguments apply to other notions of group fairness as well. Here is
+a plausible explanation: Except for independence, notions of group
+fairness, such as sufficiency and separation, were only discussed
+more widely after the publication of the seminal ProPublica article
+[1], which appeared four years after the publication of [7]. Thus,
+Dwork et al. might have raised their objections against notions of
+group fairness in general, and not just against independence, if they
+had been aware of other notions. It should also be noted that the
+primary focus of Dwork et al. is on the notion of individual fairness,
+not on group fairness. The paper does examine the relation between
+individual fairness and independence (statistical parity), but this is
+not the center of attention. All in all, the idea that independence
+is somehow more problematic than other group fairness criteria,
+which is held in parts of the computer science literature and can at
+least partially be traced back to Dwork et al., may be a historical
+accident.4
+3.2 Hardt et al.: The Argument From Accuracy
+Other arguments in the computer science literature are targeted
+more specifically at independence and do not apply to other notions
+of group fairness such as sufficiency and separation. In [8], the
+authors propose separation as a fairness measure. To differentiate
+separation from independence, the authors claim that independence
+is flawed for two reasons that do not apply to separation. The first
+reason is the kind of argument made in [7]. The second reason
+4[2]mention that argument against independencemay apply to other statistical fairness
+measures as well, but this is not elaborated.
+why independence is flawed is given in the following quote – note
+that the authors call independence “demographic parity”, and the
+predictor is denoted 𝑌 :
+... demographic parity often cripples the utility
+that we might hope to achieve. Just imagine the
+common scenario in which the target variable
+𝑌 – whether an individual actually defaults or
+not – is correlated with 𝐴. Demographic parity
+would not allow the ideal predictor 𝑌 = 𝑌 ,
+which can hardly be considered discriminatory
+as it represents the actual outcome. As a result,
+the loss in utility of introducing demographic
+parity can be substantial. [8, p. 2]
+Later, the authors note that separation does not have this prob-
+lem: “Unlike demographic parity, our notion always allows for the
+perfectly accurate solution [...]” (Ibid.) We will now reconstruct the
+argument in this passage based on the distinctions made in sec-
+tion 2. There are two different readings of the argument. The first
+reading focuses on the relation between accuracy and utility, while
+the second reading focuses on the relation between accuracy and
+fairness. On the first reading, the argument can be reconstructed
+as follows:
+P1 A perfect predictor maximizes utility.
+P2 Independence is a non-conservative fairness criterion (is
+not generally compatible with a perfect predictor), while
+separation is a conservative fairness criterion (is compatible
+with a perfect predictor).
+C1 Therefore, independence is not generally compatible with
+maximal utility, while separation is.
+C2 Therefore, separation should be preferred over indepen-
+dence.
+There are two main problems with this argument. The first prob-
+lem is premiss 1: It is not the case that accuracy and utility align
+necessarily; see [5]. For one, accuracy only captures the state of
+the world as it is at a certain point in time. Thus, if we maximize
+accuracy, we maximize utility only with regard to short-term goals.
+To take the example of risk assessment, maximizing utility means
+minimizing current risk. This does not take into account the value
+of changing risk assessment so as to minimize, say, future risk,
+which can be tied to, say, racial justice. It is explicitly noted in [5]
+that utility according to present risk scores is “immediate utility”.
+Furthermore, note that if we have a predictor 𝑅 that is not perfect,
+and false positives and false negatives have different utilities, we
+may have to choose a predictor 𝑅′ that is even less accurate than 𝑅
+to maximize utility.
+The second problem is the step from conclusion 1 to conclusion
+2. As is often pointed out in the computer science literature, we
+virtually never have a perfect predictor. So we are almost never in a
+situation where it actually matters that a fairness measure is conser-
+vative, i.e., that the measure is compatible with the perfect predictor.
+However, if we are almost never in this situation, conservativeness
+is a theoretical concern, but practically irrelevant. A situation that
+5
+133
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Tim Räz
+is practically irrelevant should not guide our choice of fairness mea-
+sure. So, there is no practical reason to prefer conservative fairness
+measures over non-conservative ones.5
+It could be thought that the above argument also goes through
+for broader notions of conservativeness, i.e., that it holds for incre-
+ments of accuracy: if we increase accuracy, and this automatically
+increases the degree to which a fairness measure holds, then we
+do not need a perfect predictor for accuracy to be of practical rele-
+vance; the two align in increments. In fact, Hardt et al. appear to
+have an argument along these lines in mind. Immediately after the
+passage quoted above, they write:
+[O]ur criterion is easier to achieve the more
+accurate the predictor 𝑌 is, aligning fairness
+with the central goal in supervised learning of
+building more accurate predictors. [8, p. 2]
+This claim, however, is false in view of proposition 8, which
+establishes that it is possible to start with a predictor 𝑅 that satisfies
+separation, increase the accuracy of 𝑅, and obtain a new predictor
+𝑅′ that no longer satisfies separation. Proposition 8 shows that both
+separation and sufficiency are not incrementally conservative, and
+that, therefore, an incremental version of the above argument does
+not support separation or sufficiency as opposed to independence.
+Let us now turn to the second reading of the argument in the
+quote from Hardt et al., which focuses on the relation between
+accuracy and fairness:
+𝑃1∗ A perfect predictor is (maximally) fair, because it aligns with
+the actual outcome.
+𝑃2∗ Independence is a non-conservative fairness criterion (is
+not generally compatible with a perfect predictor), while
+separation is a conservative fairness criterion (is compatible
+with a perfect predictor).
+C1* Therefore, independence is not generally compatible with a
+(maximally) fair predictor, while separation is.
+C2* Therefore, separation should be preferred over indepen-
+dence.
+There are, again, two problems with this argument. The first
+problem, the step from the first to the second conclusion, was al-
+ready discussed above – we can reasonably doubt the practical
+relevance of perfect predictors, because they are virtually never re-
+alized, and an incremental version of the argument is demonstrably
+false. The second, more fundamental problem is premiss 𝑃1∗. This
+premiss is unsupported, and, arguably, wrong in general. Premiss
+𝑃1∗ is problematic both from a philosophical and from a computer
+science perspective.
+From a computer science perspective, there are important aspects
+of algorithmic fairness that are not captured by group fairness
+measures, and this is well known. Take, for example, the kinds of
+fairness discussed in [10]; see section 2.4 above. Negative legacy is
+unfairness due to unfair sampling or labeling. Consider the case of
+unfair labeling. Unfair labeling means that the distribution 𝑃 (𝑌,𝐴)
+is unfair, i.e., the distribution of actual outcomes 𝑌 we measure at
+a certain point in time favors one of the groups in 𝐴 over another
+5Note that from a conceptual or philosophical point of view, it could be worthwhile
+to explore the case of perfect predictors. The argument made here takes the more
+practical position of computer science that perfect predictors are negligible as a point
+of departure.
+in a way we consider to be unfair. What premiss 𝑃1∗ says is that a
+perfect predictor 𝑅 is fair because it aligns with the actual outcome,
+i.e., because we have 𝑌 = 𝑅. However, 𝑌 = 𝑅 only provides a good
+justification of the fairness of 𝑅 with respect to 𝐴, i.e., of 𝑃 (𝑅,𝐴),
+if the distribution 𝑃 (𝑌,𝐴) itself is fair, which need not be the case
+if labeling is unfair; this is what Kamishima et al. point out. The
+distribution 𝑃 (𝑌,𝐴) can arise through unfair practices, historical
+biases, and so on.
+Importantly, Kamishima et al. also point out that this sort of
+unfairness is hard to detect or measure if we do not have access to a
+sample with fair labeling, such that we can obtain a fair estimate of
+𝑃 (𝑌,𝐴). But of course, just because it can be hard, or even impossi-
+ble, to quantify negative legacy, does not mean that this quantity
+is of no ethical import. Fairness is completely independent of our
+ability to measure it.
+Let us illustrate these points with some examples. Why should
+we think that an accurate predictor is fair? One of the reasons
+may be that an accurate predictor aligns with the ground truth
+𝑌 . And trying to align predictions with the truth should not be
+considered to be discriminatory – this is the point made by Hardt
+et al. in the above quote. To address this point, recall what truth
+means in the present context: It means that 𝑌 captures what we
+observe in the world at a certain point. For example, we observe
+that people from group 𝑝 in fact get arrested more frequently than
+people from group 𝑞, we observe that group 𝑝 in fact has more loan
+applications rejected than group 𝑞, and so on. This is what the joint
+distribution of 𝑌 and 𝐴 captures. In other words, the distribution
+𝑃 (𝑌,𝐴) is a picture of the status quo. However, the world as it is at
+a certain point, or the status quo, is not a moral category. It is just
+a description of what we find in the world. It does not answer the
+question whether the world as we find it is fair, or morally justified.
+Finding the world to be a certain way, and inferring from this that
+the world ought to be this way, is committing a fallacy according to
+some philosophers, based on a confusion between facts and values;
+see, e.g., the discussion of the Is-Ought gap in [15, Sec. 2.1.].
+At this point, it could be objected that in some cases, the distribu-
+tion of labels does have moral import. Take, for example, the often-
+mentioned case of violent offenders. If the distribution 𝑃 (𝑌,𝐴)
+captures the historical record of reoffending of violent criminals
+in the past, then it makes sense to align our predictor 𝑅 with 𝑌 .
+It seems that we cannot just ignore the historical record in favor
+of a group fairness measure such as independence. The price we
+pay by releasing (potentially) violent criminals from one group, or
+by locking up (potentially) innocent members of the other group
+because these groups have different frequencies with respect to 𝑌 ,
+seems very high, and the choice of such a predictor seems morally
+wrong. A form of this argument is made in the following passage of
+[3, p. 14]: “[Independence] has been criticized because it can lead
+to highly undesirable decisions for individuals (Dwork et al. 2012).
+One might incarcerate Muslims who pose no public safety risk so
+that the same proportions of Muslims and Christians are released
+on parole.”
+The response to this objection is that it is perfectly possible that
+ignoring the status quo has undesirable moral consequences, as in
+the case of violent offenders. However, this does not invalidate the
+point that the status quo in itself does not have moral status. It just
+means that the status quo can impact considerations of fairness
+6
+134
+Group Fairness: Independence Revisited FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+in some cases, and that we may have to weight the moral conse-
+quences of sticking to or deviating from the status quo against other
+considerations of fairness. We will turn to a discussion of how this
+could be achieved in the next section.
+4 ARGUMENTS IN FAVOR OF
+INDEPENDENCE
+So far, we have examined arguments against independence, and we
+have found that the case against independence is not as clear cut
+as some of the computer science literature suggests. In this section,
+we turn to the case for independence. Why is independence a good
+or useful fairness measure? We compare independence to other
+notions of group fairness to highlight its usefulness, but also its
+limitations. Our goal is not to recapitulate the philosophical liter-
+ature that supports independence. Rather, our goal is to establish
+some connections between philosophical concerns and the more
+formal discussion in computer science.
+Independence is defined as 𝑅 ⊥ 𝐴, that is, probabilistic indepen-
+dence of group membership and prediction. Note that in practice, it
+makes sense to not require strict independence, but an approximate
+version of independence. One justification of independence is that it
+controls, and potentially compensates, for historical injustice. One
+manifestation of historical injustice is what Kamishima et al. call
+negative legacy [10], viz. a distribution 𝑃 (𝑌,𝐴) that we consider
+to be unjust. The distribution can be unjust because it does not
+adequately represent the true properties of the groups involved –
+this would correspond to unfair sampling, in which case we may
+not know the true distribution – , or because the distribution does
+represent the true properties of the groups involved, but these prop-
+erties themselves did not come about in a fair way – this would
+correspond to unfair labeling.6
+Formally, negative legacy can manifest as a correlation between
+group membership 𝐴 and ground truth 𝑌 , i.e., 𝑌 ̸⊥ 𝐴: if the groups
+𝐴 should have equal access to the outcome encoded by 𝑌 , there
+should be no correlation between group membership and outcome,
+i.e., we should have𝑌 ⊥ 𝐴. Note that, as in the case of independence,
+we can formulate an approximate version of this requirement. Now,
+if we build a predictor 𝑅 with a focus on accuracy, as it is usually
+the case, we get 𝑅 ≈ 𝑌 , i.e., the predictor is approximately accurate.
+However, this also implies that the predictor 𝑅 does not satisfy
+(an approximate version of) independence. Thus, independence
+helps us detect this form of historical injustice, and it suggests that
+we modify 𝑅, such that, approximately, we obtain 𝑅 ⊥ 𝐴. This
+modification of 𝑅 may also influence negative legacy in the long
+run by moving the distribution 𝑌 closer to the desired 𝑌 ⊥ 𝐴 over
+time, such that accuracy and independence align naturally. This is
+one argument in favor of independence.
+To better understand the usefulness of independence as a fair-
+ness measure, let us compare it to other kinds of measures. Take,
+first, sufficiency and separation. The main difference between inde-
+pendence on the one hand, and sufficiency and separation on the
+other, is that independence is formulated without 𝑌 . This means
+that while sufficiency and separation track the difference between a
+6Note that above, we have excluded the first case through the assumption that the
+confusion matrices are at least approximately representative of the true probabilities.
+We have not excluded the second case.
+prediction 𝑅 and the truth given by 𝑌 – they are measures of error
+or deviation from the truth – independence does not track devia-
+tion from the truth. Prima facie, this may seem like a deficiency
+of independence. However, as was just explained, independence
+helps us detect unfairness in the distribution of 𝑌 exactly because
+it does not focus on deviations from 𝑌 . It helps us to see what may
+be wrong with the distribution of 𝑌 itself. This is an advantage of
+independence in contrast to separation and sufficiency.
+Now let us compare independence to affirmative action, viz., the
+requirement that predictions 𝑅 have to satisfy certain thresholds or
+quota. In the case of college admissions, the requirement could be
+that a certain percentage of admitted candidates have to bemembers
+of a racial minority; see [9] for a discussion of affirmative action
+in the context of college admissions. A justification for affirmative
+action is to compensate for historical injustice. In this respect, the
+justification of affirmative action is similar to the justification of
+independence given above.
+However, there are also important differences between indepen-
+dence and affirmative action. One difference is that independence
+only requires predictions to be independent of group membership.
+Affirmative action, on the other hand, can be more stringent in
+requiring that predictions satisfy certain proportions. For example,
+if only 10% of college applicants belong to a minority, indepen-
+dence would require that the admission rate for these 10% is the
+same as the general admission rate, while affirmative action may
+require that the admission rate among the 10% is larger to allow for
+a given balance of admitted candidates, irrespective of application
+rates. This means that independence, formulated for a given set
+of applicants, will not correct for certain kinds of biases such as
+underrepresentation of groups among applicants, while affirmative
+action may correct for this kind of bias.
+More generally, it should be stressed that while independence
+may highlight and help to compensate for certain kinds of historical
+injustice, implementing it will not correct for many other forms
+of injustice. In particular, independence prescribes an intervention
+only on the prediction 𝑅, which can be interpreted as a compen-
+sation for a certain distribution of 𝑌 , and does not prescribe an
+intervention on the causes of this distribution, or an intervention
+on the effects of this distribution.
+5 HOW TO REASON ABOUT FAIRNESS
+MEASURES
+We have now seen arguments both in favor and against indepen-
+dence, and we have found that there is some validity to arguments
+on both sides. How should we proceed from here? How should
+these arguments be weighted? We will not be able to answer these
+questions here, but we can provide some rough guidelines in view
+of the above discussion.
+First, we should always explicitly state the moral value of either
+choosing or rejecting a group fairness measure such as indepen-
+dence, as opposed to arguing solely on the basis of factual and
+descriptive properties of fairness measures. We have seen why this
+is important in the case of independence. We have argued that accu-
+racy in and of itself does not have moral value. We do not deny that
+accuracy can be morally beneficial in certain situations or contexts;
+however, it is these moral benefits we care about, and they should
+7
+135
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Tim Räz
+be stated. For example, if neglecting accuracy has substantial social
+costs in some cases, this is what we care about, and not accuracy
+per se. Only once the values supporting arguments for or against
+independence have been made explicit can we weight them.
+Second, gerrymandering is a problem shared by all measures
+of group fairness. It is possible to violate individual fairness while
+complying with sufficiency or separation, just as it is possible to
+comply with independence. Now, there is already a lot of work in
+computer science dealing with this problem, beginning with [7],
+who examine under which conditions independence and individ-
+ual fairness can be combined. One of the problems of combining
+measures of group fairness and individual fairness will be, once
+more, to make the moral value of either choice explicit and assign
+appropriate weights to these choices.
+Third, it is a mistake to think that we can either require or reject
+measures of group fairness independently of the case to which it is
+applied. Rather, the importance of different group fairness measures
+is context dependent. We have seen examples of this above: The
+cost of requiring independence in the case of classifying violent
+offenders is different from the cost of requiring independence in
+the case of college admissions. In the first case, the cost of making
+mistakes seems high; in the second case, the cost of makingmistakes
+seems lower both for individuals and for society; see [4].
+Fourth, the preceding two points suggest that none of the group
+fairness measures we discussed here are logically necessary or log-
+ically sufficient for fairness: They cannot be logically sufficient
+because they violate individual fairness at least in some cases, and
+they cannot be logically necessary because they appear to be in
+conflict with our intuitions about fairness in other cases. This also
+suggests to interpret these measures of group fairness not as abso-
+lute criteria for fairness. Rather, they can be indicative of fairness
+or unfairness depending on the case at hand.
+6 CONCLUSION
+In this paper, we have examined the discussion of independence
+in the computer science literature, and we have found that some
+arguments against independence are not convincing in that they
+either equally apply to other measures of group fairness, or unduly
+emphasize descriptive properties of fairness measures, viz. con-
+servativeness, as opposed to normative ones. We have also made
+a positive case for independence, arguing that it can highlight a
+distinct kind of unfairness not captured by sufficiency or separa-
+tion. The main upshot of the present paper is that independence is
+an important measure of group fairness that has to be taken into
+account in discussions of algorithmic fairness.
+A PROOFS
+Here we give proofs of the propositions in the main text. All propo-
+sitions and proofs can be found in the literature [2, 6, 16] and are
+collected here for convenience’s sake, except for the proof of propo-
+sition 8, which is new. We first state some useful properties of
+conditional independence (see the above references for proofs):
+Proposition 16. Properties of conditional independence:
+(1) If 𝑋 ⊥ 𝑌 | 𝑍 , then 𝑌 ⊥ 𝑋 | 𝑍 ;
+(2) if 𝑋 ⊥ 𝑌 | 𝑍 and 𝑈 = ℎ(𝑋 ), then i) 𝑈 ⊥ 𝑌 | 𝑍 and ii)
+𝑋 ⊥ 𝑌 | (𝑍,𝑈 );
+(3) if 𝑌 = ℎ(𝑍 ), then 𝑋 ⊥ 𝑌 | 𝑍 ;
+(4) 𝑋 ⊥ 𝑌 | 𝑍 and 𝑋 ⊥𝑊 | (𝑌, 𝑍 ) iff. 𝑋 ⊥ (𝑊,𝑌 ) | 𝑍 ;
+(5) if 𝑋 ⊥ 𝑌 | 𝑍 , 𝑋 ⊥ 𝑍 | 𝑌 , and (X,Y,Z) is positively distributed
+everywhere, then 𝑋 ⊥ (𝑌, 𝑍 ).
+Note that properties 1, 2, 3 also hold without conditioning on 𝑍 .
+Proof of proposition 4: A perfect predictor means that 𝑌 = 𝑅.
+Sufficiency means 𝐴 ⊥ 𝑌 | 𝑅 and separation means 𝐴 ⊥ 𝑅 | 𝑌 .
+For a perfect predictor, these reduce to 𝐴 ⊥ 𝑌 | 𝑌 . By property
+3 of conditional independence, this is true for a perfect predictor
+because 𝑌 = 𝑓 (𝑌 ). □
+Proof of proposition 6: The direction (1) ⇒ (2) is property 5 of
+conditional independence. The direction (2)⇒ (1) can be seen as
+follows: view (𝑌, 𝑅) as a two-dimensional random variable, note
+that 𝑌 and 𝑅 are functions of this random variable (projection),
+then the result follows from property 2 of conditional independence
+(without conditioning on 𝑍 ). □
+Proof of Proposition 8 (Incremental Conservativeness):
+We show that sufficiency and separation are not, in general,
+preserved if the accuracy of a predictor is increased, by giving an
+example where accuracy increases but separation and sufficiency
+are lost. First, consider the two following confusion matrices (recall
+that 𝑌 stands for the true label, while 𝑅 stands for the prediction):
+Y
++ – total
+R + 10 2 12
+– 3 11 14
+total 13 13
+Table 3: Group A=p
+Y
++ – total
+R + 20 4 24
+– 6 22 28
+total 26 26
+Table 4: Group A=q
+These matrices satisfy sufficiency and separation; the easiest
+way to see this is to check that the table for 𝑞 is a multiple of the
+table for 𝑝 , so the relative frequencies are the same, which implies
+that sufficiency and separation are satisfied by proposition 6. It
+can also be checked by hand, by using the relation between the
+statistics of confusion matrices on the one hand and fairness on the
+other, explained in section 2.3. Now we increase the accuracy of
+the predictor 𝑅, by taking, in each group, an element of the false
+negatives and shifting it to the true positives. This yields a new
+predictor 𝑅′ with the following confusion matrices:
+Y
++ – total
+R’ + 11 2 13
+– 2 11 13
+total 13 13
+Table 5: Group A=p
+Y
++ – total
+R’ + 21 4 25
+– 5 22 27
+total 26 26
+Table 6: Group A=q
+Note that the predictor is more accurate in both groups. Now
+we check whether these tables satisfy sufficiency and separation.
+For sufficiency, we would need that the positive predictive values
+(PPV) agree, but we have:
+𝑎
+𝑎 + 𝑏 =
+11
+13
+≠
+21
+25
+=
+𝑎′
+𝑎′ + 𝑏 ′ (1)
+8
+136
+Group Fairness: Independence Revisited FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+For separation, we would need that the false negative rates (FNR)
+agree, but we have:
+𝑐
+𝑎 + 𝑐 =
+2
+13
+≠
+5
+26
+=
+𝑐 ′
+𝑎′ + 𝑐 ′ (2)
+Thus, we have increased accuracy and lost both separation and
+sufficiency. This shows that separation and sufficiency are not in-
+crementally conservative fairness measures. □
+Note that if we had increased accuracy in proportion to group
+size, i.e., if we had shifted two elements instead of one from false
+negatives to true positives in group 𝑞, we would have preserved
+sufficiency and separation. The reason for this is that this increment
+would have preserved the proportions of the confusion matrices
+between the two groups. However, this is a very special kind of
+increment. The case we have discussed above, with increments
+not proportional to the size of the groups, is easier to realize and
+presumably more common.
+Proof of proposition 10: Sufficiency for groups 𝐴 = 𝑝, 𝑞 means, in
+the case 𝑅 = + and 𝑌 = +:
+𝑃 (𝑌 = + | 𝐴 = 𝑝, 𝑅 = +) = 𝑃 (𝑌 = + | 𝐴 = 𝑞, 𝑅 = +)
+⇔ 𝑎
+𝑎 + 𝑏 =
+𝑎′
+𝑎′ + 𝑏 ′ ,
+where the choice of 𝑌 = − yields an equivalent condition; the
+same reasoning holds for 𝑅 = −. □
+Proof of proposition 11: Similar to proof of proposition 10.
+ACKNOWLEDGMENTS
+I thank Michele Loi, Corinna Herweck, and members of the phi-
+losophy of science research colloquium in the Fall of 2020 at the
+University of Bern for helpful comments on an earlier draft of the
+paper. This work is supported by the National Research Programme
+“Digital Transformation” (NRP 77) of the Swiss National Science
+Foundation (SNSF) under Grant No.: 187473.
+REFERENCES
+[1] Angwin, J., J. Larson, S. Mattu, and L. Kirchner. 2016. Machine bias: There’s
+software used across the country to predict future criminals. and it’s biased
+against blacks. ProPublica.
+[2] Barocas, S., M. Hardt, and A. Narayanan. 2019. Fairness and Machine Learning.
+fairmlbook.org.
+[3] Berk, R., H. Heidari, S. Jabbari, M. Kearns, and A. Roth. 2018. Fairness in Criminal
+Justice Risk Assessments: The State of the Art. Sociological Methods & Research .
+[4] Chouldechova, A. 2017. Fair prediction with disparate impact: A study of bias in
+recidivism prediction instruments. ArXiv:1703.00056v1.
+[5] Corbett-Davies, S., E. Pierson, A. Feller, S. Goel, and A. Huq. 2017. Algorithmic
+Decision Making and the Cost of Fairness. KKD ’17 : 797–806.
+[6] Dawid, A. P. 1979. Conditional Independence in Statistical Theory. Journal of
+the Royal Statistical Society. Series B (Methodological) 41(1): 1–31.
+[7] Dwork, C., M. Hardt, T. Pitassi, O. Reingold, and R. S. Zemel. 2012. Fairness
+through Awareness. Proc. ACM ITCS, pp. 214—226.
+[8] Hardt, M., E. Price, and N. Srebro. 2016. Equality of Opportunity in Supervised
+Learning. Advances in Neural Information Processing Systems.
+[9] Hertweck, C. 2020. Designing Affirmative Action Policies under Uncertainty.
+Master’s thesis, University of Helsinki.
+[10] Kamishima, T., S. Akaho, and J. Sakuma. 2011. Fairness-aware Learning through
+Regularization Approach. 2011 IEEE 11th International Conference on Data
+Mining Workshops.
+[11] Kearns, M., S. Neel, A. Roth, and Z. S. Wu. 2018. Preventing Fairness Gerryman-
+dering: Auditing and Learning for Subgroup Fairness. PMLR 80: 2564–2572.
+[12] Kleinberg, J. M., S. Mullainathan, and M. Raghavan. 2016. Inherent Trade-Offs in
+the Fair Determination of Risk Scores. CoRR abs/1609.05807.
+[13] Loi, M., A. Herlitz, and H. Heidari. 2019. A Philosophical Theory of Fairness for
+Prediction-Based Decisions. Http://dx.doi.org/10.2139/ssrn.3450300.
+[14] Miller, D. 2017. Justice. The Stanford Encyclopedia of Philosophy.
+[15] Väyrynen, P. 2019. Thick Ethical Concepts. The Stanford Encyclopedia of
+Philosophy.
+[16] Wasserman, L. 2004. All of Statistics. Springer Texts in Statistics. New York:
+Springer.
+[17] Zemel, R., Y. Wu, K. Swersky, T. Pitassi, and C. Dwork. 2013. Learning fair
+representations. ICML’13 : 325–33.
+9
+137

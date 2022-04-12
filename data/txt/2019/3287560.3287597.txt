@@ -1,0 +1,1254 @@
+The Disparate Effects of Strategic Manipulation
+Lily Hu
+Harvard University
+Cambridge, MA
+lilyhu@g.harvard.edu
+Nicole Immorlica
+Microsoft Research
+Cambridge, MA
+nicimm@microsoft.com
+Jennifer Wortman Vaughan
+Microsoft Research
+New York, NY
+jenn@microsoft.com
+ABSTRACT
+When consequential decisions are informed by algorithmic input,
+individuals may feel compelled to alter their behavior in order to
+gain a system’s approval. Models of agent responsiveness, termed
+"strategic manipulation," analyze the interaction between a learner
+and agents in a world where all agents are equally able to manip-
+ulate their features in an attempt to “trick" a published classi￿er.
+In cases of real world classi￿cation, however, an agent’s ability
+to adapt to an algorithm is not simply a function of her personal
+interest in receiving a positive classi￿cation, but is bound up in a
+complex web of social factors that a￿ect her ability to pursue certain
+action responses. In this paper, we adapt models of strategic ma-
+nipulation to capture dynamics that may arise in a setting of social
+inequality wherein candidate groups face di￿erent costs to manipu-
+lation. We ￿nd that whenever one group’s costs are higher than the
+other’s, the learner’s equilibrium strategy exhibits an inequality-
+reinforcing phenomenon wherein the learner erroneously admits
+some members of the advantaged group, while erroneously exclud-
+ing some members of the disadvantaged group. We also consider
+the e￿ects of interventions in which a learner subsidizes members
+of the disadvantaged group, lowering their costs in order to im-
+prove her own classi￿cation performance. Here we encounter a
+paradoxical result: there exist cases in which providing a subsidy
+improves only the learner’s utility while actually making both can-
+didate groups worse-o￿—even the group receiving the subsidy. Our
+results reveal the potentially adverse social rami￿cations of deploy-
+ing tools that attempt to evaluate an individual’s “quality” when
+agents’ capacities to adaptively respond di￿er.
+CCS CONCEPTS
+• Computing methodologies → Machine learning; • Theory
+of computation → Algorithmic game theory;
+KEYWORDS
+fairness in machine learning; strategic classi￿cation
+ACM Reference Format:
+Lily Hu, Nicole Immorlica, and Jennifer Wortman Vaughan. 2019. The Dis-
+parate E￿ects of Strategic Manipulation. In FAT* ’19: Conference on Fairness,
+Accountability, and Transparency (FAT* ’19), January 29–31, 2019, Atlanta,
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for pro￿t or commercial advantage and that copies bear this notice and the full citation
+on the ￿rst page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior speci￿c permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+https://doi.org/10.1145/3287560.3287597
+GA, USA. ACM, New York, NY, USA, 18 pages. https://doi.org/10.1145/
+3287560.3287597
+1 INTRODUCTION
+The expanding realm of algorithmic decision-making has not only
+altered the ways that institutions conduct their day-to-day oper-
+ations, but has also had a profound impact on how individuals
+interface with these institutions. It has changed the ways we com-
+municate with each other, receive crucial resources, and are granted
+important social and economic opportunities. Theoretically, algo-
+rithms have great potential to reform existing systems to become
+both more e￿cient and equitable, but as exposed by various high-
+pro￿le investigations [2, 11, 23, 27], prediction-based models that
+make or assist with consequential decisions are, in practice, highly
+prone to reproducing past and current patterns of social inequality.
+While few algorithmic systems are explicitly designed to be
+discriminatory, there are many underlying forces that drive such
+socially biased outcomes. For one, since most of the features used
+in these models are based on proxy, rather than causal, variables,
+outputs often re￿ect the various structural factors that bear on
+a person’s life opportunities rather than the individualized char-
+acteristics that decision-makers often seek. Much of the previous
+work in algorithmic fairness has examined a particular undesir-
+able proxy e￿ect in which a classi￿er’s features may be linked to
+socially signi￿cant and legally protected attributes like race and
+gender, interpreting correlations that have arisen due to centuries
+of accumulated disadvantage as genuine attributes of a particular
+category of people [13, 15, 19, 24].
+But algorithmic models do not only generate outcomes that pas-
+sively correlate with social advantages or disadvantages. These
+tools also provoke a certain type of reactivity, in which agents
+see a classi￿er as a guide to action and actively change their be-
+havior to accord with the algorithm’s preferences. On this view,
+classi￿ers both evaluate and animate their subjects, transforming
+static data into strategic responses. Just as an algorithm’s use of
+certain features di￿erentially advantages some populations over
+others, the room for strategic response that is inherent in many
+automated systems also naturally favors social groups of privilege.
+Admissions procedures that heavily weight SAT scores motivate
+students who have the means to take advantage of test prep courses
+and even take the exam multiple times. Loan approval systems that
+rely on existing lines of credit as an indication of creditworthiness
+encourage those who can to apply for more credit in their name.
+Thus an algorithm that scores applicants to determine how a
+resource should be allocated sets a standard for what an ideal candi-
+date’s features ought to be. A responsive subject would look to alter
+how she appears to a classi￿er in order to increase her likelihood
+of gaining the system’s approval. But since reactivity typically re-
+quires informational and material resources that are not equally
+accessible to all, even when an algorithm draws on features that
+seem to arise out of individual e￿ort, these metrics can be skewed
+to favor those who are more readily able to alter their features.
+In the machine learning literature, agent reactivity to a classi￿er
+is termed “strategic manipulation.” Since previous work in strategic
+classi￿cation has typically depicted agent-classi￿er interactions as
+antagonistic, such actions are usually viewed as distortions that
+aim to undermine a learner’s classi￿er [5, 14]. As shown in Hardt
+et al. [14], a learner who anticipates these responses can, under
+certain formulations of agent costs, adapt to protect against the mis-
+classi￿cation errors that would have resulted from manipulation,
+recovering an accuracy level that is arbitrarily close to the theoreti-
+cal maximum. These results are welcome news for a learner who
+correctly assesses agents’ best-responses. Indeed in most strategic
+manipulation models, agents are depicted as equally able to pursue
+manipulation, allowing the learner who knows their costs to accu-
+rately preempt strategic responses. While there are occasions in
+which agents do largely face homogenous costs—an even playing
+￿eld—in many other social use cases of machine learning tools,
+agents do not encounter the same costs of altering the attributes
+that are ultimately observed and assessed by the classi￿er. As such,
+in this paper we ask, “What are the e￿ects of strategic classi￿cation
+and manipulation in a world of social strati￿cation?”
+As in previous work in strategic classi￿cation, we cast the prob-
+lem as a Stackelberg game in which the learner moves ￿rst and
+publishes her classi￿er before candidates best-respond and manip-
+ulate their features [1, 5, 7, 14]. But in contrast with the models
+in Brückner & Sche￿er [5] and Hardt et al. [14], we formalize the
+setting of a society comprised of social groups that not only may
+di￿er in terms of distributions over unmanipulated features and
+true labeling functions but also face di￿erent costs to manipulation.
+This extra set of di￿erences brings to light questions that favor an
+analysis that focuses on the welfares of the candidates who must
+contend with these classi￿ers: Do classi￿ers formulated with strate-
+gic behavior in mind impose disparate burdens on di￿erent groups?
+If so, how can a learner mitigate these adverse e￿ects? The altered
+gameplay and outcomes of strategic classi￿cation beg questions of
+fairness that are intertwined with those of optimality.
+Though our model is quite general, we obtain technical results
+that reveal important social rami￿cations of using classi￿cation
+in systems marked by deep inequalities and a potential for ma-
+nipulation. Our analysis shows that, under our model, even when
+the learner knows the costs faced by di￿erent groups, her equi-
+librium classi￿er will always act to reinforce existing inequalities
+by mistakenly excluding quali￿ed candidates who are less able to
+manipulate their features while also mistakenly admitting those
+candidates for whom manipulation is less costly, perpetuating the
+relative advantage of the privileged group. We delve into the cost
+disparities that generate such inevitable classi￿cation errors.
+Next, we consider the impact of providing subsidies to lighten
+the burden of manipulation for the disadvantaged group. We ￿nd
+that such an intervention can improve the learner’s classi￿cation
+performance as well as mitigate the extent to which her errors are
+inequality-reinforcing. However, we show that there exist cases in
+which providing subsidies enforces an equilibrium learner strategy
+that actually makes some individual candidates worse-o￿ without
+making any better-o￿. Paradoxically, in these cases, paying a sub-
+sidy to the disadvantaged group actually bene￿ts only the learner
+while both candidate groups experience a welfare decline! Further
+analysis of these scenarios reveals that, in many cases, all parties
+would have preferred a world in which manipulation of features
+was not possible for any candidates.
+Our paper’s agent-centric analysis views data points as represent-
+ing individuals and classi￿cations as impacting those individuals’
+welfares. This orientation departs from the dominant perspective
+in learning theory, which privileges a vendor’s predictive accu-
+racy, and instead evaluates classi￿cation regimes in light of the
+social consequences of the outcomes they issue. By incorporating
+insights and techniques from game theory and economics, domains
+that consider deeply the e￿ects of various policies on agents’ be-
+haviors and outcomes, we hope to broaden the perspective that
+machine learning takes on socially-oriented tools. Presenting more
+democratically-inclined analysis has been central to the ￿eld of
+algorithmic fairness, and we hope our work sheds new light on this
+generic setting of classi￿cation with strategic agents.
+1.1 Related Work
+While many earlier approaches to strategic classi￿cation in the
+machine learning literature have tended to view learner-agent in-
+teractions as adversarial [3, 16], our work does not assume inher-
+ently antagonistic relationships, and instead, shares the Stackelberg
+game-theoretic perspective akin to that presented in Brückner &
+Sche￿er [5] and built upon by Hardt et al. [14]. Departing from
+these models’ focus on static prediction and homogeneous manipu-
+lation costs, Dong et al. [8] propose an online setting of strategic
+classi￿cation in which agents appear sequentially and have individ-
+ual costs for manipulation that are unknown to the learner. Unlike
+our work, they take a traditional learner-centric view, whereas our
+concerns are with the welfare of the candidates.
+Agent features and potential manipulations in the face of a
+learner classi￿er can also be interpreted as serving informational
+purposes. In the economics literature on signaling theory, agents in-
+teract with a principal—the counterpart to our learner—via signals
+that convey important information relevant to a particular task at
+hand. Classic works, such as Spence’s paper on job-market signal-
+ing, focus their analysis on the varying quality of information that
+signals provide at equilibrium [25]. The emphasis in our analysis
+on di￿erent group costs shares features with a recent update to the
+signaling literature by Frankel & Kartik [12], who also distinguish
+between natural actions, corresponding to unmanipulated features
+in our model, and “gaming" ability, which operate similarly to our
+cost functions. The connection between gaming capacity and social
+advantage is also explicitly discussed in work by Esteban & Ray [10]
+who consider the e￿ects of wealth and lobbying on governmental
+resource allocation. While most works in the economics signaling
+literature center on the decay of the informativeness of signals as
+gaming and natural actions become indistinguishable, some recent
+work in computer science has also considered the e￿ect of costly
+signaling on mechanism design [17, 18]. In contrast to both of these
+perspectives, our work highlights the e￿ect of manipulation on a
+learner’s action and as a consequence, on the agents’ welfares.
+In independent, concurrent work appearing at the same con-
+ference, Milli et al. [22] also consider the social impacts of strate-
+gic classi￿cation. Whereas our model highlights the interplay be-
+tween a learner’s Stackelberg equilibrium classi￿er and agents’
+best-response manipulations at the feature level, their work traces
+the relationship between the learner’s utility and the social bur-
+den, a measure of agents’ manipulation costs. They show that an
+institution must select a point on the outcome curve that trades
+o￿ its predictive accuracy with the social burden it imposes. In
+their model, an agent with an unmanipulated feature vector x has
+a likelihood `(x) of having a positive label and can manipulate to
+any vector y with `(y)  `(x) at zero cost, or to y with `(y) > `(x)
+for a positive cost. This assumption, called “outcome monotonicity,"
+allows them to reason about manipulations in (one-dimensional)
+likelihood space rather than feature space, since the optimal learner
+strategies amount to thresholds on likelihoods. In contrast, we al-
+low features to be di￿erently manipulable (perhaps a student can
+boost her SAT score via test prep courses, but can do nothing to
+change her grades from the previous year, and cannot freely obtain
+a higher SAT score in exchange for a worse record of extracurricular
+activities), which a￿ects the forms of both the learner’s equilibrium
+classi￿er and agents’ best-response manipulations. Despite these
+di￿erences in model and focus, their analysis yields results that are
+qualitatively similar to ours. Highlighting the di￿erential impact of
+classi￿ers on social groups, they also ￿nd that overcoming stringent
+thresholds is more burdensome on the disadvantaged group.
+2 MODEL FORMALIZATION
+As in Brückner & Sche￿er [5] and Hardt et al. [14], we formalize the
+Strategic Classi￿cation Game as a Stackelberg competition in which
+the learner moves ￿rst by committing to and publishing a binary
+classi￿er f . Candidates, who are endowed with “innate” features,
+best respond by manipulating their feature inputs into the classi￿er.
+Formally, a candidate is de￿ned by her d-dimensional feature vector
+x 2 X = [0, 1]d and group membership A or B, with A signifying
+the advantaged group and B the disadvantaged. Group membership
+bears on manipulation costs such that a candidate from groupm
+who wishes to move from a feature vector x to a feature vector y
+must pay a cost of cm (y)   cm (x). We note that these cost function
+forms are similar to the class of separable cost functions considered
+in Hardt et al. [14]. We assume that higher feature values indicate
+higher quality to the learner, and thus restrict our attention to
+manipulations such that y   x, where the symbol   signi￿es a
+component-wise comparison such that y   x if and only if 8i 2 [d],
+ i   xi . Throughout this paper, we study non-negative monotone
+cost functions such that the cost of manipulating from a feature
+vector x to a feature vector y increases as x and y get further apart.
+To motivate this distinction between features and costs, consider
+the use of SAT scores as a signal of academic preparedness in the
+U.S. college admissions process. The high-stakes nature of the SAT
+has encouraged the growth of a test prep industry dedicated to help-
+ing students perform better on the exam. Test preparation books
+and courses, while also exposing students to content knowledge
+and skills that are covered on the SAT, promise to “hack" the exam
+by training students to internalize test-taking strategies based on
+the format, structure, and style of its questions. One can view SAT
+scores as a feature used by a learner building a classi￿er to select
+candidates with su￿cient academic success according to some cho-
+sen standard. The existence of test prep resources then presents
+an opportunity for some applicants to in￿ate their scores, which
+might “trick” the tool into classifying the candidates as more highly
+quali￿ed than they are in actuality. In this example, a candidate’s
+strategic manipulation move refers to her investment in these re-
+sources, which despite improving her exam score, do not confer any
+genuine bene￿ts to her level of academic preparation for college.
+Just as access to test prep resources tends to fall along income
+and race lines, we view candidates’ di￿erent abilities to manipulate
+as tied to their group membership. We model these group di￿er-
+ences with respect to availability of resources and opportunity by
+enforcing a cost condition that orders the two groups. We suppose
+that for all x 2 [0, 1]d and y   x,
+cA (y)   cA (x)  cB (y)   cB (x). (1)
+Manipulating from a feature vector x to y is always at least as costly
+for a member of group B as it is for a member of groupA. We believe
+our model’s inclusion of this cost condition re￿ects an authentic
+aspect of our social world wherein one group is systematically
+disadvantaged with respect to a task in comparison to another.
+In our setup, we also allow groups to have distinct probability
+distributions DA and DB over unmanipulated features and to be
+subject to di￿erent true labeling functions hA and hB de￿ned as
+hA (x) =
+8><>:
+1, 8x such that
+Pd
+i=1wA,ixi    A,
+0, 8x such that
+Pd
+i=1wA,ixi <  A,
+(2)
+hB (x) =
+8><>:
+1, 8x such that
+Pd
+i=1wB,ixi    B ,
+0, 8x such that
+Pd
+i=1wB,ixi <  B .
+(3)
+We assume that hA (x) = 1 =) hB (x) = 1 for all x 2 [0, 1].
+Returning to the SAT example, research has shown that scores are
+skewed by race even before factoring in additional considerations
+such as access to manipulation [6]. In such cases, the true threshold
+for the disadvantaged group is lower than that for the advantaged
+group. We leave this generality in our model to acknowledge and
+account for the in￿uence that various social and historical factors
+have on candidates’ unmanipulated features and not, we emphasize,
+as an endorsement of a view that groups are fundamentally di￿erent
+in ability. A formal description of the Strategic Classi￿cation Game
+with Groups is given in the following de￿nition.
+D￿￿￿￿￿￿￿￿￿ 1 (S￿￿￿￿￿￿￿￿ C￿￿￿￿￿￿￿￿￿￿￿￿￿ G￿￿￿ ￿￿￿￿ G￿￿￿￿￿).
+In the Strategic Classi￿cation Game with Groups, candidates with
+features x 2 [0, 1]d and group memberships A or B are drawn from
+distributionsDA andDB . The population proportion of each group is
+given bypA andpB wherepA+pB = 1. A candidate from groupm pays
+cost cm (y) cm (x) tomove from her original features x to y   x. There
+exist true binary classi￿ers hA and hB , for candidates of each group.
+Probability distributions, cost functions, and true binary classi￿ers are
+all common knowledge. Gameplay proceeds in the following manner:
+(1) The learner issues a classi￿er f generating outcomes {0, 1}.
+(2) Each candidate observes f and manipulates her features x to
+y   x.
+A groupm candidate with features x who moves to y earns a payo￿
+f (y)   (cm (y)   cm (x)).
+The learner incurs a penalty of
+CF P
+X
+m2 {A,B }
+pmPx⇠Dm [hm (x) = 0, f (y) = 1]
++CFN
+X
+m2 {A,B }
+pmPx⇠Dm [hm (x) = 1, f (y) = 0],
+where CF P and CFN denote the cost of a false positive and a false
+negative respectively.
+The learner looks to correctly classify candidates with respect
+to their original features x, whereas each candidate hopes to ma-
+nipulate her features to attain a positive classi￿cation, expending
+as little cost as possible in the process. Under this setup, candidates
+are only willing to manipulate their features if it ￿ips their classi￿-
+cation from 0 to 1 and if the cost of the manipulation is less than 1.
+We note that de￿ning the utility of a positive classi￿cation to be 1
+can be considered a scaling and thus is without loss of generality.
+This learner-candidate interaction is very similar to that studied
+in Hardt et al. [14]. However, our inclusion of groups with distinct
+manipulation costs leads to an ambiguity regarding a candidate’s
+initial features that does not exist when all candidates have an
+equal opportunity to manipulate. In very few cases can a vendor
+distinguish among candidates based on their group membership
+for the explicit purpose of issuing distinct classi￿cation policies,
+especially if that group category is a protected class attribute. As
+such, in our setup, we require that a learner publish a classi￿er that
+is not adaptive to di￿erent agents based on their group identities.
+It is important to note that the positive results in Hardt et al.’s
+[14] formulation of the Strategic Classi￿cation Game, wherein for
+separable cost functions, the learner can attain a classi￿cation error
+at test-time that is arbitrarily close to the optimal payo￿ attainable,
+do not carry over into this setting of heterogeneous groups and
+costs. Even when hA = hB , the existence of di￿erent costs of agent
+manipulation, even when separable as in our model, introduces
+a base uncertainty to the learning problem that generates errors
+that cannot be extricated so long as the learner must publish a
+classi￿er that does not distinguish candidates based on their group
+memberships. Second, an analysis of the learner’s strategy and per-
+formance, the perspective typically taken in most learning theory
+papers, contributes only a partial view of the total welfare e￿ect
+of using classi￿cation in strategic settings. The main objective of
+this paper is to o￿er a more thorough and holistic inspection of all
+agents’ outcomes, paying special heed to the di￿erent outcomes
+experienced by candidates of the two groups. Insofar as all social
+behaviors are impelled by goals, interests, and purposes, we should
+view data that is strategically generated to be the rule rather than
+the exception in social machine learning settings.
+Remark on the assumption that hA and hB are known. Our as-
+sumption that the learner has knowledge of groups’ true labeling
+functions is not central to our analysis. We make such an assump-
+tion to highlight the pure e￿ect of groups’ di￿erential costs of ma-
+nipulation on equilibrium gameplay and consequent welfares rather
+than the potential side e￿ects due to a learner’s noisy estimation of
+the true classi￿ers. Our general ￿ndings do not substantially rely
+on this feature of the model, and the overall results carry through
+into a setting in which the learner optimizes from samples.
+Remark on unequal group costs. The di￿erences in costs cA and
+cB encoded by the cost condition is not restricted to referring only
+to di￿erences in the monetary cost of manipulation. Instead, as is
+common in information economics and especially signaling the-
+ory, “cost” re￿ects the multiplicity of factors that bear on the e￿ort
+exertion required by feature manipulation [4, 21, 25, 26]. To demon-
+strate the generality of our formulation of distinct group costs, we
+show that the cost condition given in (1) is equivalent to a more
+explicit derivation of the choice that an agent faces when deciding
+whether to manipulate her feature.
+A rational agent with feature x will only pursue manipulation if
+her value for a positive classi￿cationminus her cost of manipulation
+exceeds her value for a negative classi￿cation:
+  ( f (x) = 0)    ( f (y) = 1)   u (c (y)   c (x)). (4)
+The monotone function u translates the costs borne by a candidate
+to manipulate from x to y into her “utility space," i.e., it re￿ects
+the value that she places on that expenditure. We can rewrite the
+previous inequality to be
+c (y)   c (x)  u
+ 1 ⇣
+  ( f (y) = 1)    ( f (x) = 0)
+⌘
+. (5)
+Substituting in k = u 1
+⇣
+  ( f (y) = 1)   ( f (x) = 0)
+⌘
+, we have c (y) 
+c (x)  k . Since the same cost expenditure is valued more highly by
+the disadvantaged group than by the advantaged group, the function
+u is more convex for group B than for group A. Thus all else equal,
+we have cA (y)   cA (x)  cB (y)   cB (x) as desired. More generally,
+the functions   , c , and u may each be di￿erent for the groups. As
+such, the disadvantage encoded in the cost condition can arise due
+to di￿erences in valuations of classi￿cations ( ), di￿erences in costs
+(c), or di￿erences in valuations of those costs (u).
+3 EQUILIBRIUM ANALYSIS
+We begin by studying agents’ best-response strategies in the basic
+Strategic Manipulation Game with Groups in which candidates
+belong to one of two groupsA and B, and the cost condition holds so
+that group Bmembers face greater costs to manipulation than group
+A members. To build intuition, we ￿rst consider best-response
+strategies in the one-dimensional case in which candidates have
+features x 2 [0, 1] and group cost functions are of any non-negative
+monotone form. We then move on to consider the d-dimensional
+case in which candidate features are given as vectors x 2 [0, 1]d
+and manipulation costs are assumed to be linear.
+3.1 One-dimensional Features
+In the d = 1 case, the cost condition given in (1) may be written as
+c
+are linear, in the one-dimensional case, they may be written as
+threshold functions where thresholds  A and  B are constants in
+[0, 1] and for agents in groupm, hm (x ) = 1 if and only if x    m .
+A university admissions decision based on a single score is an
+example of such a classi￿er. Although the SAT does not act as the
+sole determinant of admissions in the U.S., in countries such as
+Australia, Brazil, and China, a single exam score is often the only
+factor of applicant quality that is considered for admissions.
+When the learner has access to  A and  B , and group costs cA and
+cB satisfy the cost condition, the following proposition characterizes
+the space of undominated strategies for the learner who seeks to
+minimize any error-penalizing cost function.
+P￿￿￿￿￿￿￿￿￿￿ 1 (O￿￿￿D U￿￿￿￿￿￿￿￿￿￿ L￿￿￿￿￿￿ S￿￿￿￿￿￿￿￿￿).
+Given group cost functions cA and cB and true label thresholds  A
+and  B where  B   A, there exists a space of undominated learner
+threshold strategies [ B , A] ⇢ [0, 1] where  A = c
+ 1
+A (cA ( A ) + 1)
+and  B = c 1B (cB ( B ) + 1). That is, for any error penalties CF P and
+CFN , the learner’s equilibrium classi￿er f is based on a threshold
+  2 [ B , A] such that for all manipulated features  ,
+f ( ) =
+8><>:
+1, 8      ,
+0, 8  <   .
+(6)
+To understand this result, ￿rst notice that if the learner were
+to face only those candidates from group A, she would achieve
+perfect classi￿cation by labeling as 1 only those candidates with
+unmanipulated feature x    A. This strategy is enacted by consider-
+ing candidates’ best-response manipulations. A rational candidate
+would only be willing to manipulate her feature if the gain she
+receives in her classi￿cation exceeds her costs of manipulation. The
+learner would like to guard against manipulations by candidates
+with x <  A but still admit candidates with x    A, so she considers
+the maximum manipulated feature   that is attainable by a rational
+candidate with x =  A who is willing to spend up to a cost of one in
+order to secure a better classi￿cation, as illustrated in Figure 1. The
+maximum such   value is  A, and thus, the learner sets a threshold
+at  A, admitting all those with      A and rejecting all those with
+  <  A. The same reasoning applies to a learner facing only group
+B candidates, and the learner sets a threshold at  B , admitting all
+those candidates with      B and rejecting all those with   <  B .
+It can be shown that for all valid values of  A, B , cA, and cB ,
+necessarily  B   A. Then all classi￿ers with threshold   <  B are
+dominated by  B , in the sense that for any arbitrary error penalties
+CF P and CFN , the learner would su￿er higher costs by setting her
+threshold to be   rather than  B . In the same way, all thresholds
+  >  A are dominated by  A, thus leaving [ B , A] to be the space
+of undominated thresholds. For an account of the full proof of this
+result (and all omitted proofs), see the appendix.
+Even without committing to a particular learner cost function,
+the space of optimal strategies characterized in Proposition 1 leads
+to an important consequence. A rational learner in the Strategic
+Classi￿cation Game always selects a classi￿er that exhibits the fol-
+lowing phenomenon: it mistakenly admits unquali￿ed candidates
+from the group with lower costs and mistakenly excludes quali-
+￿ed candidates from the group with higher costs. This result is
+formalized in Proposition 2.
+To state the proposition, the following de￿nition is instructive.
+Whereas the true thresholds  A and  B are a function of unma-
+nipulated features, the learner only faces candidate features that
+may have been manipulated. In order to make these observed fea-
+tures commensurable with  A and  B , it is helpful for the learner
+to “translate” a candidate’s possibly manipulated feature   to its
+minimum corresponding original unmanipulated value.
+D￿￿￿￿￿￿￿￿￿ 2 (C￿￿￿￿￿￿￿￿￿￿￿￿￿ ￿￿￿￿ ￿￿￿￿￿￿￿￿￿￿￿￿￿ ￿￿￿￿
+￿￿￿￿￿). For any observed candidate feature   2 [0, 1], the minimum
+Figure 1: Group cost functions for a one-dimensional fea-
+ture x .  A and  B signify true thresholds on unmanipulated
+features for group A and B, but a learner must issue a clas-
+si￿er on manipulated features. The threshold  A perfectly
+classi￿es group A candidates;  B perfectly classi￿es group B
+candidates. A learner selects an equilibrium threshold  
+⇤ 2
+[ B , A], committing false positives on groupA (red bracket)
+and false negatives on group B (blue bracket).
+corresponding unmanipulated feature is de￿ned as
+`A ( ) = max{0, c 1A (cA ( )   1)},
+`B ( ) = max{0, c 1B (cB ( )   1)}
+(7)
+for a candidate belonging to group A and group B respectively.
+The corresponding values `A ( ) and `B ( ) are de￿ned such that
+a candidate who presents feature   must have as her true unmanip-
+ulated feature x   `A ( ) if she is a group A member and x   `B ( )
+if she is a group B member.
+P￿￿￿￿￿￿￿￿￿￿ 2 (L￿￿￿￿￿￿’￿ C￿￿￿ ￿￿ 1 D￿￿￿￿￿￿￿￿). A learner
+who employs a classi￿er f based on a threshold strategy   2 [ B , A]
+only commits false positives errors on group A and false negatives
+errors on group B. The cost C (  ) of such a classi￿er is
+CFNpBPx⇠DB
+f
+x 2 [ B , `B (  ))
+g
++CF PpAPx⇠DA
+f
+x 2 [`A (  ), A )
+g
+,
+where false negative errors entail penalty CFN , and false positive
+errors entail penalty CF P .
+A learner who commits to classifying only one of the groups
+correctly bears costs given by the following corollaries.
+C￿￿￿￿￿￿￿￿ 1. A classi￿er based on  A perfectly classi￿es group A
+candidates and bears costC ( A ) = CFNpBPx⇠DB
+f
+x 2 [ B , `B (  ))
+g
+.
+C￿￿￿￿￿￿￿￿ 2. A classi￿er based on  B perfectly classi￿es group B
+candidates and bears costC ( B ) = CF PpAPx⇠DA
+f
+x 2 [`A (  ), A )
+g
+.
+Notice that the learner’s errors always cut in the same direction—
+by unduly bene￿ting group A candidates and unduly rejecting
+group B candidates, these errors act to reinforce the existing social
+inequality that had generated the unequal group cost conditions in
+the ￿rst place. Since these errors arise out of the asymmetric group
+costs of manipulation, the Strategic Classi￿cation Game can be
+viewed as an interactive model that itself perpetuates the relative
+advantage of group A over group B candidates.
+Within the undominated region [ B , A], the equilibrium learner
+threshold   ⇤ is attained as the solution to the optimization problem
+ 
+⇤ = argmin
+  2[ B, A]
+C (  ). (8)
+In the game’s greatest generality where candidates are drawn from
+arbitrary probability distributions, groups bear any costs that abide
+by the cost condition, and the learner has arbitrary error penalties,
+one cannot specify the equilibrium learner threshold   ⇤ any further.
+However, under some special cases of candidate cost functions and
+probability distributions, the equilibrium threshold can be char-
+acterized more precisely. Speci￿cally, when candidates from both
+groups are assumed to be drawn from a uniform distribution over
+unmanipulated features in [0, 1], an error-minimizing learner seeks
+a threshold value   ⇤ that minimizes the length of the interval of
+errors, given by the following quantity:
+ 
+⇤ = argmin
+  2[ B, A]
+`B (  )   `A (  ).
+From here, one natural assumption of candidate cost functions
+would have that groups A and B bear costs that are proportional
+to each other. In this case, the curvature of the cost functions is
+determinative of a learner’s equilibrium threshold.
+P￿￿￿￿￿￿￿￿￿￿ 3. Suppose group cost functions are proportional
+such that cA (x ) = qcB (x ) for q 2 (0, 1), that DA and DB are uni-
+form on [0, 1], and thatCFN = CF P and pA = pB = 1
+2 . Let  
+⇤ be the
+learner’s equilibrium threshold.
+When cost functions are strictly concave,   ⇤ =  B . When cost func-
+tions are strictly convex,   ⇤ =  A. When cost functions are a￿ne, the
+learner is indi￿erent between all   ⇤ 2 [ B , A].
+3.2 General d-Dimensional Feature Vectors
+In the general d-dimensional case of the Strategic Classi￿cation
+Game, candidates are endowed with features that are given by a
+vector x 2 [0, 1]d and can choose to manipulate and present any
+feature y   x to the learner. In this section, we consider optimal
+learner and candidate strategies when group costs are linear such
+that they may be written as
+cA (x) =
+dX
+i=1
+cA,ixi ; cB (x) =
+dX
+i=1
+cB,ixi (9)
+for groups A and B respectively. Now, the cost condition cA (y)  
+cA (x)  cB (y)   cB (x) for all y   x—de￿ned component-wise as
+before—implies that 8i 2 [d], cA,i  cB,i . In d dimensions, the true
+classi￿ers hA and hB have linear decision boundaries such that for
+a group A candidate with feature x,
+hA (x) =
+8><>:
+i=1wA,ixi    A,
+i=1wA,ixi <  A,
+(10)
+Figure 2: The forward simplex. A candidate in group Awith
+unmanipulated feature vector x canmanipulate to reach any
+feature vector y 2  A (x) at a cost of at most 1.
+and for a group B candidate with feature x,
+hB (x) =
+8><>:
+i=1wB,ixi    B ,
+i=1wB,ixi <  B .
+(11)
+We assume that all components xi contribute positively to an
+agent’s likelihood of being classi￿ed as 1 so thatwA,i ,wB,i   0 for
+all i . To ensure that the cost of manipulation is always non-negative,
+all cost coe￿cients are positive: cB,i , cA,i   0 for all i 2 [d].
+A candidate may now manipulate any combination of the d
+components of her initial feature x to reach the ￿nal feature y
+that she presents to the learner. Despite this increased ￿exibility
+on the part of the candidate, we are still able to characterize the
+performance of undominated learner classi￿ers, generalizing the
+result in Proposition 2. All potentially optimal classi￿ers exhibit
+the same inequality-reinforcing property inherent within the one-
+dimensional interval of undominated threshold strategies, trading
+o￿ false positives on group A candidates with false negatives on
+group B candidates. Before we formally present this result, we ￿rst
+describe candidates’ best-response strategies. Here, a geometric
+view of the space of potential manipulations is informative.
+Suppose a candidate endowed with a feature vector x faces costsPd
+i=1 cixi and is willing to expend a total cost of 1 for manipulation.
+Then she can move to any y   x contained within the d-simplex
+with orthogonal corner at x and remaining vertices at x + 1
+ci ei
+where ei is the ith standard basis vector. This region is given by
+ (x) =
+⇢
+x +
+dX
+i=1
+ti
+ci
+ei 2 [0, 1]d
+    
+dX
+i=1
+ti  1 ; ti   0 8i
+ 
+. (12)
+ (x), depicted in Figure 2, gives the space of potential movement for
+a candidate with unmanipulated feature x who is willing to expend
+a total cost of 1. Notice that ti can be interpreted as the cost that a
+candidate expends on movement in the ith direction. Thus
+Pd
+i=1 ti
+gives the total cost of manipulation. Moving beyond the range of
+possible moves, in order to describe how a rational candidate will
+best-respond to a learner, we must consider the published classi￿er.
+Suppose a learner publishes a classi￿er f based on a hyperplanePd
+i=1  i i =  0, so that f (y) = 1 if and only if
+Pd
+i=1  i i    0. A
+best-response manipulation occurs along the direction that gen-
+erates the greatest increase in the value
+Pd
+i=1  i ( i   xi ) for the
+least cost. As such, a candidate will move in any directions i 2
+argmaxi 2[d]
+ i
+ci . This result is formalized in the following lemma.
+L￿￿￿￿ 1 (d￿D C￿￿￿￿￿￿￿￿ B￿￿￿ R￿￿￿￿￿￿￿). Suppose a learner
+publishes the classi￿er f (y) = 1 if and only if
+Pd
+i=1  i i    0. Con-
+sider a candidate with unmanipulated feature vector x and linear
+Figure 3: A perfect classi￿er for group A. Every candidate
+with unmanipulated feature vector x on or above the true de-
+cision boundary for groupA is able to manipulate to a point
+y 2  A (x) on or above the blue decision boundary depicted
+here. No candidatewith an unmanipulated feature vector be-
+low the true decision boundary is able to do so. The kink in
+the blue decision boundary arises due to the restriction of
+features to [0, 1]d . A perfect classi￿er for group A does not
+need to have this kink; for example, a more lenient perfect
+classi￿er can be formed by “straightening” it out.
+costs
+Pd
+i=1 cixi . If f (x) = 1 or if for all i 2 [d], f (x + 1
+ci ei ) = 0,
+the candidate’s best response is to set y = x. Otherwise, letting
+K = argmaxi 2[d]
+ i
+ci , her manipulation takes the form
+  = x +
+dX
+i=1
+ti
+ci
+ei
+for any t such that ti   0 for all i 2 [d], ti = 0 for all i < K , andPd
+i=1  i (xi +
+ti
+ci ) =  0.
+While in the d-dimensional case, a candidate has many more
+choices of manipulation directions to pursue, a best response strat-
+egy will always lead her to increase her feature in those components
+that are most valued by the learner and least costly for manipu-
+lation. That is, she behaves according to a “bang for your buck"
+principle, in which the optimal manipulations are in the direction
+or directions where the ratio  i
+ci is highest.
+Despite the fact that the optimal manipulationmay not be unique,
+as in the cases where there are multiple equivalently good direc-
+tions for a candidate to move in, a learner who knows candidates’
+costs can still anticipate best-response manipulations and avoid
+errors on that group. As such, we are once again able to construct
+a perfect classi￿er for candidates of group A and a perfect classi￿er
+for candidates of group B.
+T￿￿￿￿￿￿ 1 (d￿D S￿￿￿￿ ￿￿ D￿￿￿￿￿￿￿ L￿￿￿￿￿￿ S￿￿￿￿￿￿￿￿￿). In
+the general d-dimensional Strategic Classi￿cation Game with linear
+costs, there exists a classi￿er that perfectly classi￿es group A and a
+classi￿er that perfectly classi￿es group B. All undominated classi￿ers
+commit no false positive errors on groupA and no false negative errors
+on group B.
+A full exposition of the proof appears in the appendix, but here
+we present an abbreviated explanation of the result.
+For each groupm, the learner computes an optimal boundary
+that perfectly classi￿es all of its members by considering the set of
+simplices { m (x)} anchored at the vectors x̄ that satisfyw|
+m x̄ =  m
+and drawing the strictest hyperplane that intersects each simplex.
+That is for all hyperplanes  i :
+Pd
+j=1  i, jx j =  i,0 that are con-
+structed to intersect each simplex, then  1 :
+Pd
+j=1  1, jx j =  1,0 is
+the strictest if for all x 2 [0, 1]d ,
+dX
+j=1
+ 1, jx j =  1,0 =)
+dX
+j=1
+ i, jx j =  i,0    j,0
+for all  i . Due to the cost ordering, for any x 2 [0, 1]d ,  B (x) ✓
+ A (x), and thus wherever a comparison is possible, the group A
+boundary is at least as strict as the group B boundary. Figure 3 gives
+a visualization of a boundary formed by connecting the simplices
+ (x̄); the corresponding classi￿er perfectly classi￿es the group.
+As in the one-dimensional general costs case, learner strate-
+gies necessarily entail inequality-reinforcing classi￿ers: a rational
+learner equipped with any error-penalizing cost function will select
+an equilibrium strategy that trades o￿ undue optimism with respect
+to group A for undue pessimism with respect to group B. We note
+that except in the extreme case in which there exists a perfect clas-
+si￿er for all candidates in the population, this result implies that
+the classi￿er for group A issues false negatives on group B, and the
+classi￿er for group B issues false positives on group A. In order to
+formalize this result, we would like to generalize the idea behind
+the minimum correspondence unmanipulated features given by
+`A (·) and `B (·) in (7) for general d-dimensions and linear costs.
+A learner who observes a possibly manipulated feature vector y
+must consider the space of unmanipulated feature vectors that the
+candidate could have had. Thus we canmake use of the simplex idea
+of potential manipulation; however in this case, the learner seeks
+to project a simplex “backward" to “undo” the potential candidate
+manipulation. Since groups are subject to di￿erent costs, simplices
+  1A (y) and   1B (y)—a depiction is given in Figure 4—which repre-
+sent the region from where a candidate could have manipulated,
+will di￿er based on the candidate’s group membership, with
+  1A (y) =
+⇢
+y  
+dX
+i=1
+ti
+cA,i
+ei 2 [0, 1]d
+    
+dX
+i=1
+ti  1 ; ti   0 8i
+ 
+, (13)
+  1B (y) =
+⇢
+y  
+dX
+i=1
+ti
+cB,i
+ei 2 [0, 1]d
+    
+dX
+i=1
+ti  1 ; ti   0 8i
+ 
+. (14)
+We can now use these constructs in order to de￿ne d-dimensional
+generalizations of `A (y) and `B (y).
+D￿￿￿￿￿￿￿￿￿ 3 (C￿￿￿￿￿￿￿￿￿￿￿￿￿ ￿￿￿￿ U￿￿￿￿￿￿￿￿￿￿￿￿ F￿￿￿
+￿￿￿￿￿ ￿￿ d￿D). For any observed candidate feature y 2 [0, 1]d , the
+minimum corresponding unmanipulated feature vectors are given by
+`A (y) =
+(
+x 2   1A (y) \ [0, 1]d    @x̂ 2   1A (y) such that x̂ < x
+)
+,
+(15)
+`B (y) =
+(
+x 2   1B (y) \ [0, 1]d    @x̂ 2   1B (y) such that x̂ < x
+)
+(16)
+for a candidate belonging to group A and group B respectively.
+Figure 4: The backward simplex. A candidate in groupAwith
+manipulated feature vector y could have started with any
+feature vector x 2   1A (y) and paid a cost of at most 1.
+The corresponding values `A (y) and `B (y) are de￿ned such that
+a candidate who presents feature y must have had a true unmanip-
+ulated feature vector x   x̄ for some x̄ 2 `A (y) if she is a group A
+member and x   x̄ for some x̄ 2 `B (y) if she is a group B member.
+For any hyperplane decision boundary   containing vectors y,
+the minimum corresponding feature vectors given by `A (y) and
+`B (y) are helpful for determining the e￿ective thresholds that  
+generates on unmanipulated features for groups A and B.
+L￿￿￿￿ 2. Suppose a learner classi￿er f is based on a hyperplane
+  :
+Pd
+i=1  ixi =  0. Construct the set
+Lm ( ) =
+8>><>>:
+argmin
+x2`m (y)
+dX
+i=1
+ ixi
+    8y s. t.
+dX
+i=1
+ i i =  0
+9>>=>>;
+(17)
+Then a groupm agent with feature x canmove to some ywith f (y) = 1
+and cm (y)   cm (x)  1 if and only if x   ` for some ` 2 Lm ( ).
+By de￿nition, for any two `1, `2 2 Lm ( ),
+X
+i=1
+ i `1,i =
+X
+i=1
+ i `2,i =  0  
+ km
+cm,km
+,
+wherekm 2 argmaxi=[d]
+ i
+cm,i
+. Thus a learner who cares only about
+the true label of presented features, will construct her decision
+boundary   such that all ` 2 Lm ( ) have the same true label.
+A cost-minimizing learner who publishes a classi￿er f based
+on a hyperplane   on manipulated features will commit errors
+on those candidates with unmanipulated features x 2 [0, 1]d con-
+tained within the boundaries given by LA ( ) and LB ( ). This
+space can be understood as the d-dimensional generalization of the
+[`A (  ), `B (  )] error interval in one-dimension.
+P￿￿￿￿￿￿￿￿￿￿ 4 (L￿￿￿￿￿￿’￿ C￿￿￿ ￿￿ d D￿￿￿￿￿￿￿￿￿). A learner
+who publishes an undominated classi￿er f based on a hyperplane
+Ç|x =  0 can only commit false positives on group A candidates and
+false negatives on group B candidates. The cost of such a classi￿er is
+CFN Px⇠DB
+
+x 2
+⇣
+Ç|x <  0  
+ kB
+ckB
+\
+w|
+Bx    B
+⌘ 
++CF PPx⇠DA
+
+x 2
+⇣
+w|
+Ax <  A
+\
+Ç|x    0  
+ kA
+ckA
+⌘ 
+,
+where kB 2 argmaxi 2[d]
+ i
+cB,i and kA 2 argmaxi 2[d]
+ i
+cA,i .
+4 LEARNER SUBSIDY STRATEGIES
+Since in our setting, the learner’s classi￿cation errors are directly
+tied to unequal group costs, we ask whether she would be willing
+to subsidize group B candidates in order to shrink the manipulation
+gap between the two groups and as a result, reduce the number of
+errors she commits. In this section, we formalize subsidies as inter-
+ventions that a learner can undertake to improve her classi￿cation
+performance. Although in many high-stakes classi￿cation settings,
+the barriers that make manipulation di￿erentially accessible are
+non-monetary—such as time, information, and social access—in
+this section, we consider subsidies that are monetary in nature to
+alleviate the ￿nancial burdens of manipulation.
+We introduce these subsidies for the purpose of analyzing their
+e￿ects on not only the learner’s classi￿cation performance but also
+candidate groups’ outcomes. Since subsidies mitigate the inherent
+disparities in groups’ costs and increase access to manipulation,
+one might expect that their implementation would surely improve
+group B’s overall welfare. In this section, we show that in some
+cases, optimal subsidy interventions can surprisingly have the e￿ect
+of lowering the welfare of candidates from both groups without
+improving the welfare of even a single candidate.
+4.1 Subsidy Formalization
+There are di￿erent ways in which a learner might choose to subsi-
+dize candidates costs. In the main text of this paper, we focus on
+subsidies that reduce each group B candidate’s costs such that the
+agent need only pay a   fraction of her original manipulation cost.
+D￿￿￿￿￿￿￿￿￿ 4 (P￿￿￿￿￿￿￿￿￿￿￿ ￿￿￿￿￿￿￿). Under a proportional
+subsidy plan, the learner pays a proportion 1     of each group B
+candidate’s cost of manipulation for some   2 [0, 1]. As such, a group
+B candidate who manipulates from an initial feature vector x to a
+￿nal feature vector y bears a cost of  
+⇣
+cB (y)   cB (x)
+⌘
+.
+In the appendix, we also introduce ￿at subsidies in which the
+learner absorbs up to a ￿at   amount from each group B candidate’s
+costs, leaving the candidate to paymax{0, cB (y) cB (x)   }. Similar
+results to those shown in this section hold for ￿at subsidies.
+When considering proportional subsidies, the learner’s strategy
+now consists of both a choice of   and a choice of classi￿er f to
+issue. The learner’s goal is to minimize her penalty
+CF P
+X
+m2 {A,B }
+pmPx⇠Dm
+f
+hm (x) = 0, f (y) = 1
+g
++CFN
+X
+m2 {A,B }
+pmPx⇠Dm
+f
+hm (x) = 1, f (y) = 0
+g
++  cost ( f ,   ),
+where cost ( f ,   ) is the monetary cost of the subsidy,CF P andCFN
+denote the cost of a false positive and a false negative respectively
+as before, and     0 is some constant that determines the relative
+weight of misclassi￿cation errors and subsidy costs for the learner.
+For ease of exposition, the remainder of the section is presented
+in terms of one-dimensional features. In Section A.3.1 of the appen-
+dix, we show that in many cases, the d-dimensional linear costs
+setting can be reduced to this one-dimensional setting.
+As an analog of (7), we de￿ne ` B ( ) = ( cB )
+ 1 ( cB ( )   1),
+giving the minimum corresponding unmanipulated feature x for
+any observed feature  . Under the proportional subsidy, for a given
+ , the group B candidate must have x   ` B ( ). From this, we de￿ne
+ 
+ 
+B such that ` B ( 
+ 
+B ) =  B .
+In order to compute the cost of a subsidy plan, wemust determine
+the number of group B candidates who will take advantage of a
+given subsidy bene￿t. Since manipulation brings no bene￿t in itself,
+candidates will only choose to manipulate and use the subsidy if
+it will lead to a positive classi￿cation. For a published classi￿er f
+with threshold   , we then have
+cost ( f ,   ) =
+⇣
+1    
+⌘ Z  
+`
+ 
+B (  )
+⇣
+cB (  )   cB (x )
+⌘
+Px⇠DB (x )dx .
+Although the learner’s optimization problem can be solved an-
+alytically for various values of  , we are primarily interested in
+taking a welfare-based perspective on the e￿ects of various classi-
+￿cation regimes on both the learner and candidate groups. In the
+following section, we analyze how the implementation of a subsidy
+plan can alter a learner’s classi￿cation strategy and consider the
+potential impacts of such policies on candidate groups.
+4.2 Group Welfare Under Subsidy Plans
+While a learner would choose to adopt a subsidy strategy primarily
+in order to reduce her error rate, o￿ering cost subsidies can also
+be seen as an intervention that might equalize opportunities in
+an environment that by default favors those who face lower costs.
+That is, if costs are keeping group B down, then one might believe
+that reducing costs will surely allow group B a fairer shot at manip-
+ulation, and, as a result, a fairer shot at positive classi￿cation. Alas
+we ￿nd that mitigating cost disparities by way of subsidies does
+not necessarily lead to better outcomes for group B candidates. In
+fact, an optimal subsidy plan can actually reduce the welfares of
+both groups. Paradoxically, in some cases, the subsidy plan boosts
+only the learner’s utility, whereas every individual candidate from
+both groups would have preferred that she o￿er no subsidies at all.
+The following theorem captures the surprising result that subsi-
+dies can be harmful to all candidates, even those from the group
+that would appear to bene￿t.
+T￿￿￿￿￿￿ 2 (S￿￿￿￿￿￿￿￿ ￿￿￿ ￿￿￿￿ ￿￿￿￿ ￿￿￿￿￿￿). There exist cost
+functions cA and cB satisfying the cost conditions, learner distributions
+DA and DB , true classi￿ers with threshold  A and  B , population
+proportions pA and pB , and learner penalty parameters CFN , CF P ,
+and  , such that no candidate in either group has higher payo￿ at the
+equilibrium of the Strategic Classi￿cation Game with proportional
+subsidies compared with the equilibrium of the Strategic Classi￿cation
+Game with no subsidies, and some candidates from both group A and
+group B are strictly worse o￿.
+We note that a slightly weaker version of the theorem holds
+for ￿at subsidies. In particular, there exist cases in which some
+individual candidates have higher payo￿ at the equilibrium of the
+Strategic Classi￿cation Game with ￿at subsidies compared with
+the equilibrium with no subsidies, but both group A and group B
+candidates have lower payo￿s on average with the subsidies.
+To prove the theorem, it su￿ces to give a single case in which
+both candidate groups are harmed by the use of subsidies. However,
+to illustrate that this phenomenon does not arise only as a rare
+corner case, we provide one such example here plus two in the
+appendix, and discuss general conditions under which this occurs.
+In each example, we consider a particular instance of the Strategic
+Classi￿cation Game and compare the welfares of candidates at
+equilibriumwhen the learner is able to select a proportional subsidy
+with their welfares at equilibrium when no subsidy is allowed.
+E￿￿￿￿￿￿ 1. Suppose that a learner is error-minimizing such that
+CFN = CF P = 1 and   = 3
+4 . Suppose that unmanipulated features for
+both groups are uniformly distributed with pA = pB = 1
+2 . Let group
+cost functions be given by cA (x ) = 8
+p
+x + x and cB (x ) = 12
+p
+x ; note
+that the cost condition c
+true group thresholds be given by  A = 0.4 and  B = 0.3.
+When subsidies are not allowed, the learner chooses a classi￿er with
+threshold   ⇤ =  B ⇡ 0.398 at equilibrium. This threshold perfectly
+classi￿es all candidates from group B, while permitting false positives
+on candidates from group A with features x 2 [0.272, 0.4).
+If the learner decides to implement a proportional subsidies plan,
+at equilibrium the learner chooses a classi￿er with threshold   ⇤prop =
+ A ⇡ 0.546 and a subsidy parameter  ⇤ = 0.558. Her new threshold
+now correctly classi￿es all members of group A, while committing
+false negatives on group B members with features x 2 [0.3, 0.348).
+Some candidates in group B are thus strictly worse-o￿, while none
+improve. Without the subsidy o￿ering, group B members had been
+perfectly classi￿ed, but now there exist some candidates who are
+mistakenly excluded. Further, one can show that candidates who are
+positively classi￿ed must pay more to manipulate to the new threshold
+in spite of receiving the subsidy bene￿t. This increased cost is due
+to the fact that the higher classi￿cation threshold imposes greater
+burdens on manipulation than the   subsidy alleviates.
+Group A candidates are also strictly worse-o￿ since the thresh-
+old increase eliminates false positive bene￿ts that some members
+had previously been granted in the no-subsidy regime. Moreover, all
+candidates who manipulate must expend more to do so, since these
+candidates do not receive a subsidy payment. Only the learner is
+strictly better o￿ with the implementation of this subsidy plan.
+Additional examples in the appendix show cases in which both
+groups experience diminished welfare when they bear linear costs.
+Even when the learner has an error function that penalizes false
+negatives twice as harshly as false positives and thus is explic-
+itly concerned with mistakenly excluding group B candidates, an
+equilibrium subsidy strategy can still make both groups worse-o￿.
+We thus highlight two consequences of subsidy interventions:
+On the one hand, with reduced cost burdens, more candidates from
+the disadvantaged group should be able to manipulate to reach
+a positive classi￿cation. However, subsidy payments also allow
+a learner to select a classi￿er that is at least as strict as the one
+issued without o￿ering subsidies. These are opposing forces, and
+these examples show that without needing to distort underlying
+group probability distributions or the learner’s penalty function in
+extreme ways, the e￿ect of mitigating manipulation costs may be
+outweighed by the overall impact of a stricter classi￿er.
+This result can also be extended to show that a setup in which
+candidates are unable to manipulate their features at all can be pre-
+ferred by all three parties—groupsA and B as well as the learner—to
+both the manipulation and subsidy regimes. We provide an informal
+statement of this proposition below and defer the interested reader
+to its formal statement and demonstration in the appendix.
+P￿￿￿￿￿￿￿￿￿￿ 5. There exist general cost functions such that the
+outcomes issued by a learner’s equilibrium classi￿er under a non-
+manipulation regime is preferred by all parties—the learner, group
+A, and group B—to outcomes that arise both under her equilibrium
+manipulation classi￿er and under her equilibrium subsidy strategy.
+5 DISCUSSION
+Social strati￿cation is constituted by forms of privilege that exist
+along many di￿erent axes, weaving and overlapping to create an
+elaborate mesh of power relations. While our model of strategic ma-
+nipulation does not attempt to capture this irreducible complexity,
+we believe this work highlights a likely consequence of the expan-
+sion of algorithmic decision-making in a world that is marked by
+deep social inequalities. We demonstrate that the design of classi￿-
+cation systems can grant undue rewards to those who appear more
+meritorious under a particular conception of merit while justifying
+exclusions of those who have failed to meet those standards. These
+consequences serve to exacerbate existing inequalities.
+Our work also shows that attempts to resolve these negative
+social repercussions of classi￿cation, such as implementing poli-
+cies that help disadvantaged populations manipulate their features
+more easily, may actually have the opposite e￿ect. A learner who
+has o￿ered to mitigate the costs facing these candidates may be
+encouraged to set a higher classi￿cation standard, underestimating
+the deeper disadvantages that a group encounters, and thus serving
+to further exclude these populations. However, it is important to
+note that these unintended consequences do not always arise. A
+conscientious learner who o￿ers subsidies to equalize the playing
+￿eld can guard against such paradoxes by making sure to classify
+agents in the same way even when o￿ering to mitigate costs.
+Other research in signaling and strategic classi￿cation has con-
+sideredmodels inwhichmanipulation is desirable from the learner’s
+point of view [12, 20]. Though this perspective diverges from the
+one we consider here, we acknowledge that there do exist cases in
+which manipulation serves to improve a candidate’s quality and
+thus leads a learner to encourage such behaviors. It is important to
+note, however, that although this account may accurately represent
+some social classi￿cation scenarios, di￿erential group access to
+manipulation remains an issue, and in fact, cases in which manip-
+ulation genuinely improves candidate quality may present even
+more problematic scenarios for machine learning systems. As work
+in algorithmic fairness has shown, feedback e￿ects of classi￿cation
+can lead to deepening inequalities that become “justi￿ed" on the
+basis of features both manipulated and “natural" [9].
+The rapid adoption of algorithmic tools in social spheres calls for
+a range of perspectives and approaches that can address a variety
+of domain-speci￿c concerns. Expertise from other disciplines ought
+to be imported into machine learning, informing and infusing our
+research in motivation, application, and technical content. As such,
+our work seeks to investigate, from a theoretical learning perspec-
+tive, some of the potential adverse e￿ects of what sociology has
+called “quanti￿cation," a world increasingly governed by metrics.
+In doing so, we bring in techniques from game theory and informa-
+tion economics to model the interaction between a classi￿er and
+its subjects. This paper adopts a framework that tries to capture
+the genuine unfair aspects of our social reality by modeling group
+inequality in a population of agents. Although this perspective de-
+viates from standard idealized settings of learner-agent interaction,
+we believe that so long as machine learning tools are designed for
+deployment in the imperfect social world, pursuing algorithmic fair-
+ness will require us to explicitly build models and theory to address
+critical issues such as social strati￿cation and unequal access.
+ACKNOWLEDGEMENTS
+We thank Alex Frankel, Rupert Freeman, Manish Raghavan, Hanna
+Wallach, and Glen Weyl for constructive input and discussion on
+this project and related topics.
+REFERENCES
+[1] Emrah Akyol, Cedric Langbort, and Tamer Basar. 2016. Price of transparency in
+strategic machine learning. (2016). CoRR arXiv:1610.08210.
+[2] Julia Angwin, Je￿ Larson, Surya Mattu, and Lauren Kirchner. 2016. Machine bias.
+ProPublica, May 23 (2016).
+[3] Peter Auer and Nicolo Cesa-Bianchi. 1998. On-line learning with malicious noise
+and the closure algorithm. Annals of mathematics and arti￿cial intelligence 23,
+1-2 (1998), 83–99.
+[4] Wolfgang Ballwieser, G Bamberg, MJ Beckmann, H Bester, M Blickle, R Ewert, G
+Feichtinger, V Firchau, F Fricke, H Funke, et al. 2012. Agency theory, information,
+and incentives. Springer Science & Business Media.
+[5] Michael Brückner and Tobias Sche￿er. 2011. Stackelberg games for adversarial
+prediction problems. In Proceedings of the ACM SIGKDD International Conference
+on Knowledge Discovery and Data Mining.
+[6] David Card and Jesse Rothstein. 2007. Racial segregation and the black–white
+test score gap. Journal of Public Economics 91, 11–12 (2007), 2158–2184.
+[7] AnupamDatta, Matt Fredrikson, Gihyuk Ko, Piotr Mardziel, and Shayak Sen. 2017.
+Proxy non-discrimination in data-driven systems. (2017). CoRR arXiv:1707.08120.
+[8] Jinshuo Dong, Aaron Roth, Zachary Schutzman, BoWaggoner, and Zhiwei Steven
+Wu. 2018. Strategic Classi￿cation from Revealed Preferences. In Proceedings of
+the ACM Conference on Economics and Computation.
+[9] Danielle Ensign, Sorelle A Friedler, Scott Neville, Carlos Scheidegger, and Suresh
+Venkatasubramanian. 2018. Runaway Feedback Loops in Predictive Policing. In
+Proceedings of the Conference on Fairness, Accountability and Transparency.
+[10] Joan Esteban and Debraj Ray. 2006. Inequality, lobbying, and resource allocation.
+American Economic Review 96, 1 (2006), 257–279.
+[11] Virginia Eubanks. 2018. Automating inequality: How High-tech Tools Pro￿le, Police,
+and Punish the Poor. St. Martin’s Press.
+[12] Alex Frankel and Navin Kartik. Forthcoming, 2018. Muddled information. Journal
+of Political Economy (Forthcoming, 2018).
+[13] Nina Grgic-Hlaca, Muhammad Bilal Zafar, Krishna P Gummadi, and Adrian
+Weller. 2018. Beyond distributive fairness in algorithmic decision making: Feature
+selection for procedurally fair learning. In Proceedings of the AAAI Conference on
+Arti￿cial Intelligence.
+[14] Moritz Hardt, Nimrod Megiddo, Christos Papadimitriou, and Mary Wootters.
+2016. Strategic classi￿cation. In Proceedings of the ACM Conference on Innovations
+in Theoretical Computer Science.
+[15] Kory D Johnson, Dean P Foster, and Robert A Stine. 2016. Impartial predictive
+modeling: Ensuring fairness in arbitrary models. (2016). CoRR arXiv:1608.00528.
+[16] Michael Kearns and Ming Li. 1993. Learning in the presence of malicious errors.
+SIAM J. Comput. 22, 4 (1993), 807–837.
+[17] Andrew Kephart and Vincent Conitzer. 2015. Complexity of Mechanism Design
+with Signaling Costs. In Proceedings of the International Conference on Autonomous
+Agents and Multiagent Systems.
+[18] Andrew Kephart and Vincent Conitzer. 2016. The revelation principle for mech-
+anism design with reporting costs. In Proceedings of the ACM Conference on
+Economics and Computation.
+[19] Niki Kilbertus, Mateo Rojas Carulla, Giambattista Parascandolo, Moritz Hardt,
+Dominik Janzing, and Bernhard Schölkopf. 2017. Avoiding discrimination through
+causal reasoning. In Advances in Neural Information Processing Systems.
+[20] Jon Kleinberg and Manish Raghavan. 2018. How Do Classi￿ers Induce Agents
+To Invest E￿ort Strategically? (2018). CoRR arXiv:1807.05307.
+[21] Jean-Jacques La￿ont and David Martimort. 2009. The Theory of Incentives: The
+Principal-Agent Model. Princeton University Press.
+[22] Smitha Milli, John Miller, Anca D Dragan, and Moritz Hardt. Forthcoming, 2019.
+The Social Cost of Strategic Classi￿cation. Conference on Fairness, Accountability,
+and Transparency.
+[23] Cathy O’Neil. 2016. Weapons of Math Destruction: How Big Data Increases In-
+equality and Threatens Democracy. Broadway Books.
+[24] Bilal Qureshi, Faisal Kamiran, Asim Karim, and Salvatore Ruggieri. 2016. Causal
+Discrimination Discovery Through Propensity Score Analysis. (2016). CoRR
+arXiv:1608.03735.
+[25] Michael Spence. 1978. Jobmarket signaling. InUncertainty in Economics. 281–306.
+[26] Klaus Spremann. 1987. Agent and principal. In Agency theory, information, and
+incentives. Springer, 3–37.
+[27] Latanya Sweeney. 2013. Discrimination in online ad delivery. Queue 11, 3 (2013),
+10.

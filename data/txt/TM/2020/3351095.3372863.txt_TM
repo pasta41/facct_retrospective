@@ -1,0 +1,158 @@
+
+The criminal justice system is currently ill-equipped to improve
+outcomes of individuals who cycle in and out of the system with a
+series of misdemeanor offenses. Often due to constraints of caseload
+and poor record linkage, prior interactions with an individual may
+not be considered when an individual comes back into the system,
+let alone in a proactive manner through the application of diversion
+programs. The Los Angeles City Attorney’s Office recently created
+a new Recidivism Reduction and Drug Diversion unit (R2D2) tasked
+with reducing recidivism in this population. Here we describe a
+collaboration with this new unit as a case study for the incorpo-
+ration of predictive equity into machine learning based decision
+making in a resource-constrained setting. The program seeks to im-
+prove outcomes by developing individually-tailored social service
+interventions (i.e., diversions, conditional plea agreements, stayed
+sentencing, or other favorable case disposition based on appropriate
+social service linkage rather than traditional sentencing methods)
+for individuals likely to experience subsequent interactions with
+the criminal justice system, a time and resource-intensive under-
+taking that necessitates an ability to focus resources on individuals
+most likely to be involved in a future case. Seeking to achieve both
+efficiency (through predictive accuracy) and equity (improving
+outcomes in traditionally under-served communities and working
+to mitigate existing disparities in criminal justice outcomes), we
+discuss the equity outcomes we seek to achieve, describe the cor-
+responding choice of a metric for measuring predictive fairness in
+this context, and explore a set of options for balancing equity and
+efficiency when building and selecting machine learning models in
+an operational public policy setting.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6936-7/20/02. . . $15.00
+https://doi.org/10.1145/3351095.3372863
+CCS CONCEPTS
+• Applied computing → Computing in government; Law, so-
+cial and behavioral sciences; • Social and professional topics →
+Computing / technology policy; • Human-centered computing
+→ Interaction design; • Computing methodologies→Machine
+learning.
+KEYWORDS
+Algorithmic Fairness, Machine Learning Disparities, Racial Bias,
+Criminal Justice
+ACM Reference Format:
+Kit T. Rodolfa, Erika Salomon, Lauren Haynes, Iván Higuera Mendieta,
+Jamie Larson, and Rayid Ghani. 2020. Case Study: Predictive Fairness to
+Reduce Misdemeanor Recidivism Through Social Service Interventions. In
+Conference on Fairness, Accountability, and Transparency (FAT* ’20), January
+27–30, 2020, Barcelona, Spain. ACM, New York, NY, USA, 12 pages. https:
+//doi.org/10.1145/3351095.3372863
+1 INTRODUCTION
+Some of the most vulnerable populations in the United States strug-
+gle with a complex combination of needs, including homelessness,
+substance addiction, ongoing mental and physical health condi-
+tions, and long-term unemployment. For many, these challenges
+can lead to interactions with the criminal justice system [28]. Of the
+millions of people who are incarcerated in jails and prisons each
+year, more than half have a current or recent mental health problem
+and inmates are far more likely to have experienced homelessness
+or substance dependence. In local jails, where 64% struggle from
+mental health issues, 10% were homeless in the year before their
+arrest (compared to a national average under 1% [56]), and 55% met
+criteria for substance dependence or abuse [34].
+By 2005, there were three times as many individuals with serious
+mental illness in jails and prisons than in hospitals and the per capita
+number of psychiatric hospital beds in the US had fallen by an order
+of magnitude over 50 years, suggesting a failure of the community
+mental health system to meet the needs of this at risk population
+[26]. For some of these individuals, the criminal justice system may
+be their first or primary interaction with social services, but it is
+particularly poorly suited to address these additional needs. Lacking
+needed treatment or other interventions, a significant group of
+individuals cycles through jails and prisons, with the system as
+a whole failing to appreciably improve their individual outcomes
+or public safety [37, 39, 52]. The Criminal Justice/Mental Health
+Consensus Project found widespread dissatisfaction with the lack
+of resources available in the criminal justice system to address
+mental illness [55], and these failings are borne out in the statistics,
+with recidivism rates for individuals with mental illness reaching
+as high as 70% in some jurisdictions [57]. Likewise, Demleitner
+[18], argues that the combination of lacking effective treatment and
+“collateral restrictions” (such as restrictions on welfare benefits and
+employment opportunities) for drug offenders tends to reinforce
+the cycle of incarceration for people facing substance abuse issues.
+Faced with the high costs of incarceration, large jail populations
+booked with low-level misdemeanor offenses, and poor outcomes
+for these individuals with complex needs, some communities are
+turning to restorative justice and pre-trial diversionary programs
+as an alternative to incarceration in an effort to break this cycle.
+The design and implementation of these programs is as variable
+as the needs of the populations they serve, including (for example)
+mental health services, community service or restitution, substance
+abuse treatment, and facilitated meetings between victims and of-
+fenders. Use of these programs has expanded rapidly over the last
+two decades [50] and recent examinations of opportunities to im-
+prove outcomes in the criminal justice system have identified wide
+support for their continued expansion [55]. Evaluations of diver-
+sionary programs have generally shown success in reducing the
+time spent in jail without posing an increased risk to public safety,
+as well as increasing utilization of social services by individuals
+with mental health and substance abuse issues [16, 31, 40, 50]. Al-
+though evidence around the relative short-term costs and savings
+has been considerably mixed, depending in great degree on the im-
+plementation details and variation in costs of incarceration across
+communities [17, 50], there seems to be a growing consensus that
+diversionary programs that reflect individuals’ specific challenges
+and needs can have a positive impact on those individuals.
+1.1 Our Work
+This paper describes a collaboration between the University of
+Chicago’s Center for Data Science and Public Policy1 and the Los
+Angeles City Attorney’s Office to develop individualized interven-
+tion recommendations (i.e., diversions, conditional plea agreements,
+stayed sentencing, or other favorable case disposition based on ap-
+propriate social service linkage rather than traditional sentencing
+methods) by identifying individuals most at risk for future arrests
+for misdemeanor offenses handled by their office. The case study
+we present here is focused on dealing with equity, fairness, and bias
+issues that come up when building such systems, including: identi-
+fying desirable equitable outcomes from the policy view, defining
+these metrics for specific problems, understanding their implica-
+tions on individuals, performing machine learning model develop-
+ment and selection, and helping decision-makers decide how to
+achieve their policy outcomes in an equitable manner by imple-
+menting such a system. While there has been a lot of theoretical
+1The corresponding authors and the collaboration have nowmoved to Carnegie Mellon
+University
+work done on fairness in machine learning models in resource allo-
+cation settings, our work is focused on taking the many definitions
+and metrics for fairness that exist in literature, and showing how to
+operationalize those definitions to select a metric that optimizes a
+specific policy goal in a public policy problem. We believe that this
+mapping from theory to practice is critical if we want data-driven
+decision making to result in fair and equitable policies.
+The ethical implications of applications of machine learning to
+criminal justice systems, particularly recidivism risks, has been
+the subject of considerable work and recent debate. The May 2016
+publication by ProPublica of an investigation into the predictive
+equity of a widely-used recidivism risk score, Correctional Offender
+Management Profiling for Alternative Sanctions (COMPAS), helped
+raise both public awareness and researcher interest in these issues.
+Their analysis found dramatic racial disparities in the score’s error
+rates, with false positive rates nearly twice as high for black defen-
+dants relative to white defendants and false negative rates roughly
+twice as high for white defendants, despite similar levels of preci-
+sion across racial groups [3, 41]. Subsequent scholarly work further
+explored the COMPAS example as well as the theoretical limitations
+of various competing metrics for measuring fairness [12, 30]. More
+recently, Picard and colleagues [45] used anonymized data from
+New York city to demonstrate the generalization of ProPublica’s
+findings to another context and explore more equitable options for
+implementing risk assessment in bail determination.
+1.

@@ -1,0 +1,1046 @@
+50 Years of Test (Un)fairness: Lessons for Machine Learning
+Ben Hutchinson and Margaret Mitchell
+{benhutch,mmitchellai}@google.com
+ABSTRACT
+Quantitative definitions of what is unfair and what is fair have been
+introduced in multiple disciplines for well over 50 years, including
+in education, hiring, and machine learning. We trace how the no-
+tion of fairness has been defined within the testing communities of
+education and hiring over the past half century, exploring the cul-
+tural and social context in which different fairness definitions have
+emerged. In some cases, earlier definitions of fairness are similar
+or identical to definitions of fairness in current machine learning
+research, and foreshadow current formal work. In other cases, in-
+sights into what fairness means and how to measure it have largely
+gone overlooked. We compare past and current notions of fairness
+along several dimensions, including the fairness criteria, the focus
+of the criteria (e.g., a test, a model, or its use), the relationship of fair-
+ness to individuals, groups, and subgroups, and the mathematical
+method for measuring fairness (e.g., classification, regression). This
+work points the way towards future research and measurement of
+(un)fairness that builds from our modern understanding of fairness
+while incorporating insights from the past.
+CCS CONCEPTS
+•General and reference→ Surveys and overviews;Metrics; •
+Social and professional topics→History of computing;His-
+torical people; History of computing theory; Socio-technical sys-
+tems; User characteristics; •Mathematics of computing→ Prob-
+ability and statistics; Probabilistic algorithms; • Theory of com-
+putation→ Probabilistic computation; • Computing methodolo-
+gies→ Algebraic algorithms; • Software and its engineering→
+Model checking;
+KEYWORDS
+history, fairness, ML fairness, test fairness, psychometrics
+ACM Reference Format:
+Ben Hutchinson and Margaret Mitchell. 2019. 50 Years of Test (Un)fairness:
+Lessons for Machine Learning. In FAT* ’19: Conference on Fairness, Account-
+ability, and Transparency (FAT* ’19), January 29–31, 2019, Atlanta, GA, USA.
+ACM,NewYork, NY, USA, 10 pages. https://doi.org/10.1145/3287560.3287600
+1 INTRODUCTION
+The United States Civil Rights Act of 1964 effectively outlawed
+discrimination on the basis of of an individual’s race, color, religion,
+sex, or national origin. The Act contained two important provisions
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+https://doi.org/10.1145/3287560.3287600
+that would fundamentally shape the public’s understanding of what
+it meant to be unfair, with lasting impact into modern day: Title VI,
+which prevented government agencies that receive federal funds
+(including universities) from discriminating on the basis of race,
+color or national origin; and Title VII, which prevented employers
+with 15 or more employees from discriminating on the basis of race,
+color, religion, sex or national origin.
+Assessment tests used in public and private industry immedi-
+ately came under public scrutiny. The question posed by many
+at the time was whether the tests used to assess ability and fit in
+education and employment were discriminating on bases forbidden
+by the new law [2]. This stimulated a wealth of research into how
+to mathematically measure unfair bias and discrimination within
+the educational and employment testing communities, often with a
+focus on race. The period of time from 1966 to 1976 in particular
+gave rise to fairness research with striking parallels to ML fair-
+ness research from 2011 until today, including formal notions of
+fairness based on population subgroups, the realization that some
+fairness criteria are incompatible with one another, and pushback
+on quantitative definitions of fairness due to their limitations.
+Into the 1970s, there was a shift in perspective, with researchers
+moving from defining how a test may be unfair to how a test may
+be fair. It is during this time that we see the introduction of mathe-
+matical criteria for fairness identical to the mathematical criteria
+of modern day. Unfortunately, this fairness movement largely dis-
+appeared by the end of the 1970s, as the different and sometimes
+competing notions of fairness left little room for clarity on when
+one notion of fairness may be preferable to another. Following
+the retrospective analysis of Nancy Cole [15], who introduced the
+equivalent of Hardt et al.’s 2016 equality of opportunity [32] in 1973:
+The spurt of research on fairness issues that began in the
+late 1960s had results that were ultimately disappointing.
+No generally agreed uponmethod to determine whether
+or not a test is fair was developed. No statistic that could
+unambiguously indicate whether or not an item is fair
+was identified. There were no broad technical solutions
+to the issues involved in fairness.
+By learning from this past, we hope to avoid such a fate.
+Before further diving in to the history of testing fairness, it is
+useful to briefly consider the structural correspondences between
+tests and ML models. Test items (questions) are analogous to model
+features, and item responses analogous to specific activations of
+those features. Scoring a test is typically a simple linearmodel which
+produces a (possibly weighted) sum of the item scores. Sometimes
+test scores are normalized or standardized so that scores fit a desired
+range or distribution. Because of this correspondence, much of the
+math is directly comparable; and many of the underlying ideas in
+earlier fairness work trivially map on to modern day ML fairness.
+“History doesn’t repeat itself, but it often rhymes”; and by hearing
+this rhyme, we hope to gain insight into the future of ML fairness.
+Following terminology of the social sciences, applied statistics,
+and the notation of [4], we use “demographic variable” to refer
+to an attribute of individuals such as race, age or gender, denoted
+by the symbol A. We use “subgroup” to denote a group of indi-
+viduals defined by a shared value of a demographic variable, e.g.,
+A = a. Y indicates the ground truth or target variable, R denotes a
+score output by a model or a test, and D denotes a binary decision
+made using that score. We occasionally make exceptions when
+referencing original material.
+2 HISTORY OF FAIRNESS IN TESTING
+2.1 1960s: Bias and Unfair Discrimination
+Concerned with the fairness of tests for black and white students,
+T. Anne Cleary defined a quantitative measure of test bias for the
+first time, cast in terms of a formal model for predicting educational
+outcomes from test scores [10, 11]:
+A test is biased for members of a subgroup of the popula-
+tion if, in the prediction of a criterion for which the test
+was designed, consistent nonzero errors of prediction
+are made for members of the subgroup. In other words,
+the test is biased if the criterion score predicted from the
+common regression line is consistently too high or too
+low for members of the subgroup. With this definition
+of bias, there may be a connotation of “unfair," particu-
+larly if the use of the test produces a prediction that is
+too low. (Emphasis added.)
+According to Cleary’s criterion, the situation depicted in Fig-
+ure 1a is biased for members of subgroup π2 if the regression line
+π1 is used to predict their ability, since it underpredicts their true
+ability. For Cleary, the situation depicted in Figure 1b is not biased:
+since data from each of the subgroups produce the same regression
+line, that line can be used to make predictions for either group.
+In addition to defining bias in terms of predictions by regression
+models, Cleary also performed a study on real-world data from three
+state-supported and state-subsidized schools, comparing college
+GPA with SAT scores. Racial data was obtained from an admissions
+office, from an NAACP list of black students, and from examining
+class pictures. Cleary used Analysis of Covariance (ANCOVA) to
+test the relationships between SAT andHSR scores with GPA grades.
+Contrary to some expectations, Cleary found little evidence of the
+SAT being a biased predictor of GPA. (Later, larger studies found
+that the SAT overpredicted the GPA of black students [64]; it may
+be that the SAT is biased but less so than the GPA.)
+While Cleary’s focus was on education, her contemporary Robert
+Guion was concerned with unfair discrimination in employment.
+Arguing for the importance of quantitative analyses in 1966, he
+wrote that: “Illegal discrimination is largely an ethical matter, but
+the fulfillment of ethical responsibility begins with technical compe-
+tence” [30], and defined unfair discrimination to be “when persons
+with equal probabilities of success on the job have unequal proba-
+bilities of being hired for the job.” However, Guion recognized the
+challenges in using constructs such as the probability of success.
+We can observe actual success and failure after selection, but the
+probability of success is not itself observable, and a sophisticated
+model is required to estimate it at the time of selection.
+By the end of the 1960s, there was political and legal support
+backing concerns with the unfairness of the educational system for
+black children and the unfairness of tests purporting to measure
+black intellectual competence. Responding to these concerns, the
+Association of Black Psychologists formed in 1969 immediately
+published “A Petition of Concerns”, calling for a moratorium on
+standardized tests “(which are used) to maintain and justify the
+practice of systematically denying economic opportunities” [66].
+The NAACP followed up on this in 1974 by adopting a resolution
+that demanded “a moratorium on standardized testing wherever
+such tests have not been corrected for cultural bias” (cited by [56]).
+Meanwhile, advocates of testing worried that alternatives to testing
+such as interviews would introduce more subjective bias [26].
+As the 1960s turned to the 1970s, work began to arise that parallels
+the recent evolution of work in ML fairness, marking a change
+in framing from unfairness to fairness. Following Thorndike [62],
+“The discussion of ‘fairness’ in what has gone before is clearly over-
+simplified. In particular, it has been based upon the premise that
+the available criterion score is a perfectly relevant, reliable and
+unbiased measure...” Thorndike’s sentiment was shared by other
+academics of the time, who, in examining the earlier work of Cleary,
+objected that it failed to take into account the differing false positive
+and false negative rates that occur when subgroups have different
+base rates (i.e., A is not independent of Y ) [24, 62].
+With the goal of moving beyond simplified models, Thorndike
+[62] proposed one of the first quantitative criteria for measuring
+test fairness. With this shift, Thorndike advocated for considering
+the contextual use of a test:
+A judgment on test-fairness must rest on the inferences
+that are made from the test rather than on a comparison
+of mean scores in the two populations. One must then
+focus attention on fair use of the test scores, rather than
+on the scores themselves.
+Contrary to Cleary, Thorndike argued that sharing a common
+regression line is not important, as one can achieve fair selection
+goals by using different regression lines and different selection
+thresholds for the two groups.
+As an alternative to Cleary, Thorndike proposed that the ratio
+of predicted positives to ground truth positives be equal for each
+group. Using confusion matrix terminology, this is equivalent to
+requiring that the ratio (TP + FP)/(TP + FN ) be equal for each
+subgroup. According to Thorndike, the situation in Figure 1a is fair
+for test cutoff x∗. Figure 1b is unfair using any single threshold, but
+fair if threshold x∗
+for group π2.
+Similar tomodern dayML fairness, e.g., Friedler et al. in 2016 [28],
+Thorndike also pointed out the tension between individual notions
+of fairness and group notions of fairness: “the two definitions of
+fairness—one based on predicted criterion score for individuals and
+the other on the distribution of criterion scores in the two groups—
+will always be in conflict.” The conflict was also raised by others in
+the period, including Sawyer et al. [57], in a foreshadowing of the
+compas debate of 2016:
+universities’ covert attempts to suppress the numbers of Jewish students, whose
+performance on entrance exams had led them to become an increasing percentage of
+the student population [38].
+(a) Labels on regression lines indicate which subgroup they fit. (b) The regression line labeled πc fits both subgroups separately (and
+hence also their union).
+Figure 1: Petersen and Novick’s [52] original figures demonstrating fairness criteria. The marginal distributions of test scores
+and ground truth scores for subgroups π1 and π2 are shown by the axes.
+A conflict arises because the success maximization pro-
+cedures based on individual parity do not produce equal
+opportunity (equal selection for equal success) based on
+group parity and the opportunity procedures do not pro-
+duce success maximization (equal treatment for equal
+prediction) based on individual parity.
+Almost as an aside, Thorndike mentions the existence of another
+regression line ignored by Cleary: the line that estimates the value
+of the test score R given the target variable Y . This idea hints at the
+notion of equal opportunity for those with a given value of Y , an
+idea which soon was picked up by Darlington [19] and Cole [14].
+At a glance, Cleary’s and Thorndike’s definitions are difficult to
+compare directly because of the different ways in which they’re
+defined. Darlington [19] helped to shed light on the relationship
+between Cleary and Thorndike’s conceptions of fairness by express-
+ing them in a common formalism. He defines four fairness criteria
+in terms of the correlation ρAR between the demographic variable
+and the test score. Following Darlington,
+(1) Cleary’s criterion can be restated in terms of correlations of
+the “culture variable” with test scores. If Cleary’s criterion
+holds for every subgroup, then ρAR = ρAY /ρRY
+(2) Similarly, Thorndike’s criterion is equivalent to requiring
+that ρAR = ρAY .
+(3) The criterion ρAR = ρAY × ρRY is motivated by thinking
+about R as a dependent variable affected by independent
+variables A and Y . If A has no direct effect on R once Y is
+taken into account then we have a zero partial correlation,
+i.e. ρAR .Y = 0]
+(4) An alternative “starkly simple” criterion of ρAR = 0 (rec-
+ognizable as modern day demographic parity [23]) is intro-
+duced but not dwelt on.
+Darlington’s mapping of Cleary’s and Thorndike’s criteria lets
+him prove that they’re incompatible except in the special cases
+where the test perfectly predicts the target variable (ρRY = 1), or
+where the target variable is uncorrelated with the demographic vari-
+able (ρAY = 0). Figure 2, reproduced from Darlington’s 1971 work,
+criterion only holds if A, R and Y have a multivariate normal distribution.
+Figure 2: Darlington’s original graph of fair values of the
+correlation between culture and test score (rCX in Darling-
+ton’s notation), plotted against the correlation between test
+score and ground truth (rXY ), according to his definitions
+(1–4). (The correlation between the demographic and target
+variables is assumed here to be fixed at 0.2.)
+shows that, for any given non-zero correlation between the demo-
+graphic and target variables, definitions (1), (2), and (3) converge
+as the correlation between the test score and the target variable
+approach 1. When the test has only a poor correlation with the
+target variable, there may be no fair solution using definition (1).
+Figure 2 enables a range of further observations. According to
+definition (1), for a given correlation between demographic and
+target variables, the lower the correlation of the test with the target
+variable, the higher it is allowed to correlate with the demographic
+variable and still be considered fair. Definition (3), on the other hand,
+is the opposite, in that the lower the correlation of the test with
+the target variable, the lower too must be the the test’s correlation
+with the demographic variable. Darlington’s criterion (2) is the
+geometric mean of criteria (1) and (3): “a compromise position
+midway between [the] two... however, a compromise may end up
+satisfying nobody; psychometricians are not in the habit of agreeing
+on important definitions or theorems by compromise.” Darlington
+shows that definition (3) is the only one of the four whose errors
+are uncorrelated with the demographic variable, where by “errors”,
+he means errors in the regression task of estimating Y from R.
+Category Description
+individual Fairness criterion defined purely in
+terms of individuals
+non-comparative Fairness criterion for each subgroup
+does not reference other subgroups
+subgroup parity Fairness criterion defined in terms of
+parity of some value across subgroups
+correlation Fairness criterion defined in terms of
+the correlation of the demographic vari-
+able with the model output
+Table 1: Categories of Fairness Criteria
+In 1973, Cole [14] continued exploring ideas of equal outcomes
+across subgroups, defining fairness as all subgroups having the same
+True Positive Rate (TPR), recognizable as modern day equality of
+opportunity [32]. That same year, Linn [43] introduced (but did not
+advocate for) equal Positive Predictive Value (PPV) as a fairness
+criterion, recognizable as modern day predictive parity [9].
+is a property of the test itself. This is contrary to Thorndike, Linn
+and Cole, who take fairness to be a property of the use of a test.
+The latter group tended to assume that a test is static, and focused
+on optimizing its use; whereas Cleary’s concerns were with how
+to improve the tests themselves. Cleary worked for Educational
+Testing Services, and one can imagine a test being designed allowing
+for a range of use cases, since it may not be knowable in advance
+either i) the precise populations on which it will be deployed, nor
+ii) the number of students which an institution deploying the test
+is able to offer places to.
+By March 1976, the interest in fairness in the educational testing
+community was so strong that an entire issue of the Journal of
+Education Measurement was devoted to the topic [47], including
+a lengthy lead article by Peterson and Novick [52], in which they
+consider for the first time the equality of True Negative Rates (TNR)
+across subgroups, and equal TPR / equal TNR across subgroups
+(modern day equalized odds [32]). Similarly, they consider the case
+of equal PPV and equal NPV across subgroups.
+four distinct categories: individual, non-comparative, subgroup
+parity, and correlation, defined in Table 1. It should be empha-
+sized that in not all cases where a researcher defined a criterion did
+they also advocate for it. In particular, Darlington, Linn, Jones, and
+Peterson and Novick all define criteria purely for the purposes of
+exploring the space of concepts related to fairness. A summary of
+fairness technical definitions during this time is listed in Table 2.
+2.3 Mid-1970s: The Fairness Tide Turns
+Immediately after the the journal issue of 1976, research into quan-
+titative definitions of test fairness seems to have come to a halt.
+Considering why this happened may be a valuable lesson to learn
+PPV and NPV) on the grounds that either combination requires unusual circumstances.
+However there is a flaw in their reasoning. For example, arguing against equal TPR
+and equal TNR, they claim that this requires equal base rates in the ground truth in
+addition to equal TPR.
+from for modern day fairness research. The same Cole who in 1973
+proposed equality of TPR, wrote in 2001 that [15]:
+In short, research over the last 30 or so years has not
+supplied any analyses to unequivocally indicate fairness
+or unfairness, nor has it produced clear procedures to
+avoid unfairness. To make matters worse, the views of
+fairness of the measurement profession and the views of
+the general public are often at odds.
+Foreshadowing this outcome, statements from researchers in
+the 1970s indicate an increasing concern with how fairness cri-
+teria obscure “the fundamental problem, which is to find some
+rational basis for providing compensatory treatment for the dis-
+advantaged” [48]. Following Peterson and Novick, the concepts of
+culture-fairness and group parity are not viable in practice, leading
+to models that can sanction the discrimination they seek to rectify
+[52]. They argue that fairness should be reconceptualized as a prob-
+lem in maximizing expected utility [51], recognizing “high social
+utility in equalizing opportunity and reducing disadvantage” [48].
+A related thread of work highlights that different fairness cri-
+teria encode different value systems [34], and that quantitative
+techniques alone cannot answer the question of which to use. In
+1971, Darlington [19] urges that the concept of “cultural fairness”
+be replaced by “cultural optimality”, which takes into account a
+policy-level question concerning the optimum balance between
+accuracy and cultural factors. In 1974, Thorndike points out that
+“one’s value system is deeply involved in one’s judgment as to what
+is ‘fair use’ of a selection device” [48]), and similarly, in 1976, Linn
+[44] draws attention to the fact that “Values are implicit in the mod-
+els. To adequately address issues of values they need to be dealt
+with explicitly.” Hunter and Schmidt [34] begin to address this issue
+by bringing ethical theory to the discussion, relating fairness to
+theories of individualism and proportional representation. Current
+work may learn from this point in history by explicitly connecting
+fairness criteria to different cultural and social values.
+2.4 1970s on: Differential Item Functioning
+Concurrent with the development of criteria for the fair use of tests,
+another line of research in the measurement community concerned
+looking for bias in test questions (“items”). In 1968, Cleary and
+Hilton [12] used an analysis of variance (ANOVA) design to test
+the interaction between race, socioeconomic level and test item.
+Ten years later, the related idea of Differential Item Functioning
+(DIF) was introduced by Scheuneman in 1979 [58]: “an item is
+considered unbiased if, for persons with the same ability in the
+area being measured, the probability of a correct response on the
+item is the same regardless of the population group membership
+of the individual.” That is, if I = I (q) is the variable representing a
+correct response on question q, then by this definition I is unbiased
+if A ⊥ I |Y .
+In practice, the best measure of the ability that the item is testing
+is often the test in which the item is a component [21]:
+Amajor change from focusing primarily on fairness in a
+domain, where so many factors could spoil the validity
+effort, to a domainwhere analyses could be conducted in
+a relatively simple, less confounded way. ... In a DIF anal-
+ysis, the item is evaluated against something designed to
+Source Criterion Category Proposition
+Guion (1966)
+“people with equal probabilities of success on the job
+have equal probabilities of being hired for the job”
+individual Is the use of the test fair?
+Cleary (1966) “a subgroup does not have consistent errors” non-comparative Is the test fair to subgroup a?
+Einhorn and Bass (1971)
+†
+Prob(Y > y ∗ |R = ra∗,A = a) is constant for all
+subgroups a
+subgroup parity
+Is the use of the test fair
+with respect to A?
+Thorndike (1971)
+Prob(R >= ra ∗ |A = a)/Prob(Y >= y ∗ |A = a) is
+constant for all subgroups a
+subgroup parity
+Is the use of the test fair
+with respect to A?
+Darlington (1971) (1) ρAX = ρAY /ρRY (equivalent to ρAY .R = 0)
+correlation Is the test fair with respect to A?
+Darlington (1971) (2) ρAR = ρAY
+Darlington (1971) (3) ρAR = ρAY × ρRY (equivalent to ρAR .Y = 0)
+Darlington (1971) (4) ρAR = 0
+Darlington (1971) ρR(Y−kA), is maximized where k is the subjective
+value placed on subgroup attribute A = 1
+correlation
+Does the test produce the
+culturally optimum†
+optimal outcome w.r.t. A?
+Cole (1973)
+Prob(R >= ra ∗ |Y >= y∗,A = a) is constant for all
+subgroups a
+subgroup parity
+Is the use of the test fair
+with respect to A?
+Linn (1973)
+Prob(Y >= y ∗ |R >= ra∗,A = a) is constant for all
+subgroups a
+subgroup parity
+Is the use of the test fair
+with respect to A?
+Jones (1973)
+E(Ŷ |a) = E(Y |a) non-comparative Is the test fair to subgroup a?
+mean fair†
+Jones (1973)
+a subgroup a has equal representation in the
+top-n candidates ranked by model score as it has
+in the top-n candidates ranked by Y , for all n
+non-comparative Is the test fair to subgroup a?general standard†
+Jones (1973)
+a subgroup a has equal representation in the
+top-n candidates ranked by model score as it has
+in the top-n candidates ranked by Y
+non-comparative
+Is the use of the test fair to
+subgroup a?
+at position n†
+Peterson & Novick (1976) Prob(R >= ra ∗ |Y >= y∗,A = a) is constant for all
+subgroups a, and Prob(R < ra ∗ |Y < y∗,A = a) is
+constant for all subgroups a
+subgroup parity
+Is the use of the test fair
+with respect to A?
+conditional probability and
+its converse
+Peterson & Novick (1976) Prob(Y >= y ∗ |R >= ra∗,A = a) is constant for all
+subgroups a, and Prob(Y < y ∗ |R < ra∗,A = a) is
+constant for all subgroups a
+subgroup parity
+Is the use of the test fair
+with respect to A?
+equal probability and its
+converse
+Table 2: Early technical definitions of fairness in educational and employment testing. Variables: R is the test score; Y is the
+target variable; A is the demographic variable. The Proposition column indicates whether fairness is considered a property of
+the way in which a test is used, or of the test itself. † indicates that the criterion is discussed in the appendix.
+measure a particular construct and something that the
+test producer controls, namely a test score.
+Figure 3 illustrates DIF for a test item.
+DIF became very influential in the education field, and to this day
+DIF is in the toolbox of test designers. Items displaying a DIF are
+ideally examined further to identify the cause of bias, and possibly
+removed from the test [50].
+2.5 1980s and beyond
+With the start of the 1980s came renewed public debate about the
+existence of racial differences in general intelligence, and the impli-
+cations for fair testing, following the publication of the controversial
+Bias in Mental Testing [36]. Political opponents of group-based con-
+siderations in educational and employment practices framed them
+in terms of “preferential treatment” for minorities and “reverse dis-
+crimination” against whites. Despite, or perhaps because of, much
+public debate, neither Congress nor the courts gave unambiguous
+answers to the question of how to balance social justice consid-
+erations with the historical and legal importance placed on the
+individual in the United States [18].
+Into the 1980s, courts were asked to rule on many cases involv-
+ing (un)fairness in educational testing. To give just one example,
+Zwick and Dorans [71] described the case of Debra P. v. Turlington
+1984, in which a lawsuit was filed on behalf of “present and future
+twelfth grade students who had failed or would fail” a high school
+Figure 3: Original graph from [22] illustrating DIF.
+graduation test. The initial ruling found that the test perpetuated
+past discrimination and was in violation of the Civil Rights Act.
+More examples of court rulings on fairness are given by [53, 71].
+By the early 1980s, ideas about fairness were having awidespread
+influence on U.S. employment practices. In 1981, with no public
+debate, the United States Employment Services implemented score-
+adjustment strategy that was sometimes called “race-norming” [54].
+Each individual is assigned a percentile ranking within their own
+ethnic group, rather than to the test-taking population. By the mid-
+1980s, race-norming was “a highly controversial issue sparking
+heated debate.” The debate was settled through legislation, with the
+1991 Civil Rights Act banning the practice of race-norming [65].
+3 CONNECTIONS TO ML FAIRNESS
+3.1 Equivalent Notions
+Many of the fairness criteria we have overviewed are identical to
+modern-day fairness definitions. Here is a brief summary of these
+connections:
+• Peterson and Novick’s “conditional probability and its con-
+verse” is equivalent to what in ML fairness is variously called
+sufficiency [4], equalized odds [32], or conditional procedure
+accuracy [5], sometimes expressed as the conditional inde-
+pendence A ⊥ D |Y .
+• Similarly, their “equal probability and its converse” is equiv-
+alent to what is called sufficiency [4] or conditional use accu-
+racy equality [5], A ⊥ Y |D.
+• Cole’s 1973 fairness definition is identical to equality of op-
+portunity [32], A ⊥ D |Y = 1.
+• Linn’s 1973 definition is equivalent to predictive parity [9],
+A ⊥ Y |D = 1.
+• Darlington’s criterion (1) is equivalent to sufficiency in the
+special case where A, R and Y have a multivariate Gaussian
+distribution. This is because for this special case the partial
+correlation ρAY .X = 0 is equivalent to A ⊥ Y |R [3]. In gen-
+eral though, we cannot assume even a one way implication,
+since A ⊥ Y |R does not imply ρAY .X = 0 (see [63] for a
+counterexample).
+• Similarly, Darlington’s criteria (2) and (3) are equivalent to
+independence and separation only in the special cases of
+multivariate Gaussian distributions.
+• Darlington’s definition (4) is a relaxation of what is called
+independence [4] or demographic parity in ML fairness, i.e.
+A ⊥ R; it is equivalent when A and R have a bivariate Gauss-
+ian distribution.
+• Guion’s definition “people with equal probabilities of success
+on the job have equal probabilities of being hired for the job”
+is a special case of Dwork’s [23] individual fairness with the
+presupposition that “probability of success on the job” is a
+construct that can be meaningfully reasoned about.
+The fairness literature in both the fields of ML and in testing have
+also been motivated by causal considerations [32, 41]. Darlington
+[19] motivate his definition (3) on the basis of a causal relation-
+ship between Y and R (since an ability being measured affects the
+performance on the test). However [34] have pointed out that in
+testing scenarios we typically only have a proxy for ability, such as
+later GPA 4 years later, and it is wrong to draw a causal connection
+from GPA to college entrance exam.
+Hardt et al. [32] describe the challenge in building causal mod-
+els, by considering two distinct models and their consequences
+and concluding that “no test based only on the target labels, the
+protected attribute and the score would give different indications
+for the optimal score R∗ in the two scenarios.” This is remarkably
+reminiscent of Anastasi [1], writing in 1961 about test fairness:
+No test can eliminate causality. Nor can a test score, how-
+ever derived, reveal the origin of the behavior it reflects.
+If certain environmental factors influence behavior, they
+will also influence those samples of behavior covered by
+tests.Whenwe use tests to compare different groups, the
+only question the tests can answer directly is: “How do
+these groups differ under existing cultural conditions?”
+Both the testing fairness and ML fairness literatures have also
+paid great attention to impossibility results, such as the distinction
+between group fairness and individual fairness, and the impossi-
+bility of obtaining more than one of separation, sufficiency and
+independence except under special conditions [4, 9, 19, 40, 52, 62].
+In addition, we see some striking parallels in the framing of
+fairness in terms of ethical theories, including explicit advocacy for
+utilitarian approaches.
+• Petersen and Novick’s utility-based approaches relate to
+Corbett-Davies et al.’s framing of the cost of fairness [17].
+• Hunter and Schmidt’s analysis of the value systems under-
+lying fairness criteria is similar in spirit to Friedler et al.’s
+relation of fairness criteria and different worldviews [28].
+3.2 Variable Independence
+As briefly mentioned above, modern day ML fairness has catego-
+rized fairness definitions in terms of independence of variables,
+which includes sufficiency and separation [4]. Some historical no-
+tions of fairness neatly fit into this categorization, but others shed
+light on further dimensions of fairness criteria. Table 3 summarizes
+these connections, linking the historical criteria introduced in Sec-
+tion 2 to modern day categories. (Utility-based criteria are omitted,
+but will be discussed below.)
+We find that non-comparative criteria (discussed by Cleary and
+Jones) do not map onto any of the independence conditions used
+in ML fairness. Similarly, Thorndike’s, and Darlington’s have no
+Historical criterion ML fairness criterion Relationship
+Guion (1966) individual relaxation
+Cleary (1968) sufficiency
+when Cleary’s criterion holds for all subgroups then we we have equivalence
+when R and Y have bivariate Gaussian distribution
+Einhorn and Bass (1971) sufficiency
+both involve probability of Y conditioned on R , but Einhorn and Bass are
+only concerned with the conditional likelihood at the decision threshold
+Thorndike (1971) — —
+Darlington (1971) (1) sufficiency equivalent when variables have a multivariate Gaussian distribution
+Darlington (1971) (2) — —
+Darlington (1971) (3) separation equivalent when variables have a multivariate Gaussian distribution
+Darlington (1971) (4) independence equivalent when variables have a bivariate Gaussian distribution
+Cole (1973) separation relaxation (equivalent to equality of opportunity)
+Linn (1973) sufficiency relaxation (equivalent to predictive parity)
+Jones (1973) mean fair — —
+Jones (1973) at position n — —
+Jones (1973) general criterion — —
+Peterson and Novick (1976)
+separation equivalent
+conditional probability and its converse
+Peterson and Novick (1976)
+sufficiency equivalent
+equal probability and its converse
+Table 3: Relationships between testing criteria and ML’s independence criteria
+counterparts that we know of. There are conceptual similarities
+between Jones’ criteria and the constrained ranking problem de-
+scribed by [8], and also between Einhorn’s criterion and concerns
+about infra-marginality [60].
+For a binary classifier, Thorndike’s 1971 group parity criterion
+is equivalent to requiring that the ratio of positive predictions to
+ground truth positives be equal for all subgroups. This ratio has no
+common name that we could find (unlike e.g., precision, recall, etc.),
+although [52] refer to this as the “Constant RatioModel”. It is closely
+related to coverage constraints [29], class mass normalization [70]
+and expectation regularization [45]. Similar arguments can be made
+for Darlington’s criterion (2) and Jones’ criteria “at position n” and
+“general criterion”.When viewed as amodel of subgroup quotas [34],
+Thorndike’s criterion is reminiscent of fair division in economics.
+3.3 Regression and Correlation
+In reviewing the history of fairness in testing, it becomes clear that
+regression models have played a much larger role than in the ML
+community. Similarly, the use of correlation as a fairness criterion
+is all but absent in modern ML Fairness literature.
+Given that correlation of two variables is a weaker criterion
+than independence, it is reasonable to ask why one might want a
+fairness criterion defined in terms of correlations. One practical
+reason is that calculating correlations is a lot easier than estimating
+independence. Whereas correlation is a descriptive statistic, and
+so calculating requires few assumptions, estimating independence
+requires an the use of inferential statistics, which can in general be
+highly non-trivial [59].
+Considering the analogy between model features and test items
+described in the Introduction, we also know of no ML analogs to
+the Differential Item Functioning. Such analogs might test for bias
+in model features. Instead, one approach adopted in ML fairness
+has been the use of adversarial methods to mitigate the effects of
+features with undesirable correlations with subgroups, e.g., [6, 69].
+3.4 Model vs. Model Use
+Section 2 described how the test literature had competing notions
+of whether fairness is a property of a test, or of the use of a test.
+A similar discussion of whether ML models can be judged as fair
+or unfair independent of a specific use (including a specific model
+threshold) has been largely implicit or missing in the ML fairness
+literature. Models are sometimes trained to be “fair” at their default
+decision threshold (e.g., 0.5), although the use of different thresholds
+can have a major impact on fairness [32]. The ML fairness notion
+of calibration, i.e., P(Y = 1|A = a,R = r ) = r for all a and r , can
+be interpreted to be a property of the model rather than of its use,
+since it does not depend on the choice of decision threshold.
+3.5 Race and Gender
+Some work on practically assessing fairness in ML has tackled
+the problem of using race as a construct. This echoes concerns in
+the testing literature that stem back to at least 1966: “one stum-
+bles immediately over the scientific difficulty of establishing clear
+yardsticks by which people can be classified into convenient racial
+categories” [30]. Recent approaches have used Fitzpatrick skin type
+or unsupervised clustering to avoid racial categorizations [7, 55].
+We note that the testing literature of the 1960s and 1970s frequently
+uses the phrase “cultural fairness” when referring to parity between
+blacks and whites. Other than Thomas [61], the test fairness lit-
+erature of the 1960s and 1970s was typically concerned with race
+rather than gender (although received attention later, e.g., [67]). The
+role of culture in gender identity and gender presentation has seen
+less consideration in ML fairness, but gender labels raise ethical
+concerns [31, 33].
+Comparable to modern sentiment in the difficulties of measur-
+ing fairness, earlier decisions in the courtroom highlighted the
+impossibility of properly accounting for all factors that influence in-
+equalities. For example, in 1964, Illinois Fair Employment Practices
+Commission (FEPC) examiner found that Motorola had discrimi-
+nated against Leon Myart, a black American, in his application to
+work at Motorola as an “analyzer and phaser”. The examiner found
+that the 5 minute screening test that Myart took did not account
+for inequalities and environmental factors of culturally deprived
+groups. The case was appealed to the Illinois Supreme Court, which
+found that Myart actually passed the test, and so declined to rule
+on the fairness of the test [2].
+4 FAIRNESS GAPS
+4.1 Fairness and Unfairness
+In mapping out earlier fairness approaches and their relationship
+to ML fairness, some conceptual gaps emerge. One noticeable gap
+relates to the difference in framing between fairness and unfairness.
+In earlier work on test fairness, there was a focus on defining mea-
+surements in terms of unfair discrimination and unfair bias, which
+brought with it the problem of uncovering sources of bias [12]. In
+the 1970s, this developed into framings in terms of fairness, and the
+introduction of fairness criteria similar or identical to ML fairness
+criteria known today. However, returning to the idea of unfairness
+suggests several new areas of inquiry, including quantifying dif-
+ferent kinds of unfairness and bias (such as content bias, selection
+system bias, etc., cf. [35]), and a shift in focus from outcomes to
+inputs and processes [13]. Quantifying types of unfairness may not
+only add to the problems that machine learning can address, but
+also accords with realities of sentencing and policing behind much
+of the fairness research today: Individuals seeking justice do so
+when they believe that something has been unfair.
+4.2 Differential Item Functioning
+Another gap that becomes clear from the historical perspective
+is the lack of an analog to Differential Item Functioning (Section
+2.4) in current ML fairness research. DIF was used by education
+professionals as a motivation for investigating causes of bias, and a
+modern-day analog might include unfairness interpretability in ML
+models. An direct analog inML could be to compare P(Xi |R = r ,A =
+a) for different input features Xi , model outputs R and subgroupsA.
+For example, when predicting loan repayment, this might involve
+comparing how income levels differ across subgroups for a given
+predicted likelihood of repaying the loan.
+4.3 Target Variable / Model Score Relationship
+Another gap is the ways in which the model (test) score and the tar-
+get variable are related to each other. In many cases in ML fairness
+and test fairness, there are correspondences between pairs of criteria
+which differ only in the roles played by the model (test) score R and
+the target variable Y . That is, one criterion can be transformed into
+another by swapping the symbols R and Y ; for example, separation
+can be transformed into sufficiency: A ⊥ R |Y −→ A ⊥ Y |R. In this
+section we will refer to this type of correspondence as “converse”,
+i.e., separation is the converse of sufficiency.
+When viewed in this light, some asymmetries stand out:
+• Converse Cleary criterion: Cleary’s criterion considers the
+case of a regression model that predicts a target variable
+Y given test score R. One could also consider the converse
+regression model (mentioned in passing by [62]), which pre-
+dicts model score R from ground truth Y , as an instrument
+for detecting bias.
+say that a test has connotations of unfair for a subgroup if
+the converse regression line has positive errors, i.e., for each
+given level of ground truth ability, the test score is higher
+than the converse regression line predicts.
+• Converse calibration: In a regression scenario, the calibration
+condition P(Y = 1|R = r ,A = a) = r can be rewritten as
+E(Y |R = r ,A = a) = r , or E(Y − r |R = r ,A = a) = 0.
+The converse calibration condition is therefore E(R − y |Y =
+y,A = a) = 0 for all subgroups A = a. In other words, for
+each subgroup and level of ground truth performance Y = y,
+the expected error in R’s prediction of the value y is zero.
+We point out these overlooked concepts not to advocate for their
+use, but to map out the geography of concepts related to fairness
+more completely.
+4.4 Compromises
+Darlington [19] points out that Thorndike’s criterion is a compro-
+mise between one criterion related to sufficiency and one related to
+separation (see Section 2.2 and Tables 2 and 3). In general, a space
+of compromises is possible; in terms of correlations, this might be
+modeled using a parameter λ:
+ρAR = ρAY .ρ
+λ
+RY (1)
+where λ values of -1, 0, and 1 imply Darlington’s definitions (1), (2)
+and (3), respectively.
+This also suggests exploring interpolations between the contrast-
+ing sufficiency and separation criteria. For example, one way of
+parameterizing their interpolation is in terms of binary confusion
+matrix outcomes.
+Definition 4.1. (λ1, λ2)-Thorndikian fairness: A binary classifier
+satisfies (λ1, λ2)-Thorndikian fairness with respect to demographic
+variable A if both
+a)
+TP + λ1FP
+TP + λ2FN
+is constant for all values of A , and
+b)
+TN + λ1FN
+TN + λ2FP
+is constant for all values of A.
+Note that (1, 0)-Thorndikian fairness is equivalent to sufficiency,
+while (0, 1)-Thorndikian fairness is equivalent to separation.
+Petersen and Novick [52] showed that (1, 1)-Thorndikian fairness
+requires that either a) for each subgroup, the positive class is pre-
+dicted in proportion to its ground truth rate; or b) every subgroup
+has the same ground truth rate of positives. We can also consider
+relaxations of (λ1, λ2)-Thorndikian fairness in which only one of the
+two conditions (a) or (b) is required to hold. For example, only re-
+quiring condition (a) gives us a way of parameterizing compromises
+between equality of opportunity and predictive parity.
+where the magnitudes of the variables have been standardized.
+Our goal here is not to advocate for this particular model of
+compromise between separation and sufficiency. Rather, since sep-
+aration and sufficiency criteria can encode competing interests of
+different parties, our goal is to suggest that ML fairness consider
+how to encode notions of compromise, which in some scenarios
+might relate to the public’s notion of fairness. We propose that the
+economics literature on fair division might provide some useful
+ideas, as has also been suggested by [68]. However, we do heed
+Darlington’s [19] warning that “a compromise may end up satisfy-
+ing nobody; psychometricians are not in the habit of agreeing on
+important definitions or theorems by compromise.” This statement
+may be equally true of ML practitioners.
+5 DISCUSSION
+This short review of historical connections in fairness suggest sev-
+eral concrete steps forward for future research in ML fairness:
+(1) Developing methods to explain and reduce model unfairness
+by focusing on the causes of unfairness. To paraphrase Dar-
+lington’s [19] question: “What can be said about models that
+discriminate among cultures at various levels?” yields more
+actionable insights than “What is a fair model?” This is re-
+lated to research on causality in ML Fairness (see Section
+3.1), but including examination of full causal pathways, and
+processes that interact well before decision time. In other
+words: What causes the disparities?
+(2) Drawing from earlier insights of Guion [30], Thorndike [62],
+Cole [14], Linn [43], Jones [37], and Peterson & Novick [52]
+to expand fairness criteria to include model context and use.
+(3) Building from earlier insights of 1970s researchers [19, 34, 44]
+to incorporate quantitative factors for the balance between
+fairness goals and other goals, such as a value system or a
+system of ethics. This will likely include clearly articulating
+assumptions and choices, as recently proposed in [46].
+(4) Diving more deeply into the question of how subgroups are
+defined, suggested as early as 1966 [30], including question-
+ing whether subgroups should be treated as discrete cate-
+gories at all, and how intersectionality can be modeled. This
+might include, for example, how to quantify fairness along
+one dimension (e.g., age) conditioned on another dimension
+(e.g., skin tone), as recent work has begun to address [27, 39].
+6 CONCLUSIONS
+The spike in interest in test fairness in the 1960s arose during a
+time of social and political upheaval, with quantitative definitions
+catalyzed in part by U.S. federal anti-discrimination legislation in
+the domains of education and employment. The rise of interest
+in fairness today has corresponded with public interest in the use
+of machine learning in criminal sentencing and predictive polic-
+ing, including discussions around compas [16, 20, 42] and PredPol
+[25, 49]. Each era gave rise to its own notions of fairness and rele-
+vant subgroups, with overlapping ideas that are similar or identical.
+In the 1960s and 1970s, the fascination with determining fairness ul-
+timately died out as the work became less tied to the practical needs
+of society, politics and the law, and more tied to unambiguously
+identifying fairness.
+We conclude by reflecting on what further lessons the history
+of test fairness may have for the future of ML fairness. Careful
+attention should be paid to legal and public concerns about fair-
+ness. The experiences of the test fairness field suggest that in the
+coming years, courts may start ruling on the fairness of ML models.
+If technical definitions of fairness stray too far from the public’s
+perceptions of fairness, then the political will to use scientific con-
+tributions in advance of public policy may be difficult to obtain.
+Perhaps ML practitioners should cautiously take heed from Cole
+and Zieky’s [15] portrayal of developments in their field:
+Members of the public continue to see apparently inap-
+propriate interpretations of test scores and misuses of
+test results. They see this area as a primary fairness con-
+cern. However, the measurement profession has strug-
+gled to understand the nature of its responsibility in this
+area, and has generally not acted strongly against in-
+stances of misuse, nor has it acted in concert to attack
+misuses.
+We welcome broader debate on fairness that includes both tech-
+nical and cultural causes, how the context and use of ML models
+further influence potential unfairness, and the suitability of the vari-
+ables used in fairness research for capturing systemic unfairness.
+We agree with Linn’s [44] argument from 1976 that values encoded
+by technical definitions should be made explicit. By concretely re-
+lating fairness debates to ethical theories and value systems (as
+done by [34, 71]), we can make discussions more accessible to the
+general public and to researchers of other disciplines, as well as
+helping our own ML Fairness community to be more attuned to
+our own implicit cultural biases.
+7 ACKNOWLEDGEMENTS
+Thank you to Moritz Hardt and Shira Mitchell for invaluable con-
+versations and insight.
+REFERENCES
+[1] Anne Anastasi. 1961. Psychological tests: Uses and abuses. Teachers College
+Record (1961).
+[2] Philip Ash. 1966. The implications of the Civil Rights Act of 1964 for psychological
+assessment in industry. American Psychologist 21, 8 (1966), 797.
+[3] Kunihiro Baba, Ritei Shibata, and Masaaki Sibuya. 2004. Partial correlation and
+conditional correlation as measures of conditional independence. Australian &
+New Zealand Journal of Statistics 46, 4 (2004), 657–664.
+[4] Solon Barocas, Moritz Hardt, and Arvind Naranayan. 2018. Fairness in Machine
+Learning. http://fairmlbook.org. (2018).
+[5] Richard Berk, Hoda Heidari, Shahin Jabbari, Michael Kearns, and Aaron Roth.
+2017. Fairness in criminal justice risk assessments: the state of the art. arXiv
+preprint arXiv:1703.09207 (2017).
+[6] Alex Beutel, Jilin Chen, Zhe Zhao, and Ed H. Chi. 2017. Data Decisions and
+Theoretical Implications whenAdversarially Learning Fair Representations. CoRR
+abs/1707.00075 (2017). arXiv:1707.00075 http://arxiv.org/abs/1707.00075
+[7] Joy Buolamwini and Timnit Gebru. 2018. Gender shades: Intersectional accu-
+racy disparities in commercial gender classification. In Conference on Fairness,
+Accountability and Transparency. 77–91.
+[8] L Elisa Celis, Damian Straszak, and Nisheeth K Vishnoi. 2017. Ranking with
+fairness constraints. arXiv preprint arXiv:1704.06840 (2017).
+[9] Alexandra Chouldechova. 2017. Fair prediction with disparate impact: A study
+of bias in recidivism prediction instruments. Big data 5, 2 (2017), 153–163.
+[10] T. Anne Cleary. 1966. Test bias: Validity of the Scholastic Aptitude Test for Negro
+and white students in integrated colleges. ETS Research Bulletin Series 1966, 2
+(1966), i–23.
+[11] T. Anne Cleary. 1968. Test bias: Prediction of grades of Negro and white students
+in integrated colleges. Journal of Educational Measurement 5, 2 (1968), 115–124.
+[12] T Anne Cleary and Thomas L Hilton. 1968. An investigation of item bias. Educa-
+tional and Psychological Measurement 28, 1 (1968), 61–75.
+[13] Irina Cojuharenco and David Patient. 2013. Workplace fairness versus unfairness:
+Examining the differential salience of facets of organizational justice. Journal of
+Occupational and Organizational Psychology 86, 3 (2013), 371–393.
+[14] Nancy S Cole. 1973. Bias in selection. Journal of educational measurement 10, 4
+(1973), 237–255.
+[15] Nancy S Cole and Michael J Zieky. 2001. The new faces of fairness. Journal of
+Educational Measurement 38, 4 (2001), 369–382.
+[16] Sam Corbett-Davies, Emma Pierson, Avi Feller, and Sharad Goel.
+2016. A computer program used for bail and sentencing deci-
+sions was labeled biased against blacks. Its actually not that clear.
+https://www.washingtonpost.com/news/monkey-cage/wp/2016/10/17/can-
+an-algorithm-be-racist-our-analysis-is-more-cautious-than-propublicas/.
+(2016).
+[17] Sam Corbett-Davies, Emma Pierson, Avi Feller, Sharad Goel, and Aziz Huq. 2017.
+Algorithmic decision making and the cost of fairness. CoRR abs/1701.08230 (2017).
+arXiv:1701.08230 http://arxiv.org/abs/1701.08230
+[18] National Research Council et al. 1989. Fairness in employment testing: Validity
+generalization, minority issues, and the General Aptitude Test Battery. National
+Academies Press.
+[19] Richard B Darlington. 1971. Another Look at Cultural Fairness. Journal of
+Educational Measurement 8, 2 (1971), 71–82.
+[20] William Dieterich, Christina Mendoza, and Tim Brennan.
+2016. COMPAS risk scales: Demonstrating accuracy equity
+and predictive parity. http://go.volarisgroup.com/rs/430-MBX-
+989/images/ProPublica_Commentary_Final_070616.pdf. (2016).
+[21] Neil J Dorans. 2017. Contributions to the Quantitative Assessment of Item, Test,
+and Score Fairness. In Advancing Human Assessment. Springer, 201–230.
+[22] Neil J Dorans and Paul W Holland. 1992. DIF Detection and Description: Mantel-
+Haenszel and Standardization. ETS Research Report Series 1992, 1 (1992), i–40.
+[23] Cynthia Dwork, Moritz Hardt, Toniann Pitassi, Omer Reingold, and Richard
+Zemel. 2012. Fairness Through Awareness. In Proceedings of the 3rd Innovations
+in Theoretical Computer Science Conference (ITCS ’12). ACM, New York, NY, USA,
+214–226. https://doi.org/10.1145/2090236.2090255
+[24] Hillel J Einhorn and Alan R Bass. 1971. Methodological considerations relevant
+to discrimination in employment testing. Psychological Bulletin 75, 4 (1971), 261.
+[25] Danielle Ensign, Sorelle A Friedler, Scott Neville, Carlos Scheidegger, and Suresh
+Venkatasubramanian. 2017. Runaway feedback loops in predictive policing. arXiv
+preprint arXiv:1706.09847 (2017).
+[26] Ronald L Flaugher. 1974. Bias in Testing: A Review and Discussion. TM Report No.
+36. Technical Report. Educational Testing Services.
+[27] James R. Foulds and Shimei Pan. 2018. An Intersectional Definition of Fairness.
+CoRR abs/1807.08362 (2018).
+[28] Sorelle A Friedler, Carlos Scheidegger, and Suresh Venkatasubramanian. 2016.
+On the (im) possibility of fairness. arXiv preprint arXiv:1609.07236 (2016).
+[29] Gabriel Goh, Andrew Cotter, Maya Gupta, and Michael P Friedlander. 2016. Satis-
+fying real-world goals with dataset constraints. In Advances in Neural Information
+Processing Systems. 2415–2423.
+[30] Robert M Guion. 1966. Employment tests and discriminatory hiring. Industrial
+Relations: A Journal of Economy and Society 5, 2 (1966), 20–37.
+[31] Foad Hamidi, Morgan Klaus Scheuerman, and Stacy M Branham. 2018. Gender
+Recognition or Gender Reductionism?: The Social Implications of Embedded
+Gender Recognition Systems. In Proceedings of the 2018 CHI Conference on Human
+Factors in Computing Systems. ACM, 8.
+[32] Moritz Hardt, Eric Price, , and Nati Srebro. 2016. Equality of Opportu-
+nity in Supervised Learning. In Advances in Neural Information Processing
+Systems 29, D. D. Lee, M. Sugiyama, U. V. Luxburg, I. Guyon, and R. Gar-
+nett (Eds.). Curran Associates, Inc., 3315–3323. http://papers.nips.cc/paper/
+6374-equality-of-opportunity-in-supervised-learning.pdf
+[33] Anna Lauren Hoffmann. 2017. Data, technology, and gender: Thinking about
+(and from) trans lives. In Spaces for the Future. Routledge, 15–25.
+[34] John E Hunter and Frank L Schmidt. 1976. Critical analysis of the statistical and
+ethical implications of various definitions of test bias. Psychological Bulletin 83, 6
+(1976), 1053.
+[35] Christopher Jencks. 1998. Racial bias in testing. The Black-White test score gap 55
+(1998), 84.
+[36] Arthur R Jensen. 1980. Bias in mental testing. (1980).
+[37] Marshall B Jones. 1973. Moderated regression and equal opportunity. Educational
+and Psychological Measurement 33, 3 (1973), 591–602.
+[38] Jerome Karabel. 2006. The chosen: The hidden history of admission and exclusion
+at Harvard, Yale, and Princeton. Houghton Mifflin Harcourt.
+[39] Michael Kearns, Seth Neel, Aaron Roth, and Zhiwei Steven Wu. 2018. Preventing
+Fairness Gerrymandering: Auditing and Learning for Subgroup Fairness. In ICML.
+[40] Jon Kleinberg, Sendhil Mullainathan, and Manish Raghavan. 2016. Inherent
+trade-offs in the fair determination of risk scores. arXiv preprint arXiv:1609.05807
+(2016).
+[41] Matt J Kusner, Joshua Loftus, Chris Russell, and Ricardo Silva. 2017. Counterfac-
+tual fairness. In Advances in Neural Information Processing Systems. 4066–4076.
+[42] Jeff Larson, Surya Mau, Lauren Kirchner, and Julia Angwin.
+2016. How We Analyzed the COMPAS Recidivism Algorithm.
+https://www.propublica.org/article/how-we-analyzed-the-compas-recidivism-
+algorithm. (2016).
+[43] Robert L Linn. 1973. Fair test use in selection. Review of Educational Research 43,
+2 (1973), 139–161.
+[44] Robert L Linn. 1976. In search of fair selection procedures. Journal of Educational
+Measurement 13, 1 (1976), 53–58.
+[45] Gideon S Mann and Andrew McCallum. 2007. Simple, robust, scalable semi-
+supervised learning via expectation regularization. In Proceedings of the 24th
+international conference on Machine learning. ACM, 593–600.
+[46] Shira Mitchell, Eric Potash, and Solon Barocas. 2018. Prediction-Based De-
+cisions and Fairness: A Catalogue of Choices, Assumptions, and Definitions.
+arXiv:1811.07867 (2018).
+[47] National Council on Measurement in Education NCME (Ed.). 1976. Journal of
+Education Measurement. 13, 1 (1976).
+[48] Melvin R Novick and Nancy S Petersen. 1976. Towards equalizing educational
+and employment opportunity. Journal of Educational Measurement 13, 1 (1976),
+77–88.
+[49] Cathy O’Neil. 2016. Weapons of math destruction: How big data increases inequality
+and threatens democracy. Broadway Books.
+[50] Randall D Penfield. 2016. Fairness in Test Scoring. In Fairness in Educational
+Assessment and Measurement. Routledge, 71–92.
+[51] Nancy S Petersen. 1976. An expected utility model for “optimal” selection. Journal
+of Educational Statistics 1, 4 (1976), 333–358.
+[52] Nancy S Petersen and Melvin R Novick. 1976. An evaluation of some models for
+culture-fair selection. Journal of Educational Measurement 13, 1 (1976), 3–29.
+[53] S E Phillips. 2016. Legal Aspects of Test Fairness. In Fairness in Educational
+Assessment and Measurement, Neil J Dorans and Linda L Cook (Eds.). Routledge,
+239–268.
+[54] Mitchell F Rice and Brad Baptiste. 1994. Race Norming, Validity Generalization,
+and Employment Testing. Handbook of Public Personnel Administration 58 (1994),
+451.
+[55] Hee Jung Ryu, Hartwig Adam, and Margaret Mitchell. 2018. InclusiveFaceNet:
+Improving Face Attribute Detection with Race and Gender Diversity. InWorkshop
+on Fairness, Accountability and Transparency in Machine Learning.
+[56] Ronald J Samuda. 1998. Psychological testing of American minorities: Issues and
+consequences. Vol. 10. Sage.
+[57] Richard L Sawyer, Nancy S Cole, and James WL Cole. 1976. Utilities and the issue
+of fairness in a decision theoretic model for selection. Journal of Educational
+Measurement 13, 1 (1976), 59–76.
+[58] Janice Scheuneman. 1979. A method of assessing bias in test items. Journal of
+Educational Measurement 16, 3 (1979), 143–152.
+[59] Rajen D Shah and Jonas Peters. 2018. The Hardness of Conditional Independence
+Testing and the Generalised Covariance Measure. arXiv preprint arXiv:1804.07203
+(2018).
+[60] Camelia Simoiu, Sam Corbett-Davies, Sharad Goel, et al. 2017. The problem of
+infra-marginality in outcome tests for discrimination. The Annals of Applied
+Statistics 11, 3 (2017), 1193–1216.
+[61] Charles L Thomas. 1973. The Overprediction Phenomenon among Black Colle-
+gians: Some Prelinimary Considerations. (1973).
+[62] Robert L Thorndike. 1971. Concepts of culture-fairness. Journal of Educational
+Measurement 8, 2 (1971), 63–70.
+[63] András Vargha, Tamas Rudas, Harold D Delaney, and Scott E Maxwell. 1996.
+Dichotomization, partial correlation, and conditional independence. Journal of
+Educational and Behavioral statistics 21, 3 (1996), 264–282.
+[64] Frederick E Vars andWilliam G Bowen. 1998. Scholastic aptitude test scores, race,
+and academic performance in selective colleges and universities. The Black-White
+test score gap (1998), 457–79.
+[65] Kimberly West-Faulcon. 2011. Fairness Feuds: Competing Conceptions of Title
+VII Discriminatory Testing. Wake Forest L. Rev. 46 (2011), 1035.
+[66] Robert L Williams, William Dotson, Patricia Don, and Willie S Williams. 1980.
+The war against testing: A current status report. The Journal of Negro Education
+49, 3 (1980), 263–273.
+[67] Warren W Willingham and Nancy S Cole. 2013. Gender and fair assessment.
+Routledge.
+[68] Muhammad Bilal Zafar, Isabel Valera, Manuel Rodriguez, Krishna Gummadi,
+and Adrian Weller. 2017. From parity to preference-based notions of fairness in
+classification. In Advances in Neural Information Processing Systems. 229–239.
+[69] Brian Hu Zhang, Blake Lemoine, and Margaret Mitchell. 2018. Mitigating Un-
+wanted Biases with Adversarial Learning. (2018).
+[70] Xiaojin Zhu, Zoubin Ghahramani, and John D Lafferty. 2003. Semi-supervised
+learning using gaussian fields and harmonic functions. In Proceedings of the 20th
+International conference on Machine learning (ICML-03). 912–919.
+[71] Rebecca Zwick and Neil J Dorans. 2016. Philosophical Perspectives on Fairness in
+Educational Assessment. In Fairness in Educational Assessment and Measurement,
+Neil J Dorans and Linda L Cook (Eds.). Routledge, 267–281.

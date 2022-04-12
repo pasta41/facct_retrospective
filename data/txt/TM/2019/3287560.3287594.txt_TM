@@ -1,0 +1,132 @@
+
+Assessing the fairness of a decision making system with respect
+to a protected class, such as gender or race, is challenging when
+class membership labels are unavailable. Probabilistic models for
+predicting the protected class based on observable proxies, such as
+surname and geolocation for race, are sometimes used to impute
+these missing labels for compliance assessments. Empirically, these
+methods are observed to exaggerate disparities, but the reason why
+is unknown. In this paper, we decompose the biases in estimating
+outcome disparity via threshold-based imputation into multiple
+interpretable bias sources, allowing us to explain when over- or
+underestimation occurs. We also propose an alternative weighted
+estimator that uses soft classification, and show that its bias arises
+simply from the conditional covariance of the outcome with the
+true class membership. Finally, we illustrate our results with nu-
+merical simulations and a public dataset of mortgage applications,
+using geolocation as a proxy for race. We confirm that the bias of
+threshold-based imputation is generally upward, but its magnitude
+varies strongly with the threshold chosen. Our new weighted esti-
+mator tends to have a negative bias that is much simpler to analyze
+and reason about.
+CCS CONCEPTS
+• Social and professional topics → Race and ethnicity; Geo-
+graphic characteristics; •Applied computing→ IT governance;
+Law;
+KEYWORDS
+fair lending, disparate impact, protected class, racial discrimina-
+tion, race imputation, probablistic proxy model, Bayesian Improved
+Surname Geocoding
+∗
+Corresponding author
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’19, January 29–31, 2019, Atlanta, GA, USA
+© 2019 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6125-5/19/01. . . $15.00
+https://doi.org/10.1145/3287560.3287594
+ACM Reference Format:
+Jiahao Chen, Nathan Kallus, Xiaojie Mao, Geoffry Svacha, and Madeleine
+Udell. 2019. Fairness Under Unawareness: Assessing Disparity When Pro-
+tected Class Is Unobserved. In FAT* ’19: Conference on Fairness, Account-
+ability, and Transparency (FAT* ’19), January 29–31, 2019, Atlanta, GA, USA.
+ACM,NewYork, NY, USA, 13 pages. https://doi.org/10.1145/3287560.3287594
+1 INTRODUCTION
+Models for high stakes decision making have ethical and legal needs
+to demonstrate a lack of discrimination with respect to protected
+classes [2, 26]. Examples of such decisions include employment and
+compensation [14, 20], university admissions [4], and sentence and
+bail setting [3, 7, 16]. Another example relevant to the financial
+services industry is credit decisioning [6], which is a classification
+problemwhere these ethical concerns are enshrined in concrete reg-
+ulatory compliance requirements. Credit decisions must be shown
+to comply with a myriad of federal and state fair lending laws,
+some of which are summarized in [6]
+protected classes, such as race and gender, where discrimination
+on the basis of a customer’s membership in these classes is prohib-
+ited. Table 1 summarizes the protected classes defined by the Fair
+Housing Act (FHA) [28] and Equal Credit Opportunity Act (ECOA)
+[29].
+Table 1: Protected classes defined under fair lending laws.
+Law FHA[28] ECOA[29]
+age X
+color X X
+disability X
+exercised rights under CCPA X
+familial status (household composition) X
+gender identity X
+marital status (single or married) X
+national origin X X
+race X X
+recipient of public assistance X
+religion X X
+sex X X
+United States of America.
+1.1 Assessing fairness with unknown protected
+class membership
+When demonstrating that credit decisions comply with these fair
+lending laws, we sometimes run into situations where fairness and
+bias assessments must be done on populations without knowing
+their memberships in protected classes, because it is illegal or oper-
+ationally difficult to do so. For example, credit card and auto loan
+companies must demonstrate that the way they extend credit is not
+racially discriminatory, yet are not allowed to ask applicants what
+race they are when they apply for credit.
+can only solicit race and ethnicity information for new members
+but cannot obtain the same information for existing members [18].
+Given the lack of secure protocols that permit disparity evaluation
+with encrypted protected classes [23], disparate impact assessments
+for these situations have to impute the mostly (or entirely) missing
+labels corresponding to the protected class, usually by relying on
+observed proxy variables that can predict class memberships. The
+imputed protected classes are then used by regulators in assessing
+disparate impact (but they are not allowed to be used in decision
+making). Generally, any model that imputes the missing protected
+attribute value based on other, observed variables is known as a
+proxy model, and such a model that is based on predicting condi-
+tional class membership probabilities is known as a probabilistic
+proxy model.
+For example, for assessing adverse action with regard to race in
+credit decisions, regulators like the Bureau of Consumer Financial
+Protection (BCFP)
+bilistic proxy model to impute the customers’ unknown race labels
+[12]. They used a naïve Bayes classifier, the Bayesian Improved
+Surname Geocoding (BISG) method, to predict the probability of
+race membership given the customer’s surname and address of
+residence [19]. Specifically, assuming that surname and location
+are statistically independent given race, BISG uses Bayes’s rule
+to compute race membership probabilities from the conditional
+distributions of surname given race and of location given race as
+inferred by census data. This methodology [12] notably supported
+a $98 million fine against a major auto loan lender [11]. This case
+generated some controversy [8–10, 13, 24], in part due to empirical
+findings that the amount of disparate impact estimated by BISG
+appears to overestimate true disparities [1, 31]. However, the cause
+for this overestimation phenomenon is unknown, as is whether
+overestimation is to be expected always, or whether or not underes-
+timation of disparate impact is also possible. This observation forms
+the motivation for our current work, which is broadly applicable to
+any fairness assessment where an unobserved protected class must
+be imputed using a proxy model. The aim is not to criticize the use
+of proxy models in general, but rather to provide a more informed
+analysis of the statistical biases inherent in any assessment where
+membership in protected classes must be imputed.
+Main results. This paper investigates the bias in estimating demo-
+graphic disparity (Definition 2.2) when a proxy model is employed
+standing that the answer will not affect the outcome of the application and that the
+information is collected for compliance assessment only [15, 1

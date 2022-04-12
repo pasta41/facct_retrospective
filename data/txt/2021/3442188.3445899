@@ -1,0 +1,1315 @@
+Algorithmic Recourse:
+from Counterfactual Explanations to Interventions
+Amir-Hossein Karimi
+MPI-IS, Germany
+ETH Zürich, Switzerland
+Bernhard Schölkopf
+MPI-IS, Germany
+Isabel Valera
+MPI-IS, Germany
+Saarland University, Germany
+ABSTRACT
+As machine learning is increasingly used to inform consequential
+decision-making (e.g., pre-trial bail and loan approval), it becomes
+important to explain how the system arrived at its decision, and
+also suggest actions to achieve a favorable decision. Counterfactual
+explanations –“how the world would have (had) to be different
+for a desirable outcome to occur”– aim to satisfy these criteria.
+Existing works have primarily focused on designing algorithms
+to obtain counterfactual explanations for a wide range of settings.
+However, it has largely been overlooked that ultimately, one of the
+main objectives is to allow people to act rather than just under-
+stand. In layman’s terms, counterfactual explanations inform an
+individual where they need to get to, but not how to get there. In
+this work, we rely on causal reasoning to caution against the use
+of counterfactual explanations as a recommendable set of actions
+for recourse. Instead, we propose a shift of paradigm from recourse
+via nearest counterfactual explanations to recourse through minimal
+interventions, shifting the focus from explanations to interventions.
+CCS CONCEPTS
+• Computing methodologies → Causal reasoning and diag-
+nostics; • Human-centered computing;
+KEYWORDS
+algorithmic recourse, explainable artificial intelligence, causal in-
+ference, counterfactual explanations, contrastive explanations, con-
+sequential recommendations, minimal interventions
+ACM Reference Format:
+Amir-Hossein Karimi, Bernhard Schölkopf, and Isabel Valera. 2021. Al-
+gorithmic Recourse: from Counterfactual Explanations to Interventions.
+In Proceedings of FAccT ’21. ACM, New York, NY, USA, 10 pages. https:
+//doi.org/10.1145/3442188.3445899
+1 INTRODUCTION
+Predictivemodels are being increasingly used to support consequen-
+tial decision-making in a number of contexts, e.g., denying a loan,
+rejecting a job applicant, or prescribing life-altering medication. As
+a result, there is mounting social and legal pressure [51] to provide
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 1–4, 2021, Virtual Event, Canada
+© 2021 Association for Computing Machinery.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+https://doi.org/10.1145/3442188.3445899
+X1
+X2
+Ŷ
+U1
+U2
+X1 B U1
+X2 B 𝑓2 (X1) + U2
+}
+M
+Ŷ = ℎ(X1,X2)
+Figure 1: Illustration of an example causal generative pro-
+cess governing theworld, showing both the graphicalmodel,
+G, and the structural causal model,M, [34]. In this example,
+X1 represents an individual’s annual salary, X2 is bank bal-
+ance, and Ŷ is the output of a fixed deterministic predictor ℎ,
+predicting the eligibility of an individual to receive a loan.
+explanations that help the affected individuals to understand “why
+a prediction was output”, as well as “how to act” to obtain a desired
+outcome. Answering these questions, for the different stakeholders
+involved, is one of the main goals of explainable machine learning
+[7, 14, 20, 27, 32, 41, 42].
+In this context, several works have proposed to explain a model’s
+predictions of an affected individual using counterfactual explana-
+tions, which are defined as statements of “how the world would
+have (had) to be different for a desirable outcome to occur” [52].
+Of specific importance are nearest counterfactual explanations, pre-
+sented as the most similar instances to the feature vector describing
+the individual, that result in the desired prediction from the model
+[18, 26]. A closely related term is algorithmic recourse – the actions
+required for, or “the systematic process of reversing unfavorable
+decisions by algorithms and bureaucracies across a range of coun-
+terfactual scenarios” – which is argued as the underwriting factor
+for temporally extended agency and trust [50].
+Counterfactual explanations have shown promise for practition-
+ers and regulators to validate a model on metrics such as fairness
+and robustness [18, 45, 49]. However, in their raw form, such ex-
+planations do not seem to fulfill one of the primary objectives of
+“explanations as a means to help a data-subject act rather than
+merely understand” [52].
+The translation of counterfactual explanations to recourse ac-
+tions, i.e., to a recommendable set of actions to help an individual to
+achieve a favourable outcome, was first explored in [49], where ad-
+ditional feasibility constraints were imposed to support the concept
+of actionable features (e.g., prevent asking the individual to reduce
+their age or change their race). While a step in the right direction,
+this work and others that followed [18, 31, 38, 45] implicitly assume
+that the set of actions resulting in the desired output would directly
+follow from the counterfactual explanation. This arises from the as-
+sumption that “what would have had to be in the past” (retrodiction)
+not only translates to “what should be in the future” (prediction) but
+also to “what should be done in the future” (recommendation) [47].
+353
+FAccT ’21, March 1–4, 2021, Virtual Event, Canada Karimi, Schölkopf, Valera
+We challenge this assumption and attribute the shortcoming of
+existing approaches to their lack of consideration for real-world
+properties, specifically the causal relationships governing the world
+in which actions will be performed.
+For ease of exposition, we present the following examples (see
+[3] for additional examples).
+Example 1: Consider, for example, the setting in Figure 1 where
+an individual has been denied a loan and seeks an explanation
+and recommendation on how to proceed. This individual has an
+annual salary (X1) of $75, 000 and an account balance (X2) of $25, 000
+and the predictor grants a loan based on the binary output of ℎ =
+sgn(X1+5·X2−$225, 000). Existing approaches may identify nearest
+counterfactual explanations as another individual with an annual
+salary of $100, 000 (+%33) or a bank balance of $30, 000 (+%20),
+therefore encouraging the individual to reapply when either of
+these conditions are met. On the other hand, bearing in mind that
+actions take place in a world where home-seekers save %30 of their
+salary (i.e., X2 B 3/10 · X1 + U2), a salary increase of only %14 to
+$85, 000 would automatically result in $3, 000 additional savings,
+with a net positive effect on the loan-granting algorithm’s decision.
+Example 2: Consider now another setting of Figure 1 where an
+agricultural team wishes to increase the yield of their rice paddy.
+While many factors influence yield =ℎ(temperature, solar radiation,
+water supply, seed quality, ...), the primary actionable capacity of
+the team is their choice of paddy location. Importantly, the altitude
+at which the paddy sits has an effect on other variables. For example,
+the laws of physics may imply that a 100𝑚 increase in elevation
+results in a 1°C decrease in temperature on average. Therefore,
+it is conceivable that a counterfactual explanation suggesting an
+increase in elevation for optimal yield, without consideration for
+downstream effects of the elevation increase on other variables,
+may actually result in the prediction not changing.
+The two examples above illustrate the pitfalls of generating re-
+course actions directly from counterfactual explanations without
+consideration for the structure of the world in which the actions will
+be performed. Actions derived directly from counterfactual expla-
+nations may ask too much effort from the individual (Example 1)
+or may not even result in the desired output (Example 2).
+In this paper, we remedy this situation via a fundamental re-
+formulation of the recourse problem, where we rely on causal
+reasoning to incorporate knowledge of causal dependencies into
+the process of recommending recourse actions, that if acted upon
+would result in a counterfactual instance that favourably changes
+the output of the predictive model. In more detail, we first provide a
+causal analysis to illuminate the intrinsic limitations of the setting
+in which actions directly follow counterfactual explanations. Impor-
+tantly, we show that even when equipped with knowledge of causal
+dependencies after-the-fact, the actions derived from pre-computed
+(nearest) counterfactual explanations may prove sub-optimal, or
+directly, unfeasible. Second, to address the above limitations, we
+emphasize that, from a causal perspective, actions correspond to
+interventions which not only model the change in the intervened-
+upon variable, but also the downstream effects of this intervention
+on the rest of the (non-intervened-upon) variables. This insight
+allows us to propose a recourse through minimal interventions prob-
+lem, whose solution informs stakeholders on how to act in addition
+to understand. We complement this result with a commentary on
+the form of interventions, and with a more general definition of
+feasibility beyond actionability. Finally, we provide a detailed dis-
+cussion on both the importance and the practical limitations of
+incorporating causal reasoning in the formulation of recourse.
+2 ALGORITHMIC RECOURSE VIA
+COUNTERFACTUAL EXPLANATIONS
+Counterfactual explanations (CFE) are statements of “how the world
+would have (had) to be different for a desirable outcome to occur”
+[52]. In the context of explainable machine learning, the literature
+has focused on finding nearest counterfactual explanations (i.e., in-
+stances),
+1
+which result in the desired prediction while incurring
+the smallest change to the individual’s feature vector, as measured
+by a context-dependent dissimilarity metric, dist : X × X → R+.
+This problem has been formulated as the following optimization
+problem [52]:
+𝒙*CFE ∈ 𝑎𝑟𝑔𝑚𝑖𝑛
+𝒙
+dist(𝒙, 𝒙F) s.t. ℎ(𝒙) ≠ ℎ(𝒙F), 𝒙 ∈ P,
+(1)
+where 𝒙F ∈ X is the factual instance; 𝒙*CFE ∈ X is a (perhaps
+not unique) nearest counterfactual instance; ℎ is the fixed binary
+predictor; and P is an optional set of plausibility constraints, e.g.,
+the counterfactual instance be from a relatively high-density region
+of the input space [17, 38].
+Most of the existing approaches in the counterfactual expla-
+nations literature have focused on providing solutions to the op-
+timization problem in (1), by exploring semantically meaningful
+distance/dissimilarity functions dist(·, ·) between individuals (e.g.,
+ℓ0, ℓ1, ℓ∞, percentile-shift), accommodating different predictive mod-
+elsℎ (e.g., random forest, multilayer perceptron), and realistic plausi-
+bility constraints,P. In particular, [6, 31, 52] solve (1) using gradient-
+based optimization; [43, 49] employ mixed-integer linear program
+solvers to support mixed numeric/binary data; [38] use graph-based
+shortest path algorithms; [26] use a heuristic search procedure by
+growing spheres around the factual instance; [13, 45] build on ge-
+netic algorithms for model-agnostic behavior; and [18] solve (1)
+using satisfiability solvers with closeness guarantees.
+Although nearest counterfactual explanations provide an under-
+standing of the most similar set of features that result in the desired
+prediction, they stop short of giving explicit recommendations on
+how to act to realize this set of features. The lack of specification of
+the actions required to realize 𝒙*CFE from 𝒙F leads to uncertainty
+and limited agency for the individual seeking recourse. To shift
+the focus from explaining a decision to providing recommendable
+actions to achieve recourse, Ustun et al. [49] reformulated (1) as:
+𝜹∗ ∈ 𝑎𝑟𝑔𝑚𝑖𝑛
+𝜹
+cost(𝜹 ; 𝒙F) s.t. ℎ(𝒙CFE) ≠ ℎ(𝒙F),
+𝒙CFE = 𝒙F + 𝜹,
+𝒙CFE ∈ P, 𝜹 ∈ F ,
+(2)
+where cost(·; 𝒙F) : X × X → R+ is a user-specified cost that en-
+codes preferences between feasible actions from 𝒙F, and F and
+P are optional sets of feasibility and plausibility constraints,
+2
+re-
+stricting the actions and the resulting counterfactual explanation,
+1
+A counterfactual instance can be from the dataset [38, 53] or generated [18, 49, 52].
+2
+Here, “feasible” means possible to do, whereas “plausible” means possibly true, believ-
+able or realistic. Optimization terminology refers to both as feasibility sets.
+354
+Algorithmic Recourse:
+from Counterfactual Explanations to Interventions FAccT ’21, March 1–4, 2021, Virtual Event, Canada
+respectively. The feasibility constraints in (2), as introduced in [49],
+aim at restricting the set of features that the individual may act
+upon. For instance, recommendations should not ask individuals to
+change their gender or reduce their age. Henceforth, we refer to
+the optimization problem in (2) as the CFE-based recourse problem.
+3 A CAUSAL PERSPECTIVE OF
+ALGORITHMIC RECOURSE
+The seemingly innocent reformulation of the counterfactual expla-
+nation problem in (1) as a recourse problem in (2) is founded on
+two assumptions:
+Assumption 1: the feature-wise difference between factual and
+nearest counterfactual instances, 𝜹∗ = 𝒙*CFE−𝒙F, directly translates
+to the minimal action set, ACFE
+, such that performing the actions
+in ACFE
+starting from 𝒙F will result in 𝒙*CFE; and
+Assumption 2: there is a 1-1mapping between dist(·, ·) and cost(·; ·),
+whereby larger actions incur larger distance and higher cost.
+Unfortunately, these assumptions only hold in restrictive set-
+tings, rendering the solution of (2) sub-optimal or infeasible in many
+real-world scenarios. Specifically, Assumption 1 holds only if (i)
+the individual applies effort in a world where changing a variable
+does not have downstream other variables (i.e., features are indepen-
+dent from each other); or if (ii) the individual changes the value of
+a subset of variables while simultaneously enforcing that the value
+of all other variables remain unchanged (i.e., breaking dependen-
+cies between features). Beyond the sub-optimality that arises from
+assuming/reducing to an independent world in (i), and disregarding
+the feasibility of non-altering actions in (ii), non-altering actions
+may naturally incur a cost which is not captured in the current
+definition of cost, and hence Assumption 2 does not hold either.
+Therefore, except in trivial cases where the model designer actively
+inputs pair-wise independent features to ℎ, generating recommen-
+dations from counterfactual explanations in this manner, i.e., ignor-
+ing the dependencies between features, warrants reconsideration.
+Next, we formalize these shortcomings using causal reasoning.
+3.1 Actions as Interventions
+Let M ∈ Π denote the structural causal model (SCM) capturing all
+inter-variable causal dependencies in the real world.M = ⟨F,X,U⟩
+is characterized by the endogenous (observed) variables, X ∈ X,
+the exogenous variables, U ∈ U, and a sequence of structural
+equations F : U → X, describing how endogenous variables can be
+(deterministically) obtained from the exogenous variables [34, 46].
+Often, M is illustrated using a directed graphical model, G (see,
+e.g., Figure 1).
+From a causal perspective, actions may be carried out via struc-
+tural interventions, A : Π → Π, which can be thought of as a trans-
+formation between SCMs [33, 34]. A set of interventions can be
+constructed as A = do({X𝑖 B 𝑎𝑖 }𝑖∈𝐼 ) where 𝐼 contains the indices
+of the subset of endogenous variables to be intervened upon. In
+this case, for each 𝑖 ∈ 𝐼 , the do-operator replaces the structural
+equation for the 𝑖-th endogenous variable X𝑖 in F with X𝑖 B 𝑎𝑖 .
+Correspondingly, graph surgery is performed on G, severing graph
+edges incident on an intervened variable, X𝑖 . Thus, performing
+the actions A in a world M yields the post-intervention world
+X1 X2U1 U2
+X1 B U1
+X2 B 𝑓2 (X1) + U2
+}
+M
+X1 X2 U2
+X1 B 𝑎1
+X2 B 𝑓2 (X1) + U2
+}
+M1
+X1 X2U1
+X1 B U1
+X2 B 𝑎2
+}
+M2
+X1 X2
+X1 B 𝑎1
+X2 B 𝑎2
+}
+M3
+Figure 2: Given world model, M, intervening on X1 and/or
+on X2 result in different post-intervention models: M1 =
+MA={do(X1B𝑎1) } corresponds to interventions only on X1
+with consequential effects on X2; M2 = MA={do(X2B𝑎2) }
+shows the result of structural interventions only on X2
+which in turn dismisses ancestral effects on this variable;
+and, M3 = MA={do(X1B𝑎1,X2B𝑎2) } is the resulting (indepen-
+dent world) model after intervening on both variables, i.e.,
+the type of interventions generally assumed in the CFE-
+based recourse problem.
+modelMA with structural equations FA = {𝐹𝑖 } 𝑖∉𝐼 ∪ {X𝑖 B 𝑎𝑖 }𝑖∈𝐼 .
+Structural interventions are illustrated in Figure 2.
+Structural interventions are used to predict the effect of actions on
+the world as a whole (i.e., how M becomes MA). In the context of
+recourse, we aim to model the effect of actions on one individual’s
+situation (i.e., how 𝒙F becomes 𝒙SCF) to ascertain whether or not the
+desirable outcome is achieved (i.e., ℎ(𝒙F) ≠ ℎ(𝒙SCF)). We compute
+individual-level effects using structural counterfactuals [36].
+Assuming causal sufficiency of M (i.e., no hidden confounders),
+and full specification of an invertible F (such that F(F−1 (𝒙)) = 𝒙),
+X can be uniquely determined given the value ofU (and vice-versa).
+Hence, one can determine the distinct values of exogenous variables
+that give rise to a particular realization of the endogenous variables,
+{X𝑖 = 𝑥F
+𝑖
+}𝑖 ⊆ X, as F−1 (𝒙F) [36].3 As a result, we can compute
+any structural counterfactual query 𝒙SCF for an individual 𝒙F as
+𝒙SCF = FA (F−1 (𝒙F)). In our context, that is: “if an individual 𝒙F
+observed in world M performs the set of actions A, what will be
+the resulting individual’s feature vector 𝒙SCF”.4
+3.2 Limitations of CFE-based recourse
+Next, we use causal reasoning to formalize the limitations of the
+CFE-based recourse approach in (2). To this end, we first reinterpret
+the actions resulting from solving the CFE-based recourse problem,
+i.e., 𝜹∗, as structural interventions by defining the set of indices
+of observed variables that are intervened upon, 𝐼 . We remark that,
+given 𝜹∗, an individual seeking recourse may intervene on any
+arbitrary subset of observed variables 𝐼 , as long as the intervention
+contains the variable indices for which 𝛿∗
+𝑖
+≠ 0. Now, we are in a
+position to define CFE-based actions as interventions, i.e.,
+3
+For notational simplicity, we interchangeably use sets and vectors, e.g., {X𝑖 = 𝑥F
+𝑖 }𝑖 ⊆
+X and 𝒙F ∈ X.
+4
+Queries such as this subsume both retrospective/subjunctive/counterfactual (“what
+would have been the value of”) and prospective/indicative/predictive (“what will be the
+value of”) conditionals [11, 25, 48], as long as we assume that the laws governing the
+world, F, are stationary.
+355
+FAccT ’21, March 1–4, 2021, Virtual Event, Canada Karimi, Schölkopf, Valera
+Definition 3.1 (CFE-based actions). Given an individual 𝒙F in
+world M, the solution of (2), 𝜹∗, and the set of indices of observed
+variables that are acted upon, 𝐼 , a CFE-based action refers to a set of
+structural interventions of the formACFE
+:= do({X𝑖 B 𝑥𝐹
+𝑖
++𝛿∗
+𝑖
+}𝑖∈𝐼 ).
+Using Definition 3.1, we can derive the following key results that
+provide necessary and sufficient conditions for CFE-based actions
+to guarantee recourse.
+Proposition 3.1. A CFE-based action, ACFE, where 𝐼 = {𝑖 | 𝛿∗
+𝑖
+≠ 0},
+performed by individual 𝒙F, in general results in the structural coun-
+terfactual, 𝒙SCF = 𝒙*CFE := 𝒙F + 𝜹∗, and thus guarantees recourse
+(i.e., ℎ(𝒙SCF) ≠ ℎ(𝒙F)), if and only if, the set of descendants of the
+acted upon variables, determined by 𝐼 , is the empty set.
+Corollary 3.1. If the true world M is independent, i.e, all the ob-
+served features are root-nodes, then CFE-based actions always guar-
+antee recourse.
+While the above results are formally proven in Appendix A,
+we provide a sketch of the proof below. If the intervened-upon
+variables do not have descendants, then by definition 𝒙SCF = 𝒙*CFE.
+Otherwise, the value of the descendants will depend on the coun-
+terfactual value of their parents, leading to a structural counterfac-
+tual that does not resemble the nearest counterfactual explanation,
+𝒙SCF ≠ 𝒙*CFE, and thus may not result in recourse. Moreover, in an
+independent world the set of descendants of all the variables is by
+definition the empty set.
+Unfortunately, the independent world assumption is not realistic,
+as it requires all the features selected to train the predictive model
+ℎ to be independent of each other. Moreover, limiting changes to
+only those variables without descendants may unnecessarily limit
+the agency of the individual, e.g., in Example 1, restricting the
+individual to only changing bank balance without e.g., pursuing
+a new/side job to increase their income would be limiting. Thus,
+for a given non-independentM capturing the true causal depen-
+dencies between features, CFE-based actions require the individual
+seeking recourse to enforce (at least partially) an independent post-
+intervention modelMACFE (so that Assumption 1 holds), by inter-
+vening on all the observed variables for which 𝛿𝑖 ≠ 0 as well as on
+their descendants (even if their 𝛿𝑖 = 0). However, such requirement
+suffers from two main issues. First, it conflicts withAssumption 2,
+since holding the value of variables may still imply potentially in-
+feasible and costly interventions in M to sever all the incoming
+edges to such variables, and even then it may not change the predic-
+tion (see Example 2). Second, as will be proven in the next section
+(see also, Example 1), CFE-based actions may still be suboptimal,
+as they do not benefit from the causal effect of actions towards
+changing the prediction. Thus, even when equipped with knowl-
+edge of causal dependencies, recommending actions directly from
+counterfactual explanations in the manner of existing approaches
+is not satisfactory.
+4 ALGORITHMIC RECOURSE VIA
+MINIMAL INTERVENTIONS
+In the previous section, we learned that actions which immediately
+follow from counterfactual explanations may require unrealistic
+assumptions, or alternatively, result in sub-optimal or even infea-
+sible recommendations. To solve such limitations we rewrite the
+X3
+X1X2
+X4
+𝑌
+U1
+U2
+U3
+U4
+X1 B U1
+X2 B U2
+X3 B 𝑓3 (X1,X2) + U3
+X4 B 𝑓4 (X3) + U4
+
+M
+Ŷ = ℎ
+(
+{X𝑖 }4𝑖=1
+)
+Figure 3: The structural causal model (graph and equations)
+for the working example and demonstration in Section 4.
+recourse problem so that instead of finding the minimal (indepen-
+dent) shift of features as in (2), we seek the minimal cost set of
+actions (in the form of structural interventions) that results in a
+counterfactual instance yielding the favourable output from ℎ:
+A∗ ∈ 𝑎𝑟𝑔𝑚𝑖𝑛
+A
+cost(A; 𝒙F)
+s.t. ℎ(𝒙SCF) ≠ ℎ(𝒙F)
+𝒙SCF = FA (F−1 (𝒙F))
+𝒙SCF ∈ P, A ∈ F ,
+(3)
+where A∗ ∈ F directly specifies the set of feasible actions to be per-
+formed forminimally costly recourse, with cost(·; 𝒙F) : F × X → R+,
+and 𝒙*SCF = FA∗ (F−1 (𝒙F)) denotes the resulting structural counter-
+factual. We recall that, although 𝒙*SCF is a counterfactual instance,
+it does not need to correspond to the nearest counterfactual expla-
+nation, 𝒙*CFE, resulting from (2) (see, e.g., Example 1). Importantly,
+using the formulation in (3) it is now straightforward to show the
+suboptimality of CFE-based actions, as shown next (proof in Ap-
+pendix A):
+Proposition 4.1. Given an individual 𝒙F observed in worldM ∈ Π,
+a family of feasible actions F , and the solution of (3), A∗ ∈ F .
+Assume that there exists CFE-based action ACFE ∈ F that achieves re-
+course, i.e., ℎ(𝒙F) ≠ ℎ(𝒙*CFE). Then, cost(A∗
+; 𝒙F) ≤ cost(ACFE
+; 𝒙F).
+Thus, for a known causal model capturing the dependencies
+among observed variables, and a family of feasible interventions,
+the optimization problem in (3) yields Recourse through Minimal
+Interventions (MINT). Generating minimal interventions through
+solving (3) requires that we be able to compute the structural coun-
+terfactual, 𝒙SCF, of the individual 𝒙F in worldM, given any feasible
+action,A. To this end, we consider that the SCMM falls in the class
+of additive noise models (ANM), so that we can deterministically
+compute the counterfactual 𝒙SCF = FA (F−1 (𝒙F)) by performing
+the Abduction-Action-Prediction steps proposed by Pearl et al. [36].
+4.1 Working example
+Consider the model in Figure 3, where {U𝑖 }4𝑖=1 are mutually inde-
+pendent exogenous variables, and {𝑓𝑖 }4𝑖=1 are structural (linear or
+nonlinear) equations. Let 𝒙F = [𝑥F
+1
+, 𝑥F
+2
+, 𝑥F
+3
+, 𝑥F
+4
+]𝑇 be the observed
+features belonging to the (factual) individual, for whom we seek
+a counterfactual explanation and recommendation. Also, let 𝐼 de-
+note the set of indices corresponding to the subset of endogenous
+variables that are intervened upon according to the action set A.
+356
+Algorithmic Recourse:
+from Counterfactual Explanations to Interventions FAccT ’21, March 1–4, 2021, Virtual Event, Canada
+Then, we obtain a structural counterfactual, 𝒙SCF = FA (F−1 (𝒙F)),
+by applying the Abduction-Action-Prediction steps [35] as follows:
+Step 1. Abduction uniquely determines the value of all exoge-
+nous variables, {𝑢𝑖 }4𝑖=1, given evidence, {X𝑖 = 𝑥F
+𝑖
+}4
+𝑖=1
+:
+𝑢1 = 𝑥F
+1
+,
+𝑢2 = 𝑥F
+2
+,
+𝑢3 = 𝑥F
+3
+− 𝑓3 (𝑥F1 , 𝑥
+F
+2
+),
+𝑢4 = 𝑥F
+4
+− 𝑓4 (𝑥F3 ).
+(4)
+Step 2. Action modifies the SCM according to the hypothetical
+interventions, do({X𝑖 B 𝑎𝑖 }𝑖∈𝐼 ) (where 𝑎𝑖 = 𝑥𝐹
+𝑖
++ 𝛿𝑖 ), yielding FA:
+X1 B [1 ∈ 𝐼 ] · 𝑎1 + [1 ∉ 𝐼 ] · U1,
+X2 B [2 ∈ 𝐼 ] · 𝑎2 + [2 ∉ 𝐼 ] · U2,
+X3 B [3 ∈ 𝐼 ] · 𝑎3 + [3 ∉ 𝐼 ] ·
+(
+𝑓3 (X1,X2) + U3
+)
+,
+X4 B [4 ∈ 𝐼 ] · 𝑎4 + [4 ∉ 𝐼 ] ·
+(
+𝑓4 (X3) + U4
+)
+,
+(5)
+where [·] denotes the Iverson bracket.
+Step 3. Prediction recursively determines the values of all en-
+dogenous variables based on the computed exogenous variables
+{𝑢𝑖 }4𝑖=1 from Step 1 and FA from Step 2, as:
+𝑥SCF
+1
+B [1 ∈ 𝐼 ] · 𝑎1 + [1 ∉ 𝐼 ] ·
+(
+𝑢1
+)
+,
+𝑥SCF
+2
+B [2 ∈ 𝐼 ] · 𝑎2 + [2 ∉ 𝐼 ] ·
+(
+𝑢2
+)
+,
+𝑥SCF
+3
+B [3 ∈ 𝐼 ] · 𝑎3 + [3 ∉ 𝐼 ] ·
+(
+𝑓3 (𝑥SCF1
+, 𝑥SCF
+2
+) + 𝑢3
+)
+,
+𝑥SCF
+4
+B [4 ∈ 𝐼 ] · 𝑎4 + [4 ∉ 𝐼 ] ·
+(
+𝑓4 (𝑥SCF3
+) + 𝑢4
+)
+.
+(6)
+4.2 General assignment formulation
+As we have not made any restricting assumptions about the struc-
+tural equations (only that we operate with additive noise mod-
+els
+5
+where noise variables are pairwise independent), the solution
+for the working example naturally generalizes to SCMs correspond-
+ing to other DAGswithmore variables. The assignment of structural
+counterfactual values can generally be written as:
+𝑥SCF𝑖 = [𝑖 ∈ 𝐼 ] · (𝑥F𝑖 + 𝛿𝑖 )
++ [𝑖 ∉ 𝐼 ] ·
+(
+𝑥F𝑖 + 𝑓𝑖 (paSCF𝑖 ) − 𝑓𝑖 (paF𝑖 )
+)
+.
+(7)
+In words, the counterfactual value of the 𝑖-th feature, 𝑥SCF
+𝑖
+, takes
+the value 𝑥F
+𝑖
++ 𝛿𝑖 if such feature is intervened upon (i.e., 𝑖 ∈ 𝐼 ).
+Otherwise, 𝑥SCF
+𝑖
+is computed as a function of both the factual and
+counterfactual values of its parents, denoted respectively by 𝑓𝑖 (paF𝑖 )
+and 𝑓𝑖 (paSCF𝑖
+). The closed-form expression in (7) can replace the
+counterfactual constraint in (3), i.e., 𝒙SCF = FA (F−1 (𝒙F)), after
+which the optimization problem may be solved by building on exist-
+ing frameworks for generating nearest counterfactual explanations,
+including gradient-based, evolutionary-based, heuristics-based, or
+verification-based approaches as referenced in Section 2. While out
+of scope of the current work, for the demonstrative examples below,
+5
+We remark that the presented formulation also holds for more general SCMs (for
+example where the exogenous variable contribution is not additive) as long as the
+sequence of structural equations F is invertible, i.e., there exists a sequence of equations
+F−1 such that 𝒙 = F(F−1 (𝒙)) (in other words, the exogenous variables are uniquely
+identifiable via the abduction step).
+we extended the open-source code of MACE [18]; we will submit a
+pull-request to the respective repository.
+4.3 Demonstration
+We showcase our proposed formulation by comparing the actions
+recommended by existing (nearest) counterfactual explanation
+methods, as in (2), to the ones generated by the proposed mini-
+mal intervention formulation in (3). We recall that prior literature
+has focused on generating counterfactual explanations or CFE-
+based actions, which as shown above lack optimally or feasibility
+guarantees in non-independent worlds. Thus, to the best of our
+knowledge, there exists no baseline approach in the literature that
+guarantees algorithmic recourse. The experiments below serve as
+an illustration of the sub-optimality of existing approaches relative
+to our proposed formulation of recourse via minimal intervention.
+Section 6 presents a detailed discussion on practical considerations.
+We consider two settings: i) a synthetic setting whereM follows
+Figure 1; and ii) a real-world setting based on the german credit
+dataset [1], where M follows Figure 3. We computed the cost of
+actions as the ℓ1 norm over normalized feature changes to make
+effort comparable across features, i.e., cost(·; 𝒙F) =
+∑
+𝑖∈𝐼 |𝛿𝑖 |/𝑅𝑖 ,
+where 𝑅𝑖 is the range of feature 𝑖 .
+For the synthetic setting, we generate data following the model
+in Figure 1, where we assume X1 B U1, X2 B 3/10 · X1 + U2,
+with U1 ∼ $10000 · Poission(10) and U2 ∼ $2500 · N (0, 1); and
+the predictive model ℎ = sgn(X1 + 5 · X2 − $225000). Given 𝒙F =
+[$75000, $25000]𝑇 , solving our formulation, (3), identifies the op-
+timal action set A∗ = do(X1 B 𝑥F
+1
++ $10000) which results in
+𝒙*SCF = FA∗ (F−1 (𝒙F)) = [$85000, $28000]𝑇 , whereas solving pre-
+vious formulations, (2), yields 𝜹∗ = [$0, +$5000]𝑇 resulting in
+𝒙*CFE = 𝒙F + 𝜹∗ = [$75000, $30000]𝑇 . Importantly, while 𝒙*SCF
+appears to be at a further distance from 𝒙F compared to 𝒙*CFE,
+achieving the former is less costly than the latter, specifically,
+cost(𝜹∗; 𝒙F) ≈ 2 cost(A∗
+; 𝒙F).
+As a real-world setting, we consider a subset of the features
+in the german credit dataset. The setup is depicted in Figure 3,
+where X1 is the individual’s gender (treated as immutable), X2 is
+the individual’s age (actionable but can only increase), X3 is credit
+given by the bank (actionable), X4 is the repayment duration of the
+credit (non-actionable but mutable), and Ŷ is the predicted customer
+risk, according to ℎ (logisitic regression or decision tree). We learn
+the structural equations by fitting a linear regression model to the
+child-parent tuples. We will release the data, and the code used to
+learn models and structural equations.
+Given the setup above, for instance, for the individual 𝒙F =
+[Male, 32, $1938, 24]𝑇 identified as a risky customer, solving our
+formulation, (3), yields the optimal action set A∗ = do({X2 B
+𝑥F
+2
++ 1,X3 B 𝑥F
+3
+− $800}) which results in 𝒙*SCF = FA∗ (F−1 (𝒙F)) =
+[Male, 33, $1138, 22]𝑇 , whereas solving (2) yields𝜹∗ = [N/A, +6, 0, 0]𝑇
+resulting in 𝒙*CFE = 𝒙F + 𝜹∗ = [Male, 38, $1938, 24]𝑇 . Similar to the
+toy setting, we observe a %42 decrease in effort required of the indi-
+vidual when using the action by our method, since our cost function
+states that waiting for six years to get the credit approved is more
+costly than applying the following year for a lower (−$800) credit
+amount. We extend our analysis to a population level, and observe
+that for 50 negatively affected test individuals, previous approaches
+357
+FAccT ’21, March 1–4, 2021, Virtual Event, Canada Karimi, Schölkopf, Valera
+suggest actions that are on average %39 ± %24 and %65 ± %8 more
+costly than our approach when considering, respectively, a logistic
+regression and a decision tree as the predictive model ℎ.
+The demonstrations above confirm our theoretical analysis that
+MINT-based actions from (3) are less costly and thusmore beneficial
+for affected individuals than existing CFE-based actions from (2)
+that fail to utilize the causal relations between variables.
+5 TOWARDS REALISTIC INTERVENTIONS
+In Section 4, we formulated algorithmic recourse by considering
+the causal relations between features in the real world. Our for-
+mulation minimized the cost of actions, which were carried out
+as structural interventions on the corresponding graph. Each in-
+tervention proceeds by unconditionally severing all edges incident
+on the intervened node, fixing the post-manipulation distribution
+of a single variable to one deterministic value. While intuitive ap-
+pealing and powerful, structural interventions are in many ways
+the simplest type of interventions, and their “simplicity comes at a
+price: foregoing the possibility of modeling many situations real-
+isitically” [8, 22]. Below, we extend (3) and (7) to add flexibility and
+realism to the types of interventions performed by the individual.
+Notably, there is nothing inherent to an SCM that a priori deter-
+mines the form, feasibility, or scope of intervention; instead, these
+choices are delegated to the individual and are made based on a
+semantic understanding of the modeled variables.
+5.1 On the Form of Interventions
+The demonstrations in Section 4.3 primarily focused on actions
+performed as structural (a.k.a., hard) interventions [34] where all
+incoming edges to the intervened node are severed (see (7)). Hard
+interventions are particularly useful for Randomized Control Trial
+(RCT) settings where one aims to evaluate (isolate) the causal effect
+of an action (e.g., effect of aspirin on patients with migraine) on the
+population by randomly assigning individuals to treatment/control
+groups, removing the influence of other factors (e.g., age).
+In the context of algorithmic recourse, however, an individual
+performs actions in the real world, and therefore must play the rules
+governing the world. In earlier sections, these rules (captured in an
+SCM) guided the search for an optimal set of actions by modelling
+actions along with their consequences. The rules also determine the
+form of an intervention, e.g., specifying whether an intervention
+cancels out or complements existing causal relations.
+For instance, consider Example 1, where an individual chooses
+to increase their bank balance (e.g., through borrowing money from
+family, i.e., a deliberate action/intervention on X2 while continuing
+to put aside a portion of their income (i.e., retaining the relation
+X2 B 3/10 · X1 + U2). Indeed, it would be unwise for a recommen-
+dation to suggest abandoning saving habits. In such a scenario, the
+action would be carried out as an additive (a.k.a., soft) interven-
+tion [10]. Such interventions do not sever graphical edges incident
+on the intervened node and continue to allow for parents of the
+node to affect that node. Conversely, in Example 2, recourse rec-
+ommendations may suggest performing a structural intervention
+on temperature, e.g., by creating a climate controlled green-house,
+to cancel the natural effect of altitude change on temperature.
+The previous examples illustrate a scenario where an individu-
+al/agriculture team actually have the agency to choose which type
+of intervention to perform. However, it is easy to conceive of ex-
+amples where such an option does not exist. For instance, as part
+of a medical system’s recommendation, we might consider adding
+5 mg/l of insulin to a patient with diabetes with a certain blood in-
+sulin level [36]. This action cannot disable pre-existing mechanisms
+regulating blood insulin levels and therefore, the action can only be
+performed additively. Conversely, one may also consider another
+example from the medical domain whereby the only treatment of
+malignancy may be through a surgical (structural) amputation.
+6
+Just as structural interventions were supported in our framework
+via a closed-form expression (see (7)), additive interventions can be
+encoded through an analogous assignment formulation:
+𝑥SCF𝑖 = [𝑖 ∈ 𝐼 ] · 𝛿𝑖 +
+(
+𝑥F𝑖 + 𝑓𝑖 (paSCF𝑖 ) − 𝑓𝑖 (paF𝑖 )
+)
+. (8)
+The choice of whether interventions should be applied in a addi-
+tive/soft or structural/hard manner depends on the variable seman-
+tic [3], and should be decided prior to solving (3).
+5.2 On the Feasibility of Interventions
+We saw in Section 3 that earlier works motivated the addition
+of feasibility constraints as a means to provide more actionable
+recommendations for the individual seeking recourse [49]. There,
+the actionability (a.k.a. mutability) of a feature was determined
+based on the feature semantic and value in the factual instance,
+marking those features which the individual has/lacks the agency
+to change (e.g., bank balance vs. race). While the interchangeable
+use of definition holds under an independent world, it fails when
+operating in most real-world settings governed by a set of causal
+dependencies. We study this subtlety below.
+In an independent world, any change to variable X𝑖 could come
+about only via an intervention on X𝑖 itself. Therefore, immutable
+and non-actionable variables overlap. In a dependent world, how-
+ever, changes to variable X𝑖 may arise from an intervention on
+X𝑖 or through changes to any of the ancestors of X𝑖 . In this more
+general setting, we can tease apart the definition of actionability
+and mutability, and distinguish between three types of variables: (i)
+immutable (and hence non-actionable), e.g., race; (ii) mutable but
+non-actionable, e.g., credit score; and (iii) actionable (and hence mu-
+table), e.g., bank balance. Each type requires special consideration
+which we show can be intuitively encoded as constraints amended
+to A ∈ F from (3).
+Immutable:We posit that the set of immutable (and hence non-
+actionable) variables should be closed under ancestral relationships
+given by the model,M. This condition parallels the ancestral clo-
+sure of protected attributions in [23]. This would ensure that under
+no circumstance would an intervention on an ancestor of an im-
+mutable variable change the immutable variable. Therefore, for an
+immutable variable X𝑖 , the constraint [𝑖 ∉ 𝐼 ] = 1 recursively neces-
+sitates the fulfillment of additional constraints [ 𝑗 ∉ 𝐼 ] = 1 ∀ 𝑗 ∈ pa𝑖
+in F . For instance, the immutability of race triggers the immutabil-
+ity of birthplace.
+Mutable but non-actionable: To encode the conditions for
+mutable but non-actionable variables, we note that while a variable
+6
+See, e.g., https://www.cancer.org/cancer/bone-cancer/treating/surgery.html.
+358
+Algorithmic Recourse:
+from Counterfactual Explanations to Interventions FAccT ’21, March 1–4, 2021, Virtual Event, Canada
+may not be directly actionable, it may still change as a result of
+changes to its parents. For example, the financial credit score in
+Figure 3 may change as a result of interventions to salary or savings,
+but is not itself directly intervenable. Therefore, for a non-actionable
+but mutable variable X𝑖 , the constraint [𝑖 ∉ 𝐼 ] = 1 is sufficient and
+does not induce any other constraints.
+Actionable: In the most general sense, the actionable feasibility
+of an intervention on X𝑖 may be contingent on a number of condi-
+tions, as follows: (a) the pre-intervention value of the intervened
+variable (i.e., 𝑥F
+𝑖
+); (b) the pre-intervention value of other variables
+(i.e., {𝑥F
+𝑗
+} 𝑗⊂[𝑑 ]\𝑖 ); (c) the post-intervention value of the intervened
+variable (i.e., 𝑥SCF
+𝑖
+); and (d) the post-intervention value of other
+variables (i.e., {𝑥SCF
+𝑗
+} 𝑗⊂[𝑑 ]\𝑖 ). Such feasibility conditions can easily
+be encoded into F ; consider the following scenarios:
+(a) an individual’s age can only increase, i.e., [𝑥SCF𝑎𝑔𝑒 ≥ 𝑥F𝑎𝑔𝑒 ]; (b)
+an individual cannot apply for credit on a temporary visa, i.e.,
+[𝑥F
+𝑣𝑖𝑠𝑎
+= PERMANENT] ≥ [𝑥SCF
+𝑐𝑟𝑒𝑑𝑖𝑡
+= TRUE];
+(c) an individual may undergo heart surgery (an additive inter-
+vention) only if they won’t remiss due to sustained smoking habits,
+i.e., [𝑥SCF
+ℎ𝑒𝑎𝑟𝑡
+≠ REMISSION]; and
+(d) an individual may undergo heart surgery only after their
+blood pressure is regularized due to medicinal intervention, i.e.,
+[𝑥SCF
+𝑏𝑝
+= O.K.] ≥ [𝑥SCF
+ℎ𝑒𝑎𝑟𝑡
+= SURGERY].
+In summary, while previous works on algorithmic recourse dis-
+tinguished between actionable, conditionally actionable,
+7
+and im-
+mutable variables [49], we can now operate on a more realistic
+spectrum of variables, ranging from conditionally soft/hard action-
+able, to non-actionable but mutable, and finally to immutable and
+non-actionable variables. Finally, we remind that feasibility is a
+distinct notion from plausibility; whereas the former restricts ac-
+tions A ∈ F to those that can be performed by the individual,
+the latter determines the likeliness of the counterfactual instance
+𝒙SCF = FA (F−1 (𝒙F)) ∈ P resulting from those actions. For instance,
+building on the earlier example, although an individual with simi-
+lar attributes and higher credit score may exist in the dataset (i.e.,
+plausible), directly acting on credit score is not feasible.
+5.3 On the Scope of Interventions
+One final assumption has been made throughout our discussion of
+actions as interventions which pertain to the one-to-one mapping
+between an action in the real world and an intervention on a endoge-
+nous variable in the structural causal model (which in turn are also
+input features to the predictive model). As exemplified in [3], it is
+possible for some actions (e.g., finding a higher-paying job) to simul-
+taneously intervene on multiple variables in the model (e.g., income
+and length of employment). Alternatively, for Example 2, choosing
+a new paddy location is equivalent to intervening jointly on several
+input features of the predictive model (e.g., altitude, radiation, pre-
+cipitation). Such confounded/correlated interventions, referred to
+as fat-hand/non-atomic interventions [10], will be explored further
+in follow-up work, by modelling the world at different causally
+consistent levels [4, 40].
+7
+Ustun et al. [49] also support conditionally actionable features (e.g., age or educational
+degree) with conditions derived only from 𝑥F
+𝑖 as in (a). We generalize the set of
+conditions to support actions conditioned on the value of other variables as in (b),
+additive interventions in (c), and sequential interventions as in (d).
+6 DISCUSSION
+In this paper, we have focused on the problem of algorithmic re-
+course, i.e., the process by which an individual can change their
+situation to obtain a desired outcome from a machine learning
+model. First, using the tools from causal reasoning (i.e., structural
+interventions and counterfactuals), we have shown that in their
+current form, counterfactual explanations only bring about agency
+for the individual to achieve recourse in unrealistic settings. In
+other words, counterfactual explanations do not translate to an
+optimal or feasible set of actions that would favourably change the
+prediction of ℎ if acted upon. This shortcoming is primarily due to
+the lack of consideration of causal relations governing the world
+and thus, the failure to model the downstream effect of actions
+in the predictions of the machine learning model. In other words,
+although “counterfactual” is a term from causal language, we ob-
+served that existing approaches fall short in terms of taking causal
+reasoning into account when generating counterfactual explana-
+tions and the subsequent recourse actions. Thus, building on the
+statement by Wachter et al. [52] that counterfactual explanations
+“do not rely on knowledge of the causal structure of the world,”
+it is perhaps more appropriate to refer to existing approaches as
+contrastive, rather than counterfactual, explanations [6, 30].
+To directly take causal consequences of actions into account,
+we have proposed a fundamental reformulation of the recourse
+problem, where actions are performed as interventions and we seek
+to minimize the cost of performing actions in a world governed by
+a set of (physical) laws captured in a structural causal model. Our
+proposed formulation in (3), complemented with several examples
+and a detailed discussion, allows for recourse through minimal in-
+terventions (MINT), that when performed will result in a structural
+counterfactual that favourably changes the output of the model.
+Next, we discuss the work most closely related to ours, the main
+limitation of the proposed recourse approach, and propose future
+venues for research to address such shortcomings.
+Relatedwork. Anumber of authors have argued for the need to
+consider causal relations between variables [18, 31, 49, 52], generally
+based on the intuition that changing some variables may have
+effects on others. In the original counterfactual explanations work,
+Wachter et al. [52] also suggest that “counterfactuals generated
+from an accurate causal model may ultimately be of use to experts
+(e.g., to medical professionals trying to decide which intervention
+will move a patient out of an at-risk group)”. Despite this general
+agreement, to the best of our knowledge, only two works have
+attempted to technically formulate this requirement.
+In the first work, Joshi et al. [17] study recourse in causal models
+under confounders and with predetermined treatment variables. In
+this work, a distribution over hidden confounders is first estimated
+along with a mapping from the attributes 𝒙 to hidden confounders,
+i.e., 𝐺−1
+\
+(𝒙) = 𝒛. Then, under each intervention on treatment vari-
+ables, explanations are generated following (1) with the plausibility
+term constraining the inverse of the counterfactual instance (i.e.,
+𝐺−1
+\
+(𝒙)) to the approximated confounding distribution. In this work,
+we instead optimize for recourse actions rather than counterfactual
+instances that result from those action.
+In the second work, Mahajan et al. [28] present a modified ver-
+sion of the distance function in (1), amending the standard proximity
+359
+FAccT ’21, March 1–4, 2021, Virtual Event, Canada Karimi, Schölkopf, Valera
+loss between factual and counterfactual instances with a causal reg-
+ularizer to encourage the counterfactual value of each endogenous
+variable to be close to the value of that variable had it been assigned
+via its structural equation. Beyond the uncertainty regarding the
+strength of regularization (which would mean causal relations may
+not be guaranteed), and why the standard proximity loss only iter-
+ates over the exogenous variables (which from a causal perspective,
+are characteristics that are shared across counterfactual worlds [23,
+footnote 4]), this approach suffers from a primary limitation in its
+causal treatment: the causal regularizer would penalize any variable
+whose value deviated away from its structurally assigned value.
+While on the surface this “preservation of causal relations” seems
+beneficial, such an approach would discourage interventions (addi-
+tive or structural) on non-root variables, which would, by design,
+change the value of the intervened-upon variable away from its
+structurally assigned value. Instead, the regularizer would encour-
+age interventions on variables that would not be penalized as such,
+i.e., root variables, which may not be contextually acceptable as
+root notes typically capture sensitive characteristic of the individual
+(e.g., birthplace, age, gender). The authors suggest (in the Appen-
+dix of [28]) that one may consider those variables, upon which
+(structural) interventions are to be performed, as exogenous. In this
+manner, interventions would not be penalized and down-stream
+effects of interventions would still be preserved when searching for
+the nearest counterfactual instance. We argue, however, that such
+an approach suffers from the same limitations as other CFE-based
+recourse approaches presented in Section 3.2 in that a returned
+counterfactual instance would not imply feasible or optimal actions
+for recourse. Finally, without an explicit abduction step and without
+assumptions on the form of structural equations, it is unclear how
+the authors infer and combine individual-specific characteristics (as
+embedded in the background variables) with the effect of ancestral
+changes to compute the counterfactual. We believe the problems
+above will be mostly resolved when minimizing over the cost of
+actions instead of distance over counterfactuals as we have done in
+this work.
+Practical limitations. The primary limitation of our formula-
+tion in (3) is its reliance on the true causal model of the world,
+subsuming both the graph, and the structural equations. In practice,
+the underlying causal model is rarely known, which suggests that
+the counterfactual constraint in (3), i.e., 𝒙SCF = FA (F−1 (𝒙F)), may
+not be (deterministically) identifiable. We believe this is a valid criti-
+cism, not just of our work, but of any approach suggesting actions to
+be performed in the real world for consequential decision-making.
+Importantly, beyond recourse, the community on algorithmic fair-
+ness has echoed the need for causal counterfactual analysis for fair
+predictions, and have also voiced their concern about untestable
+assumptions when the true SCM is not available [2, 5, 19, 23, 44].
+Perhaps more concerningly, our work highlights the implicit
+causal assumptions made by existing approaches (i.e., that of in-
+dependence, or feasible and cost-free interventions), which may
+portray a false sense of recourse guarantees where one does not
+exists (see Example 2 and all of Section 3.2). Our work aims to
+highlight existing imperfect assumptions, and to offer an alterna-
+tive formulation, backed with proofs and demonstrations, which
+would guarantee recourse if assumptions about the causal structure
+of the world were satisfied. Future research on causal algorithmic
+recourse may benefit from the rich literature in causality that has
+developed methods to verify and perform inference under various
+assumptions [37]. Thus, we consider further discussion on causal
+identifiability to be out of scope of this paper, as it remains as an
+open and key question in the Ethical ML community.
+This is not to say that counterfactual explanations should be
+abandoned altogether. On the contrary, we believe the counterfac-
+tual explanations hold promise for “guided audit of the data” [52]
+and evaluating various desirable model properties, such as robust-
+ness [16, 45] or fairness [15, 18, 45, 49]. Besides this, it has been
+shown that designers of interpretable machine learning systems
+use counterfactual explanations for predicting model behavior [24]
+or uncovering inaccuracies in the data profile of individuals [50].
+Complementing these offerings of counterfactual explanations, we
+offer minimal interventions as a way to guarantee algorithmic re-
+course in general settings, which is not implied by counterfactual
+explanations.
+Future work. In future work, we aim to focus on overcoming
+the main assumption of our formulation: the availability of the
+true world model, M. An immediate first step involves learning
+the true world model (partially or fully) [9, 12, 29], and studying
+potential inefficiencies that may arise from partial or imperfect
+knowledge of the causal model governing the world. Furthermore,
+while additive noise models are a broadly used class of SCMs for
+modeling real-world systems, further investigation into the effects
+of confounders (non-independent noise variables), the presence of
+only the causal graph, as well as cyclic graphical models for time
+series data (e.g., conditional interventions), would extend the reach
+of algorithmic recourse to even broader settings.
+In Section 5, we presented feasibility constraints for a wide range
+of settings, including dynamical settings in which one intervention
+enables the preconditions of another. An interesting line of future
+research would involve combining the causal intervention-based
+recourse framework, as presented in our work, with multi-stage
+planning strategies such as [39] to generate optimal sequential
+actions.
+Finally, the examples presented in relation to the form and feasi-
+bility of intervention serve only to illustrate the flexibility of our
+formulation in supporting a variety of real-world constraints. They
+do not, however, aim to provide an authoritative definition of how to
+interpret variables and the context- and individual-dependent con-
+straints for recourse as highlighted by other works [3, 21]. Future
+cross-disciplinary research would benefit from accurately defining
+the variables and relationships and types of permissible interven-
+tions in consequential decision-making settings. Relatedly, future
+research would also benefit from a study of properties that cost
+functions should satisfy (e.g., individual-based or population-based,
+monotonicity) as the primary means to measure the effort endured
+by the individual seeking recourse.
+ACKNOWLEDGMENTS
+The authors would like to thank Adrián Javaloy Bornás and Julius
+von Kügelgen for their valuable feedback on drafts of the manu-
+script. AHK is grateful to NSERC and CLS for generous funding
+support.
+360
+Algorithmic Recourse:
+from Counterfactual Explanations to Interventions FAccT ’21, March 1–4, 2021, Virtual Event, Canada
+REFERENCES
+[1] Kevin Bache and Moshe Lichman. 2013. UCI machine learning repository.
+[2] Chelsea Barabas, Karthik Dinakar, Joichi Ito, Madars Virza, and Jonathan Zittrain.
+2017. Interventions over predictions: Reframing the ethical debate for actuarial
+risk assessment. arXiv preprint arXiv:1712.08238 (2017).
+[3] Solon Barocas, AndrewD Selbst, andManish Raghavan. 2020. The hidden assump-
+tions behind counterfactual explanations and principal reasons. In Proceedings of
+the 2020 Conference on Fairness, Accountability, and Transparency. 80–89.
+[4] Sander Beckers and Joseph Y Halpern. 2019. Abstracting causal models. In
+Proceedings of the AAAI Conference on Artificial Intelligence, Vol. 33. 2678–2685.
+[5] Silvia Chiappa. 2019. Path-specific counterfactual fairness. In Proceedings of the
+AAAI Conference on Artificial Intelligence, Vol. 33. 7801–7808.
+[6] Amit Dhurandhar, Pin-Yu Chen, Ronny Luss, Chun-Chen Tu, Paishun Ting,
+Karthikeyan Shanmugam, and Payel Das. 2018. Explanations based on the
+missing: Towards contrastive explanations with pertinent negatives. In Advances
+in Neural Information Processing Systems. 592–603.
+[7] Finale Doshi-Velez and Been Kim. 2017. Towards a rigorous science of inter-
+pretable machine learning. arXiv preprint arXiv:1702.08608 (2017).
+[8] Frederick Eberhardt. 2007. Causation and intervention. PhD dissertation. Califor-
+nia Institute of Technology.
+[9] Frederick Eberhardt. 2017. Introduction to the foundations of causal discovery.
+International Journal of Data Science and Analytics 3, 2 (2017), 81–91.
+[10] Frederick Eberhardt and Richard Scheines. 2007. Interventions and causal infer-
+ence. Philosophy of science 74, 5 (2007), 981–995.
+[11] Dorothy Edgington. 2014. Indicative Conditionals. In The Stanford Encyclopedia
+of Philosophy (winter 2014 ed.), Edward N. Zalta (Ed.). Metaphysics Research Lab,
+Stanford University.
+[12] Clark Glymour, Kun Zhang, and Peter Spirtes. 2019. Review of causal discovery
+methods based on graphical models. Frontiers in Genetics 10 (2019).
+[13] Riccardo Guidotti, Anna Monreale, Salvatore Ruggieri, Dino Pedreschi, Franco
+Turini, and Fosca Giannotti. 2018. Local rule-based explanations of black box
+decision systems. arXiv preprint arXiv:1805.10820 (2018).
+[14] David Gunning. 2019. DARPA’s explainable artificial intelligence (XAI) program.
+In Proceedings of the 24th International Conference on Intelligent User Interfaces.
+ACM, ii–ii.
+[15] Vivek Gupta, Pegah Nokhiz, Chitradeep Dutta Roy, and Suresh Venkatasubrama-
+nian. 2019. Equalizing Recourse across Groups. arXiv preprint arXiv:1909.03166
+(2019).
+[16] Leif Hancox-Li. 2020. Robustness in machine learning explanations: does it
+matter?. In Proceedings of the 2020 Conference on Fairness, Accountability, and
+Transparency. 640–647.
+[17] Shalmali Joshi, Oluwasanmi Koyejo, Warut Vijitbenjaronk, Been Kim, and Joy-
+deep Ghosh. 2019. REVISE: Towards Realistic Individual Recourse and Ac-
+tionable Explanations in Black-Box Decision Making Systems. arXiv preprint
+arXiv:1907.09615 (2019).
+[18] Amir-Hossein Karimi, Gilles Barthe, Borja Balle, and Isabel Valera. 2020. Model-
+agnostic counterfactual explanations for consequential decisions. In International
+Conference on Artificial Intelligence and Statistics. 895–905.
+[19] Niki Kilbertus, Mateo Rojas Carulla, Giambattista Parascandolo, Moritz Hardt,
+Dominik Janzing, and Bernhard Schölkopf. 2017. Avoiding discrimination through
+causal reasoning. In Advances in Neural Information Processing Systems. 656–666.
+[20] Yves Kodratoff. 1994. The comprehensibility manifesto. KDD Nugget Newsletter
+94, 9 (1994).
+[21] Issa Kohler-Hausmann. 2018. Eddie Murphy and the dangers of counterfactual
+causal thinking about detecting racial discrimination. Nw. UL Rev. 113 (2018),
+1163.
+[22] Kevin B Korb, Lucas R Hope, Ann E Nicholson, and Karl Axnick. 2004. Vari-
+eties of causal intervention. In Pacific Rim International Conference on Artificial
+Intelligence. Springer, 322–331.
+[23] Matt J Kusner, Joshua Loftus, Chris Russell, and Ricardo Silva. 2017. Counterfac-
+tual fairness. In Advances in Neural Information Processing Systems. 4066–4076.
+[24] Isaac Lage, Emily Chen, JeffreyHe,MenakaNarayanan, Been Kim, SamGershman,
+and Finale Doshi-Velez. 2019. An evaluation of the human-interpretability of
+explanation. arXiv preprint arXiv:1902.00006 (2019).
+[25] David A Lagnado, Tobias Gerstenberg, and Ro’i Zultan. 2013. Causal responsibility
+and counterfactuals. Cognitive science 37, 6 (2013), 1036–1073.
+[26] Thibault Laugel, Marie-Jeanne Lesot, Christophe Marsala, Xavier Renard, and
+Marcin Detyniecki. 2017. Inverse Classification for Comparison-based Inter-
+pretability in Machine Learning. arXiv preprint arXiv:1712.08443 (2017).
+[27] Zachary C Lipton. 2018. The mythos of model interpretability. Queue 16, 3 (2018),
+31–57.
+[28] Divyat Mahajan, Chenhao Tan, and Amit Sharma. 2019. Preserving Causal
+Constraints in Counterfactual Explanations for Machine Learning Classifiers.
+arXiv preprint arXiv:1912.03277 (2019).
+[29] Daniel Malinsky and David Danks. 2018. Causal discovery algorithms: A practical
+guide. Philosophy Compass 13, 1 (2018), e12470.
+[30] Tim Miller. 2019. Explanation in artificial intelligence: Insights from the social
+sciences. Artificial Intelligence 267 (2019), 1–38.
+[31] Ramaravind Kommiya Mothilal, Amit Sharma, and Chenhao Tan. 2019. DiCE:
+Explaining Machine Learning Classifiers through Diverse Counterfactual Expla-
+nations. arXiv preprint arXiv:1905.07697 (2019).
+[32] W James Murdoch, Chandan Singh, Karl Kumbier, Reza Abbasi-Asl, and Bin Yu.
+2019. Definitions, methods, and applications in interpretable machine learning.
+Proceedings of the National Academy of Sciences 116, 44 (2019), 22071–22080.
+[33] Judea Pearl. 1994. A probabilistic calculus of actions. In Uncertainty Proceedings
+1994. Elsevier, 454–462.
+[34] Judea Pearl. 2000. Causality: models, reasoning and inference. Vol. 29. Springer.
+[35] Judea Pearl. 2013. Structural counterfactuals: A brief introduction. Cognitive
+Science 37, 6 (2013), 977–985.
+[36] Judea Pearl, Madelyn Glymour, and Nicholas P Jewell. 2016. Causal inference in
+statistics: A primer. John Wiley & Sons.
+[37] Jonas Peters, Dominik Janzing, and Bernhard Schölkopf. 2017. Elements of causal
+inference. The MIT Press.
+[38] Rafael Poyiadzi, Kacper Sokol, Raul Santos-Rodriguez, Tijl De Bie, and Peter
+Flach. 2019. FACE: Feasible and Actionable Counterfactual Explanations. arXiv
+preprint arXiv:1909.09369 (2019).
+[39] Goutham Ramakrishnan, Yun Chan Lee, and Aws Albargouthi. 2019. Synthesizing
+Action Sequences for Modifying Model Decisions. arXiv preprint arXiv:1910.00057
+(2019).
+[40] Paul K Rubenstein, Sebastian Weichwald, Stephan Bongers, Joris M Mooij, Do-
+minik Janzing, Moritz Grosse-Wentrup, and Bernhard Schölkopf. 2017. Causal
+consistency of structural equation models. arXiv preprint arXiv:1707.00819 (2017).
+[41] Cynthia Rudin. 2019. Stop explaining black box machine learning models for
+high stakes decisions and use interpretable models instead. Nature Machine
+Intelligence 1, 5 (2019), 206–215.
+[42] Stefan Rüping. 2006. Learning interpretable models. PhD dissertation. Technical
+University of Dortmund.
+[43] Chris Russell. 2019. Efficient Search for Diverse Coherent Explanations. In
+Proceedings of the Conference on Fairness, Accountability, and Transparency (FAT*
+’19). ACM, 20–28. https://doi.org/10.1145/3287560.3287569
+[44] Chris Russell, Matt J Kusner, Joshua Loftus, and Ricardo Silva. 2017. When worlds
+collide: integrating different counterfactual assumptions in fairness. In Advances
+in Neural Information Processing Systems. 6414–6423.
+[45] Shubham Sharma, Jette Henderson, and JoydeepGhosh. 2019. CERTIFAI: Counter-
+factual Explanations for Robustness, Transparency, Interpretability, and Fairness
+of Artificial Intelligence models. arXiv preprint arXiv:1905.07857 (2019).
+[46] Peter Spirtes, Clark N Glymour, Richard Scheines, and David Heckerman. 2000.
+Causation, prediction, and search. MIT press.
+[47] William Starr. 2019. Counterfactuals. In The Stanford Encyclopedia of Philoso-
+phy (fall 2019 ed.), Edward N. Zalta (Ed.). Metaphysics Research Lab, Stanford
+University.
+[48] William Starr. 2019. Counterfactuals. In The Stanford Encyclopedia of Philoso-
+phy (fall 2019 ed.), Edward N. Zalta (Ed.). Metaphysics Research Lab, Stanford
+University.
+[49] Berk Ustun, Alexander Spangher, and Yang Liu. 2019. Actionable recourse in
+linear classification. In Proceedings of the Conference on Fairness, Accountability,
+and Transparency. ACM, 10–19.
+[50] Suresh Venkatasubramanian and Mark Alfano. 2020. The philosophical basis of
+algorithmic recourse. In Proceedings of the Conference on Fairness, Accountability,
+and Transparency. ACM.
+[51] Paul Voigt and Axel Von dem Bussche. [n.d.]. The EU General Data Protection
+Regulation (GDPR). ([n. d.]).
+[52] Sandra Wachter, Brent Mittelstadt, and Chris Russell. 2017. Counterfactual
+explanations without opening the black box: Automated decisions and the GDPR.
+Harvard Journal of Law & Technology 31, 2 (2017).
+[53] JamesWexler, Mahima Pushkarna, Tolga Bolukbasi, MartinWattenberg, Fernanda
+Viégas, and JimboWilson. 2019. TheWhat-If Tool: Interactive Probing of Machine
+Learning Models. IEEE transactions on visualization and computer graphics 26, 1
+(2019), 56–65.
+361
+FAccT ’21, March 1–4, 2021, Virtual Event, Canada Karimi, Schölkopf, Valera
+A PROOFS
+A.1 Proof of Proposition 3.1
+Proposition 3.1. A CFE-based action, ACFE, where 𝐼 = {𝑖 | 𝛿∗
+𝑖
+≠ 0},
+performed by individual 𝒙F, in general results in the structural coun-
+terfactual, 𝒙SCF = 𝒙*CFE := 𝒙F + 𝜹∗, and thus guarantees recourse
+(i.e., ℎ(𝒙SCF) ≠ ℎ(𝒙F)), if and only if, the set of descendants of the
+acted upon variables, determined by 𝐼 , is the empty set.
+Proof. The setting assumes that the causal graph G is available
+such that the parent set for each variable is known. Let d(𝑋 ) and
+nd(𝑋 ) denote the sets of descendants and non-descendants of the
+variable 𝑋 according to G, respectively. For multiple intervened-
+upon variables, we define:
+X𝐼 := {𝑋𝑖 }𝑖∈𝐼 ,
+nd(X𝐼 ) := ∩𝑖∈𝐼 nd(𝑋𝑖 ),
+d(X𝐼 ) := X \ (X𝐼 ∪ nd(X𝐼 )) .
+Note that, by definition, X𝐼 , nd(X𝐼 ), and d(X𝐼 ) form a partition of
+the set of all variables X.
+To prove the iff conditional, we prove each direction separately.
+For ease of exposition, we define
+𝒙SCF = 𝒙*CFE := 𝒙F + 𝜹∗︸                         ︷︷                         ︸
+p
+⇐⇒ d(X𝐼 ) = ∅︸      ︷︷      ︸
+q
+where we recall the remark that given 𝜹∗, an individual seeking re-
+course may intervene on any arbitrary subset of observed variables
+X𝐼 , as long as (𝛿∗𝑖 ≠ 0) =⇒ (𝑖 ∈ 𝐼 ).
+q =⇒ p: Borrowing the closed-form expression of a structural
+counterfactual from (??), we have
+𝑥SCF𝑖 =
+{
+𝑥F
+𝑖
++ 𝛿∗
+𝑖
+𝑖 ∈ 𝐼
+𝑥F
+𝑖
++ 𝑓𝑖 (paSCF𝑖
+) − 𝑓𝑖 (paF𝑖 ) 𝑖 ∉ 𝐼
+(A.1)
+which can be broken down further to specify the descendants and
+non-descendants of intervened upon variables, as
+𝑥SCF𝑖 =
+
+𝑥F
+𝑖
++ 𝛿∗
+𝑖
+𝑖 ∈ 𝐼
+𝑥F
+𝑖
++ 𝑓𝑖 (paSCF𝑖
+) − 𝑓𝑖 (paF𝑖 ) 𝑖 ∈ d(X𝐼 )
+𝑥F
+𝑖
++ 𝑓𝑖 (paSCF𝑖
+) − 𝑓𝑖 (paF𝑖 ) 𝑖 ∈ nd(X𝐼 )
+(A.2)
+By assumption, d(X𝐼 ) = ∅, so the second case never holds.
+Furthermore, since structural interventions leave non-descendant
+variables unaffected, we have that
+paSCF𝑖 = paF𝑖 ∀𝑖 ∈ nd(X𝐼 ) .
+Consequently,
+𝑓𝑖 (paSCF𝑖 ) − 𝑓𝑖 (paF𝑖 ) = 𝑓𝑖 (paF𝑖 ) − 𝑓𝑖 (paF𝑖 ) = 0 ∀𝑖 ∈ nd(X𝐼 ) .
+In summary, we have
+𝑥SCF𝑖 =
+{
+𝑥F
+𝑖
++ 𝛿∗
+𝑖
+𝑖 ∈ 𝐼
+𝑥F
+𝑖
+𝑖 ∈ nd(X𝐼 )
+(A.3)
+which, upon realising that (𝛿∗
+𝑖
+≠ 0) =⇒ (𝑖 ∈ 𝐼 ), reduces to
+𝒙SCF = 𝒙*CFE := 𝒙F + 𝜹∗ as desired.
+¬q =⇒ ¬p: Starting with the negation of q, we have the ∃ 𝑘 ∈
+𝐼 s.t. d(𝑋𝑘 ) ≠ ∅. It is assumed that 𝛿∗
+𝑘
+≠ 0 (i.e., we are not per-
+forming a non-altering intervention on 𝑋𝑘 ), then using the same
+expression for structural counterfactuals in (A.2), there in general
+exists a descendant of𝑋𝑘 for which the value of its ancestors change
+under intervention, i.e., ∃ 𝑙 ∈ d(X𝐼 ) s.t. 𝑓𝑙 (paSCF𝑙
+) − 𝑓𝑙 (paF𝑙 ) ≠ 0.
+Thus, 𝑥SCF
+𝑙
+≠ 𝑥F
+𝑙
+and thus 𝒙SCF ≠ 𝒙*CFE := 𝒙F + 𝜹∗. Our proof ig-
+nores special cases such as piece-wise constant structural equations,
+where for some 𝛿∗
+𝑖
+≠ 0, the descendant of 𝑋𝑖 remains invariant.
+These rare cases can be thought of as locally violating causal mini-
+mality [37, Sec. 6.5] and are thus disregarded. □
+A.2 Proof of Corollary 3.1
+Corollary 3.1. If the true world M is independent, i.e, all the ob-
+served features are root-nodes, then CFE-based actions always guar-
+antee recourse.
+Proof. If the true worldM is independent, then by definition
+the set of descendants for all variables is the empty set. Thus, the
+statement follows directly from Proposition 3.1. □
+A.3 Proof of Proposition 4.1
+Proposition 4.1. Given an individual 𝒙F observed in worldM ∈ Π,
+a family of feasible actions F , and the solution of (3), A∗ ∈ F .
+Assume that there exists CFE-based action ACFE ∈ F that achieves re-
+course, i.e., ℎ(𝒙F) ≠ ℎ(𝒙*CFE). Then, cost(A∗
+; 𝒙F) ≤ cost(ACFE
+; 𝒙F).
+Proof. Having assumed that both ACFE,A∗ ∈ F , and consider-
+ing thatA∗
+is the optimal solution of (3) constrained to F , it follows
+from definition of optimality that cost(A∗
+; 𝒙F) ≤ cost(ACFE
+; 𝒙F).
+□
+362

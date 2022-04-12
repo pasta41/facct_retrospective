@@ -1,0 +1,152 @@
+
+Post-hoc explanations of machine learning models are crucial for
+people to understand and act on algorithmic predictions. An intrigu-
+ing class of explanations is through counterfactuals, hypothetical
+examples that show people how to obtain a different prediction.
+We posit that effective counterfactual explanations should satisfy
+two properties: feasibility of the counterfactual actions given user
+context and constraints, and diversity among the counterfactuals
+presented. To this end, we propose a framework for generating
+and evaluating a diverse set of counterfactual explanations based
+on determinantal point processes. To evaluate the actionability
+of counterfactuals, we provide metrics that enable comparison of
+counterfactual-based methods to other local explanation methods.
+We further address necessary tradeoffs and point to causal implica-
+tions in optimizing for counterfactuals. Our experiments on four
+real-world datasets show that our framework can generate a set of
+counterfactuals that are diverse and well approximate local decision
+boundaries, outperforming prior approaches to generating diverse
+counterfactuals. We provide an implementation of the framework
+at https://github.com/microsoft/DiCE.
+CCS CONCEPTS
+• Applied computing→ Law, social and behavioral sciences.
+ACM Reference Format:
+Ramaravind K. Mothilal, Amit Sharma, and Chenhao Tan. 2020. Explaining
+Machine Learning Classifiers through Diverse Counterfactual Explanations.
+In Conference on Fairness, Accountability, and Transparency (FAT* ’20), Jan-
+uary 27–30, 2020, Barcelona, Spain. ACM, New York, NY, USA, 11 pages.
+https://doi.org/10.1145/3351095.3372850
+1 INTRODUCTION
+Consider a person who applied for a loan and was rejected by the
+loan distribution algorithm of a financial company. Typically, the
+company may provide an explanation on why the loan was rejected,
+for example, due to “poor credit history”. However, such an expla-
+nation does not help the person decide what they should do next to
+improve their chances of being approved in the future. Critically,
+the most important feature may not be enough to flip the decision
+of the algorithm, and in practice, may not even be changeable such
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6936-7/20/02. . . $15.00
+https://doi.org/10.1145/3351095.3372850
+as gender and race. Thus, it is equally important to show decision
+outcomes from the algorithm with actionable alternative profiles, to
+help people understand what they could have done to change their
+loan decision. Similar to the loan example, this argument is valid for
+a range of scenarios involving decision-making on an individual’s
+outcome, such as deciding admission to a university [40], screening
+job applicants [33], disbursing government aid [3, 5], and identify-
+ing people at high risk of a future disease [11]. In all these cases,
+knowing reasons for a bad outcome is not enough; it is important to
+know what to do to obtain a better outcome in the future (assuming
+that the algorithm remains relatively static).
+Counterfactual explanations [39] provide this information, by
+showing feature-perturbed versions of the same person who would
+have received the loan, e.g., “you would have received the loan
+if your income was higher by $10, 000”. In other words, they pro-
+vide “what-if” explanations for model output. Unlike explanation
+methods that depend on approximating the classifier’s decision
+boundary [32], counterfactual (CF) explanations have the advan-
+tage that they are always truthful w.r.t. the underlying model by
+giving direct outputs of the algorithm. Moreover, counterfactual ex-
+amples may also be human-interpretable [39] by allowing users to
+explore “what-if” scenarios, similar to how children learn through
+counterfactual examples [6, 7, 41].
+However, it is difficult to generate CF examples that are actionable
+for a person’s situation. Continuing our loan decision example, a CF
+explanation may suggest to “change your house rent”, but it does
+not say much about alternative counterfactuals, or consider the
+relative ease between different changes a person may need to make.
+Like any example-based decision support system [18], we need a
+set of counterfactual examples to help a person interpret a complex
+machine learning model. Ideally, these examples should balance
+between a wide range of suggested changes (diversity), and the
+relative ease of adopting those changes (proximity to the original
+input), and also follow the causal laws of human society, e.g., one
+can hardly lower their educational degree or change their race.
+Indeed, Russell [34] recognizes the importance of diversity and
+proposes an approach for linear machine learning classifiers based
+on integer programming. In this work, we propose a method that
+generates sets of diverse counterfactual examples for any differen-
+tiable machine learning classifier. Extending Wachter et al. [39], we
+construct an optimization problem that considers the diversity of
+the generated CF examples, in addition to proximity to the original
+input. Solving the optimization problem requires considering the
+tradeoff between diversity and proximity, and the tradeoff between
+continuous and categorical features which may differ in their rela-
+tive scale and ease of change. We provide a general solution to this
+optimization problem that can generate any number of CF examples
+for a given input. To facilitate actionability, our solution is flexible
+enough to support user-provided inputs based on domain knowl-
+edge, such as custom weights for individual features or constraints
+on perturbation of features.
+Further, we provide quantitative evaluation metrics for evalu-
+ating any set of counterfactual examples. Due to their inherent
+subjectivity, CF examples are hard to evaluate. While we cannot
+replace behavioral experiments, we propose metrics that can help in
+fine-tuning parameters of the proposed solution to achieve desired
+properties of validity, diversity, and proximity. We also propose a
+second evaluation metric that approximates a behavioral experi-
+ment on whether people can understand a ML model’s decision
+given a set of CF examples, assuming that people would rationally
+extrapolate from the CF examples and “guess” the local decision
+boundary of an ML model.
+We evaluate our method on explaining ML models trained on
+four datasets: COMPAS for bail decision [4], Adult-Income for in-
+come prediction [20], German-Credit for assessing credit risk [2],
+and a dataset from Lending Club for loan decisions [1]. Compared
+to prior CF generation methods, our proposed solution generates
+CF examples with substantially higher diversity for these datasets.
+Moreover, a simple 1-nearest neighbor model trained on the gener-
+ated CF examples obtains comparable accuracy on locally approxi-
+mating the original ML model to methods like LIME [32], which are
+directly optimized for estimating the local decision boundary. No-
+tably, our method obtains higher F1 score on predicting instances
+in the counterfactual outcome class than LIME in most configura-
+tions, especially for Adult-Income and COMPAS datasets wherein
+both precision and recall are higher. Qualitative inspection of the
+generated CF examples illustrates their potential utility for making
+informed decisions. Additionally, CF explanations can expose biases
+in the original ML model, as we see when some of the generated
+explanations suggest changes in sensitive attributes like race or
+gender. The last example illustrates the broad applicability of CF
+explanations: they are not just useful to an end-user, but can be
+equally useful to model builders for debugging biases, and for fair-
+ness evaluators to discover such biases and other model properties.
+Still, CF explanations, as generated, suffer from lack of any causal
+knowledge about the input features that they modify. Features do
+not exist in a vacuum; they come from a data-generating process
+which constrains their modification. Thus, perturbing each input
+feature independently can lead to infeasible examples, such as sug-
+gesting someone to obtain a higher degree but reduce their age. To
+ensure feasibility, we propose a filtering approach on the generated
+CF examples based on causal constraints.
+To summarize, our work makes the following contributions:
+• We propose diversity as an important component for actionable
+counterfactuals and build a general optimization framework that
+exposes the importance of necessary tradeoffs, causal implica-
+tions, and optimization issues in generating counterfactuals.
+• We propose a quantitative evaluation framework for counter-
+factuals that allows fine-tuning of the proposed method for a
+particular scenario and enables comparison of CF-based methods
+to other local explanation methods such as LIME.
+• Finally, we demonstrate the effectiveness of our framework through
+empirical experiments on multiple datasets and provide an open-
+source implementation at https://github.com/microsoft/DiCE.

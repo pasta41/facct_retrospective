@@ -1,0 +1,1193 @@
+Removing Spurious Features can Hurt Accuracy and Affect
+Groups Disproportionately
+Fereshte Khani
+Stanford University
+fereshte@stanford.edu
+Percy Liang
+Stanford University
+pliang@cs.stanford.edu
+ABSTRACT
+Spurious features interfere with the goal of obtaining robust models
+that perform well across many groups within the population. A nat-
+ural remedy is to remove such features from the model. However,
+in this work, we show that removing spurious features can surpris-
+ingly decrease accuracy due to the inductive biases of overparame-
+terized models. In noiseless overparameterized linear regression,
+we completely characterize how the removal of spurious features
+affects accuracy across different groups (more generally, test distri-
+butions). In addition, we show that removal of spurious features can
+decrease the accuracy even on balanced datasets (where each target
+co-occurs equally with each spurious feature); and it can inadver-
+tently make the model more susceptible to other spurious features.
+Finally, we show that robust self-training produces models that no
+longer depend on spurious features without affecting their overall
+accuracy. The empirical results on the Toxic-Comment-Detection
+and CelebA datasets show that our results hold in non-linear mod-
+els.
+ACM Reference Format:
+Fereshte Khani and Percy Liang. 2021. Removing Spurious Features can
+Hurt Accuracy and Affect Groups Disproportionately. In Conference on
+Fairness, Accountability, and Transparency (FAccT ’21), March 3–10, 2021,
+Virtual Event, Canada. ACM, New York, NY, USA, 16 pages. https://doi.org/
+10.1145/3442188.3445883
+1 INTRODUCTION
+Machine learning models are susceptible to fitting spurious features.
+For example, models for toxic comment detection assign different
+toxicity scores to the same sentence with different identity terms
+(“I’m gay” and “I’m straight”) [9], and models for object recogni-
+tion make different predictions on the same object against different
+backgrounds [40, 48]. A common strategy to make models robust
+against spurious features is attempting to remove such features,
+e.g., removing identity terms from a comment [15], removing back-
+ground of an image [11], or learning a new representation from
+which it is impossible to predict the spurious feature [4, 29, 51].
+However, removing spurious features can lower accuracy [46, 51],
+and moreover, this drop varies widely across groups within the
+population [50].
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+© 2021 Association for Computing Machinery.
+ACM ISBN 978-1-4503-8309-7/21/03. . . $15.00
+https://doi.org/10.1145/3442188.3445883
+Core features
+Target
+Spurious
+features
+z
+y s
+Figure 1: We compare two models: the core model M−s ,
+which predicts y from only the core features z; and the full
+model M+s , which predicts y from both z and the spurious
+feature s.
+Previous work has identified two reasons for this accuracy drop:
+(i) Core (non-spurious) features are noisy or not expressive enough
+[21, 24], so spurious features are needed even by the optimal model
+to achieve the best accuracy; (ii) removing spurious features cor-
+rupts core features, especially when learning a new representation
+uncorrelated with the spurious features [53].
+In this work, we show that even in the absence of the afore-
+mentioned two reasons, removing spurious features can still lead
+to a drop in accuracy due to the effects of inductive bias in over-
+parametrized models. For our theoretical analysis, we consider
+noiseless linear regression: We have d core features z and the spuri-
+ous feature s = β⋆⊤z. See Figure 1 for the causal graph. Importantly,
+(i) the spurious feature s adds no information about y beyond what
+already exists in z, and (ii) removing s does not corrupt z (since we
+are not required to remove the correlated features to s). We con-
+sider two models: the core model M−s
+, which only uses z to predict
+y, and the full model M+s , which also uses the spurious feature
+s . In this simple setting, one might conjecture that removing the
+spurious feature should only help accuracy. However, in this work
+we show that this is not always the case and accuracy can drop by
+removing the spurious feature.We exactly characterize groups (or
+more generally, test distributions) that removing the spurious feature
+s hurts their accuracy.
+In the overparametrized regime, since number of training exam-
+ples is less than the number of features, there are some directions
+of data variation that are not observed in the training data. For
+instance, Table 1 shows a simple example with only one training
+data and two core features (z1 and z2). In this example, we do not
+observe any information about the second feature (z2). The core
+model assigns weight 0 to the unseen directions (weight 0 for the
+second feature in Table 1(c)). On the other hand, in the presence of
+a spurious feature, the full model can fit the training data perfectly
+with a smaller norm by assigning a non-zero weight for the spuri-
+ous feature (weight 1 for the feature s in Table 1(c)). This non-zero
+weight for the spurious feature leads to different assumptions for
+the unseen directions. In particular, the full model does not assign
+weight 0 to the unseen directions. In Table 1(d), the full model
+196
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Fereshte Khani and Percy Liang
+True Parameters
+θ⋆ = [2, 2]⊤ target y = [2, 2]z
+β⋆ = [1,α]⊤ spurious s = [1,α]z
+(a)
+Training Example
+z s y
+[1, 0]⊤ 1 2
+(b)
+Model estimated parameters
+Core model θ̂ = [2, 0]⊤
+Full model θ̂ = [1, 0]⊤,w = 1
+(c)
+Model prediction
+Core model ŷ = [2, 0]z
+Full model ŷ = [1, 0]z + s = [2,α]z
+(d)
+Table 1: A simple linear regression example that shows when removing a spurious feature increases the error. (a) There are 2
+core features, z = [z1, z2], one spurious feature s = β⋆⊤z and the target is y = θ⋆⊤z . (b) There is only one training example with
+no information about z2. (c) Core model’s estimate for the parameters is [2, 0]; however, the full model interpolates data with
+a smaller norm by putting weight w = 1 for the spurious feature s. (d) For the prediction, we can replace s by β⋆⊤z = [1,α]⊤z,
+which results in the full model implicitly assigning weight of α for the second feature; while the core model assigns wight of
+0 to the second feature. As a result, if |α − 2| < |0 − 2| then removing s increases the error.
+implicitly assigns weight α to the second feature (unseen direction
+at training), while the core model assigns weight 0. As a result, if
+|α − 2| is small, then the full model which uses s has lower error,
+and if |α − 2| is large then core model which does not use s has
+lower error.
+Intuitively, by using the spurious feature, the full model incor-
+porates β⋆ into its estimate. The true target parameter (θ⋆) and
+the true spurious feature parameters (β⋆) agree on some of the
+unseen directions and do not agree on the others. Thus, depending
+on which unseen directions are weighted heavily in the test time,
+removing s can increase or decrease the error. We formalize the
+conditions under which removing the spurious feature (s) increases
+the error.
+We state that in addition to the true parameters (θ⋆, β⋆), the
+distribution of core-features in train and test data are also critical
+for identifying the impact of removing s on error. Consequently,
+conditions only on the true parameters, or only on the distribution
+of the spurious feature and the target, cannot guarantee that error
+does not increase after removal of the spurious feature. Therefore,
+removing the spurious feature may aggravate the error even un-
+der favorable conditions such as balanced datasets (y ⊥ s in the
+train and test data) or if disjoint features determine the target and
+the spurious feature (θ⋆i β
+⋆
+i = 0, for all i).
+We then study multiple spurious features and show that re-
+moving one spurious feature inadvertently makes the model more
+susceptible to the rest of the spurious features, in line with the
+recent empirical results [49]. Finally, we show how to leverage
+unlabeled data and the recently introduced Robust Self-Training
+(RST) [6, 34, 39] to remove the spurious features but retain the same
+performance as the full model. The new model, Core+RST model,
+is robust to changes in s , and it can perform when s is not available.
+Empirically, we analyze the effect of removing spurious features
+by training a convolutional neural network on three datasets: the
+CelebA dataset for predicting if a celebrity is wearing lipstick where
+we use wearing earrings as the spurious feature; the Comment-
+Toxicity-Detection dataset for predicting the toxicity of a comment
+where we use identity terms as the spurious features; and finally, a
+synthetically-generated dataset where we concatenate each MNIST
+image with another image and use the label of the new image to
+be the spurious feature. Our empirical results are four folds: 1)
+Removal of the spurious feature lowers the average accuracy and
+disproportionately affects different groups (+30% increase for some
+groups and -7% decrease for others); 2) The full model is not robust
+against the spurious feature, and changing the spurious feature at
+the test time lowers its accuracy substantially; 3) The Core+RST
+achieves similar average accuracy as the full model while being
+robust against the spurious feature; 4) In the CelebA dataset, we
+show that removing the spurious hair color makes the model less
+robust against wearing earrings.
+2 SETUP
+Let z ∈ Rd denote the core features which determine the prediction
+target, y = f (z). Let s = д(z) denote a spurious feature. We study
+the overparameterized regime, where we observe n < d triples
+(zi , si ,yi ) as training data. For an arbitrary loss function ℓ, the
+standard error for a modelM : Rd × R→ R is:
+Error(M) = E[ℓ(y,M(z, s))], (1)
+where the expectation is over test points (z, s,y). We are also inter-
+ested in robustness of a model against spurious feature. Let S be
+the set of different values for the spurious feature. We define the
+robust error as follows:
+Robust-Error(M) = E[max
+s ′∈S
+ℓ(y,M(z, s ′))] (2)
+Robust-Error measures the worst case error for each data point
+z with respect to change in s . Ideally we want our model pre-
+diction to be robust with respect to change in the spurious fea-
+ture (i.e., Error(M) = Robust-Error(M)). Robust-Error is a com-
+mon definition in robust machine learning against input perturba-
+tion [6, 20, 39]. Also Robust-Error is close to counterfactual notions
+of fairness, such as Counterfactual Token Fairness [15].
+Let C denote a function that measures the complexity of a model
+(e.g., the L2-norm of its parameters), and λ be a parameter to tune
+the trade-off between the model’s complexity and its empirical risk.
+We are interested in the performance of the following two models:
+• Full model (M+s): which uses the core features z and the
+spurious s to predict y.
+M
++s = argmin
+M
+∑
+i
+ℓ (M(zi , si ),yi ) + λC(M) (3)
+• Core model (M-s): which only uses the core features z to
+predict y.
+M
+-s = argmin
+M
+∑
+i
+ℓ(M(zi , 0),yi ) + λC(M) (4)
+197
+Removing Spurious Features can Hurt Accuracy and Affect Groups Disproportionately FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+True parameters
+θ⋆ = [2, 2, 2]⊤
+β⋆ = [1, 2,−2]⊤
+Training example
+z s y
+[1, 0, 0]⊤ 1 2
+Model estimated parameters
+Core model θ̂ -s = [2, 0, 0]⊤
+Full Model θ̂+s = [1, 0, 0]⊤,w = 1
+Model prediction
+Core model ŷ = [2, 0, 0]z
+Full model ŷ = [1, 0, 0]z + s = [2, 2,−2]z
+Table 2: There is only one training example with no information about z2 and z3. The core model assigns weight of 0 to these
+two features. The full model, uses the spurious feature (s), which results in a good estimation for real weight of z2 but not z3.
+The core model does not use the spurious feature, therefore its
+Robust-Error is equal to its Error. However, there might be a large
+gap between Error and Robust-Error for the full model.
+3 WHEN DOES THE FULL MODEL
+OUTPERFORM THE CORE MODEL?
+Over the last few years, researchers have observed some surprising
+phenomena about deep networks that conflict with classical ma-
+chine learning. For example, more training data might hurt accuracy
+[36]. A line of work [2, 14, 33, 39] explain these unintuitive results
+in simple models such as linear regression in overparameterized
+regime. Accuracy drops due to the removal of spurious features is
+also in contrast with classical machine learning. Removing spuri-
+ous features should decreases the error in the underparametrized
+regime. Analogous to the mentioned work, we now explain this
+unintuitive result in noiseless overparameterized linear regression.
+We assume there are true parameters θ⋆, β⋆ ∈ Rd such that the
+prediction target, y = θ⋆⊤z, and the spurious feature s = β⋆⊤z (in
+Section 3.3 we study multiple spurious features and their interac-
+tions). Motivated by recent work in deep learning, which speculate
+that gradient descent converges to the minimum-norm solution that
+fit training data perfectly [17, 37], we consider the minimum-norm
+solution (i.e., the complexity function C in (3) and (4) returns the
+L2-norm of the parameters with regularization strength tending to
+0). We consider squared-error for the loss function.
+Let Z ∈ Rn×d be the matrix of observed core features,Y ∈ Rn be
+the targets, and S ∈ Rn be the spurious features. We first analyze
+the minimum-norm estimate for the core model. Let θ̂ -s denote
+the estimated parameters of the core model which can be obtained
+through solving the following optimization problem.
+θ̂ -s = argmin
+θ
+∥θ ∥22
+s .t . Zθ = Y . (5)
+Let Π = Z⊤(ZZ⊤)−1Z be the projection matrix to columns of Z
+then θ̂ -s = Πθ⋆.
+The full model uses the spurious feature in addition to the core
+features. Let θ̂+s and ŵ denote the estimated parameters for the
+full model which can be obtained through solving the following
+optimization problem.
+θ̂+s, ŵ = argmin
+θ,w
+∥θ ∥22 +w
+2
+s .t . Zθ + Sw = Y , (6)
+wherew denote the weight assigned to the spurious feature. Note
+that in (6) we can always set ŵ = 0 to obtain θ̂ -s, so the full model
+only achieves smaller norm by optimizing over w . In particular,
+instead of having norm of ∥Πθ⋆∥22 , the full model can use s with
+weight ŵ and have norm ∥Πθ⋆−ŵΠβ⋆∥22+ŵ
+2
+instead. The optimal
+value for ŵ which minimizes the norm is:
+ŵ =
+θ⋆⊤Πβ⋆
+1 + β⋆⊤Πβ⋆
+(7)
+Intuitively, ŵ is larger if θ⋆ and β⋆ are similar in column space
+of the training data (Π). See Appendix A for details. The estimated
+parameters for the full and core models are shown in Table 5 (first
+and second rows).
+To understand the difference between the performance of the
+core model and full model on different groups, we extend the ex-
+ample in the introduction to include two unseen directions, see
+Table 2. In this example, there are d = 3 core features and only
+one training example with no information about the second and
+the third features. Let θ⋆ = [2, 2, 2]⊤ which results in y = 2. Let
+β⋆ = [1, 2,−2]⊤ which results in s = 1. Without the spurious
+feature, the estimated parameter is θ̂ -s = [2, 0, 0]⊤ however, by
+using s the full model fits the training data perfectly with a smaller
+norm by setting ŵ = 1. By substituting s with β⋆⊤z, the full model
+implicitly assigns weights of 2 and −2 to the second and third fea-
+tures, respectively. Therefore, removing s reduces the error for a
+test distribution with high deviations from zero on the second fea-
+ture, whereas removing s increases the error for a test distribution
+with high deviations from zero on the third feature.
+The following proposition, which is our main result, provides
+general conditions that characterize precisely when the core model
+(removing the spurious feature) increases the error over the full
+model.
+Proposition 1. Let Σ = E[zz⊤] denote the covariance matrix of the
+test data (or covariance matrix for any group), and let Π denote the
+column space of training data. Error(M+s) < Error(M-s) iff:
+sign
+(
+β⋆
+⊤
+Πθ⋆
+)
+= sign
+(
+β⋆
+⊤
+(I − Π)Σ(I − Π)θ⋆
+)
+, (8)
+and  β⋆⊤Πθ⋆
+1 + β⋆⊤Πβ⋆
+ <
+2β⋆⊤
+(I − Π)Σ(I − Π)θ⋆
+β⋆⊤(I − Π)Σ(I − Π)β⋆
+ . (9)
+Intuitively, this proposition states that removing the spurious
+feature increases the error if the projection of θ⋆ on β⋆ in column
+space of training data (seen directions) is similar to the projection
+of θ⋆ on β⋆ in the null-space of training data (unseen directions)
+scaled by the covariance matrix. Applying (9) to the example in
+Table 2, shows that removing s reduces the error at the test time
+with covariance matrix Σ if 2Σ23 +3Σ22 ≤ Σ33. This is in line with
+our intuition since the full model recovers θ⋆2 exactly, however, its
+estimation for θ⋆3 is worse than the core model’s estimate.
+198
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Fereshte Khani and Percy Liang
+True parameters
+θ⋆ = [1, 0, 1, 0]⊤
+β⋆ = [1, 1,−1,−1]⊤
+Training examples
+z s y
+[1, 0, 0, 0] 1 1
+[0, 1, 0, 0] 1 0
+Estimated parameters
+θ̂ -s = [1, 0, 0, 0]⊤
+θ̂+s = [2/3, −1/3, 0, 0]⊤,w = 1/3
+Test Examples Models predictions
+z s y Core model Full model
+[0, 2, 1, 0] 1 1 0 -1/3
+[0, 2, 0, 1] 1 0 0 -1/3
+Table 3: An example demonstrating that s and y can be exactly the same in train and test time (blue filled cells), but the full
+model (which uses s) has a worse performance in comparison to the core model (which does not use s).
+3.1 Disjoint Parameters and Balanced Dataset
+are not Enough
+Proposition 1 characterizes when removing the spurious feature
+increases and when it decreases the overall error. Now we investi-
+gate whether removing the spurious feature can always decrease
+the error for some special settings. For example, if the features that
+determine the spurious feature (s) and the target (y) respectively
+are disjoint (i.e., for all i we have: β⋆i θ
+⋆
+i = 0), or when spurious
+features and the target are independent (i.e., s ⊥ y in the train and
+test distribution).
+The following corollary states that there is no condition on the
+true parameters that guarantees error reduction by removing the
+spurious feature.
+Corollary 1. (Disjoint parameters are not enough) For d ≥ 4, con-
+sider any non-zero θ⋆, β⋆ ∈ Rd , such that there is no scalar c where
+β⋆ = cθ⋆. For any n < d − 1, we can construct Z ∈ Rn×d as training
+and ,Z ′,Z ′′ ∈ Rn×d as test data such that if we train M+s and M-s
+using Z as training data, then Error(M+s) < Error(M-s) on Z ′, and
+Error(M+s) > Error(M-s) on Z ′′. On the contrary, if β⋆ = cθ⋆, then
+training both models on any Z , results in Error(M+s) ≤ Error(M-s) on
+any Z ′.
+See Appendix A for the proof. Intuitively, for any β⋆ and θ⋆, we
+can choose the training data Z , such that (i) θ⋆ has positive projec-
+tion on β⋆ in the column space of Z , (ii) there are two directions
+in the null space of Z where θ⋆ has a positive projection on β⋆ in
+one of them and negative projection in the other one. We can then
+select the test data from one of these two unseen directions. Note
+that even in the special case of disjoint parameters (θ⋆i β
+⋆
+i = 0, for
+all i), removing s can increase the error.
+Let’s now consider conditioning on the vector of observed spuri-
+ous features and the targets in train and test data. In fact, one of
+the proposed ways to reduce the sensitivity of the model against
+the spurious features is having a balanced dataset. (i.e., collecting
+the dataset such that y and s be independent in train and test data,
+P[y | s] = P[y]). For example, in comment toxicity detection, Dixon
+et al. [9] suggest adding new examples in training data to equal-
+ize the number of toxic comments and non-toxic comments for
+each identity term. Although they show some mitigation with this
+method, Wang et al. [46] demonstrate that a balanced dataset is
+not enough, and the model can still be sensitive to the spurious
+features.
+We now show that nomeasure based on the spurious features and
+the target can guarantee no error rise after removing the spurious
+feature.
+Corollary 2. (Balanced datasets are not enough) Consider anyd ≥ 4,
+n < d and S,Y ∈ Rn , where there is no scalar c such that Y = cS . We
+can construct Z ,Z ′,Z ′′ ∈ Rn×d , such that if we train M+s and M-s
+using (Z , S,Y ), then the Error(M+s) < Error(M-s) on (Z ′, S,Y ) and
+Error(M-s) < Error(M+s) on (Z ′′, S,Y ). On the contrary, if Y = cS
+then training both models on any (Z , S,Y ), results in Error(M+s) ≤
+Error(M-s) on any (Z ′, S,Y ).
+See Appendix A for the proof. At a high level, for proving this
+corollary, we first rewrite the formulation of ŵ in terms of S and Y .
+ŵ =
+θ⋆⊤Πβ⋆
+1 + β⋆⊤Πβ⋆
+=
+S⊤(ZZ⊤)−1Y
+1 + S⊤(ZZ⊤)−1S
+(10)
+We then construct Z such that the dot product of S and Y projected
+on (ZZ⊤)−1 is non-zero. We then construct Z ′,Z ′′,θ⋆, β⋆ such
+that Y = Zθ⋆ = Z ′θ⋆ = Z ′′θ⋆, and S = Zβ⋆ = Z ′β⋆ = Z ′′β⋆.
+Furthermore, we select Z ′
+to have high variance on the unseen
+directions that projection of θ⋆ on β⋆ is negative, while choosing
+Z ′′
+to have high variance on the unseen directions with positive
+projection of θ⋆ on β⋆.
+There are two interesting special cases for Corollary 2, (i) Even
+when there is no shift in the distribution of the spurious feature
+and target (i.e., S and Y are exactly the same in train and test), full
+model (which uses s) can have higher error than the core model, see
+Table 3 for a simple example; (ii) Even when targets and spurious
+features are independent at train and the test (balanced datasets),
+the full model (which uses s) can have lower error than the core
+model.
+Corollary 1 and 2 together state that we cannot compute the
+sensitivity of a model to the spurious feature, or the effect of re-
+moving spurious feature by only observing the relation between s
+and y or knowing the relationship between θ⋆ and β⋆. Therefore,
+naively collecting a balanced dataset is not enough, and we need to
+consider other features as well.
+3.2 Robust-Error analysis
+Proposition 1 compares the error of the full model and core model,
+and show that each model can outperform the other on some condi-
+tions. In this section, we show that Robust-Error of the full model is
+always larger than the Robust-Error of the core model (recall that
+for the core model Robust-Error(M-s) = Error(M-s)). Intuitively
+for any (z, s) data point, we can perturb s such that the full model
+makes the same prediction as to the core model; therefore, the full
+model’s Robust-Error is always lower than the core model error.
+Proposition 2. If ∥z∥ ≤ γ , then:
+Robust-Error(M-s) ≤ Robust-Error(M+s) (11)
+Note that without any bounds on the spurious feature, the Robust-
+Error can be infinity. By bounding the norm of z, we can bound the
+199
+Removing Spurious Features can Hurt Accuracy and Affect Groups Disproportionately FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+True parameters
+θ⋆ = [2, 2, 2]⊤
+β1
+⋆
+= [1, −3, 0]⊤
+β2
+⋆
+= [1, 0, −3]⊤
+Training example
+z s1 s2 y
+[1, 0, 0] 1 1 2
+Estimated parameters
+θ w1 w2
+with s1 and s2 [2/3, 0, 0]⊤ 2/3 2/3
+(equivalently) [2, −2, −2]⊤ 0 0
+with only s1 [1, 0, 0]⊤ 1 0
+(equivalently) [2, −3, 0]⊤ 0 0
+Table 4: An example with two spurious features (s1 and s2). There are two models: one model which only uses s1 and another
+model which uses s1 and s2. Removing s2 increases the weight for s1 (weight 1 in comparison to 2/3, blue filled cells). As a
+result the model that only uses s1 is more susceptible to change in s1 (i.e., increase the Robust-Error with respect to s1) and it
+performs worse on groups with high variance on z2 (weight of −3 instead of −2 while the true weight is 2, red filled cells).
+perturbation set of the spurious feature as S = [−γ ∥β⋆∥∗,γ ∥β
+⋆∥∗],
+where ∥.∥∗ indicates the dual norm, see Appendix A for the proof.
+3.3 Multiple spurious features
+We now extend our framework to k spurious features, s1, . . . , sk ,
+where si = βi
+⋆⊤
+z. We characterize the effect of removing one
+spurious feature on the model’s sensitivity to the other spurious
+features. In particular, we show that removing one spurious feature
+can make the model more susceptible to other spurious features.
+Extending the notation from Section 3, let Z ∈ Rn×d be the
+core features, Y ∈ Rn be the target, and S ∈ Rn×k denote the
+spurious features. Similar to the previous section, we obtain the
+minimum-norm estimate by solving the following optimization
+problem:
+θ̂+s, ŵ = argmin
+θ,w
+∥θ ∥22 + ∥w ∥22
+s .t . Zθ + Sw = Y , (12)
+where ŵ ∈ Rk denote the optimal weights for the spurious features.
+Proposition 3. The weight of the ith spurious feature of the mini-
+mum norm estimator is
+ŵi =
+θ⋆⊤Πβi
+⋆
+−
+∑
+j,i
+ŵ jβ
+i⋆⊤Πβ j
+⋆
+1 + βi
+⋆⊤
+Πβi
+⋆
+. (13)
+Consider the special case of k = 2 with s1 and s2 as spurious
+features, where β1
+⋆
+and β2
+⋆
+have positive dot product in the col-
+umn space of training data. Table 4 shows a simple example of this
+setup. As shown in (13), removing s2 increases the weight for s1,
+which makes the model more sensitive against changes in s1. For
+instance, in Table 4, after removing s2 the weight of s1 changed
+from 2/3 to 1 (green cells).
+In addition, recall that using s1 causes high error for groups with
+high variance on the unseen directions where β1
+⋆
+differs from θ⋆.
+Removing s2 leads to even higher error for these groups. In our
+example, using s1 and s2, the model’s estimate for θ⋆2 is −2 which
+is different from the true value of θ⋆2 = 2; therefore, groups with
+high variance on the second feature incur high error. Removing s2
+changes the estimate of θ⋆2 from −2 to −3, which exacerbates the
+error on the groups with high variance on z2. This is in line with
+the recent empirical results suggesting that making a model robust
+against one type of noise might make it more vulnerable against
+other types of noise [49].
+4 SELF-TRAINING
+Can we have a model that is robust against change in the spurious
+feature but have the same assumptions about the unseen directions
+as the full model? In the previous examples shown in Table 1 and
+Table 2, we showed that the full model (M
++s
+) has an equivalent form
+which has weight 0 on the spurious feature. In addition to being
+robust against change in s , this equivalent form is useful when s
+is not available. We now explain how to recover the equivalent s-
+oblivious formwith finite labeled data and access to many unlabeled
+data.
+In order to recover the s-oblivious equivalent form of the full
+model, we use Robust Self Training (RST) [6, 34, 39, 45]. Intuitively
+RST leverages unlabeled data to understand the assumptions for
+the unseen directions for a model that has low error but high
+Robust-Error. It then incorporates these assumptions for the un-
+seen directions to a robust model to achieves a robust model with
+low error.
+Assume in addition to n labeled examples (zi , si ,yi ), we have
+access to m unlabeled examples (zui , s
+u
+i ). We are interested in a
+model that 1) it is robust against s , and 2) it has the same prediction
+as the full model M
++s
+on unlabeled data. We obtain M
+-s
+RST
+which
+we call core+RST by solving the following optimization problem:
+M
+-s
+RST
+= argmin
+M
+(∑
+ℓ(M(zi , 0),yi )
++ η
+∑
+ℓ(M(zui , 0),M
++s(zui , s
+u
+i ))
++ λC(M)
+)
+, (14)
+where λ,η are parameters to tune the trade-off between the labeled
+data, unlabeled data, and complexity of the model.
+We now show that in the noiseless linear regression setup, M
+-s
+RST
+is a s-oblivious equivalent form of M
++s
+. Form ≥ d , let Zu ∈ Rm×d
+and Su ∈ Rm denote the unlabeled data. Let θ̂ -s
+RST
+denote the esti-
+mated parameters of RST model obtained by solving the following
+200
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Fereshte Khani and Percy Liang
+model weight for s weights for z Error
+M
+-s 0 Πθ⋆ E[(y − z⊤Πθ⋆)2]
+M
++s w Πθ⋆ −wΠβ⋆ E[(y − z⊤Πθ⋆)2] + E[w2(s − z⊤Πβ⋆)2] − E[2w(y − z⊤Πθ⋆)(s − z⊤Πβ⋆)]
+M
+-s
+RST
+0 Πθ⋆ +w(I − Π)β⋆ E[(y − z⊤Πθ⋆)2] + E[w2(z⊤β⋆ − z⊤Πβ⋆)2] − E[2w(y − z⊤Πθ⋆)(z⊤β⋆ − z⊤Πβ⋆)]
+Table 5: Estimated parameters and error for different models.w = β⋆⊤Πθ⋆
+1+β⋆⊤Πβ⋆
+optimization problem.
+θ̂ -s
+RST
+= argmin
+θ
+∥θ ∥22
+s.t Zθ = Y
+Zuθ = Zu θ̂+s + Suŵ, (15)
+where ŵ and θ̂+s are the estimated parameters for the full model (6).
+The following proposition states the optimal parameters for (15),
+and proves that for any data point M
+-s
+RST
+has the same prediction
+as M
++s
+.
+Proposition 4. The optimum parameters for (15) are:
+θ̂ -sRST = Πθ⋆ + ŵ(I − Π)β⋆ (16)
+and for any data point (z, s), we have:
+M-s
+RST(z, 0) = M+s(z, s) (17)
+See Appendix A for details. Intuitively M
+-s
+RST
+learns β⋆ from
+unlabeled data and replace ŵs with ŵβ⋆⊤z. See Table 5 for the
+estimated parameters of the three introduced models. For real data
+in Section 5, we pseudo-label all the unlabeled data with the full
+model and then train the core+RST model on labeled data and
+pseudo-labeled data.
+5 EXPERIMENTS
+We now investigate the effects of removing spurious features in
+non-linear models trained on real-world datasets. Although our
+theory assumptions do not hold anymore, we find similar results as
+Section 3. In particular, we show that removal of a spurious feature
+lowers the average accuracy, has disproportionate effects on dif-
+ferent groups, and makes the model less robust to other spurious
+features. We then show core+RST model can achieve higher accu-
+racy than the core model while being robust against the spurious
+feature.
+5.1 Datasets and Setup
+Double-MNIST. The MNIST dataset [26] consists of 60K images
+of handwritten digits between 0 to 9. We synthetically construct a
+new dataset from the MNIST dataset, which we call Double-MNIST.
+We concatenate each image in MNIST with another random image
+from the same class with probability of 0.9 and a random image
+from other classes with probability 0.1. The original image’s label
+is the target (y) and the concatenated image’s label is the spurious
+feature (s). Note that the features that determine the target (the first
+image) are completely disjoint from the feature that determine the
+spurious feature (the second image). We train a two-layer neural
+network with 128 hidden units on this dataset. Using 50K for the
+training data, the model achieves 98.3% accuracy. However, for our
+experiments (where we need unlabeled data), we used 1K labeled
+examples, 50K unlabeled examples, and 10K for test data.
+CelebA. The CelebA dataset [27] contains photos of celebrities
+alongwith 40 different attributes.We choosewearing lipstickwhich
+indicates if a celebrity is wearing lipstick as the target and wear-
+ing earrings as the spurious feature. We train a two-layer neural
+network with 128 hidden units on this dataset. For our purposes in
+this work, we use 1K labeled examples, 50K unlabeled examples,
+and 10K for test data..
+Toxic-Comment-Detection. The Toxic comment dataset is a public
+Kaggle dataset containing 160K Wikipedia comments.
+1
+Each com-
+ment is labeled by human raters as toxic or non-toxic, where toxicity
+is defined by Dixon et al. [9] as “rude, disrespectful, or unreasonable
+comment that is likely to make you leave a discussion.”. We cleaned
+the data by replacing abbreviations (e.g., changing “we’ve” to “we
+have”). We used term frequency-inverse document frequency (tf-
+idf) to extract features and used a logistic regression model to train
+on the extracted features. Splitting data to the 80-20 train-test, we
+achieve a similar AUC (95.8) as reported in Garg et al. [15]. Dixon
+et al. [9] provide 50 identity terms
+2
+that a model should be robust
+against them. We choose 17 of these identity terms that exist in
+positive and negative class at least 30 times (see Figure 2 for the list).
+We use these terms as the spurious feature and replace them with
+a special token for the core model. For the full model we did not
+remove these identity terms. We choose the subset of the dataset
+that contains these 17 adjectives, consisting of 11K examples. We
+did 20 − 80 train-test split, use 500 examples as labeled data, and
+the rest of examples as unlabeled data.
+See Table 6 for a summary of datasets. We run each experiment
+50 times and report the average accuracy and the standard devia-
+tion.
+5.2 Results
+Core model vs. Full model. Removing the spurious feature de-
+creases the overall accuracy in all three datasets, see the first two
+rows of Table 7. Note that the change in accuracy varies widely
+among different groups (in the CelebA dataset removing the spuri-
+ous wearing-earrings feature increases the accuracy for celebrities
+who only wear either lipstick or earrings, and in the Double-MNIST
+dataset removing the second image label increases the accuracy
+for data points where the concatenated images have the different
+labels).
+1
+https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge
+2
+https://github.com/conversationai/unintended-ml-bias-analysis/blob/master/
+unintended_ml_bias/bias_madlibs_data/adjectives_people.txt
+201
+Removing Spurious Features can Hurt Accuracy and Affect Groups Disproportionately FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+name core features (z) target (y) spurious feature (s) Example: z y s
+Double-MNIST two MNIST images label of the left im-
+age
+label of the right im-
+age
+5 7
+CelebA celebrities photo wearing lipstick wearing earrings True True
+Toxic-Comment-
+Detection
+comment (w/o iden-
+tity terms)
+toxic or not identity terms cuz i shouldn’t be blocked
+just for being ___
+non-toxic black
+Table 6: A summary of the three datasets that we used in this work. Double-MNIST is a synthetically generated dataset where
+each data point is a concatenation of two images from the MNIST dataset.
+Double-MNIST CelebA Toxic-Comments
+all
+same
+labels
+different
+labels
+all
+no lipstick
+or earrings
+only
+earrings
+only
+lipstick
+both lipstick
+and earrings
+all
+group size (in percentage) 100 90 10 100 52.0 3.4 28.8 15.8 100
+full model accuracy 92.7±0.06 96.6±0.05 53.4±0.4 83.5±0.1 85.4±0.4 33.3±0.9 79.6±0.6 95.0±0.3 90.1 ± 0.1
+core model accuracy 92.1±0.06 94.8±0.06 64.1±0.3 82.5±0.1 82.0±0.5 59.1±1.0 85.2±0.6 84.1±0.7 89.0 ± 0.1
+full model robust accuracy 47.3±0.92 49.6±0.96 24.4±0.7 66.7±0.4 58.7±0.9 33.3±0.9 79.6±0.6 76.4±0.8 74.9 ± 0.5
+core+RST accuracy 92.7±0.06 96.2±0.05 56.7±0.5 83.2±0.1 83.4±0.5 58.7±1.1 84.8±0.7 85.2±0.7 89.6 ± 0.1
+Table 7: Accuracy declines as we remove spurious feature (the core model vs. the full model), however, note that this drop
+varies widely among different group. The core+RST achieves similar average accuracy as the full model while having high
+robust accuracy and lower gap among different groups accuracy.
+For the Toxic-Comment-Detection dataset, for each identity term
+u, we construct two groups: one group consist of toxic comments
+that have u in the comment text, and another group consists of
+non-toxic comments that have u in the comment text, resulting
+in total of 34 groups. The maximum gap among accuracy of the
+17 groups containing toxic comments (max-TPR-gap) drop from
+70.1 to 28.4, and the maximum gap among accuracy of groups
+that are non-toxic (max-TNR-gap) drops from 20.5 to 1.8. Toxic-
+gay and non-toxic-gay groups incurred the maximum change in
+accuracy (−40 and +19 respectively) due to removal of identity
+terms. Figure 2 shows the change in true positive rate, true negative
+rate ratio for different identity terms.
+Robust accuracy. Recall that robust accuracy is the worst-case
+accuracy for each data point with respect to change in the spurious
+feature. First, note that the robust accuracy of the full model (third
+row) is much lower than its accuracy (first row), which indicates
+the full model’s reliance on the spurious feature. Furthermore, this
+reliance helps some groups (e.g., celebrities who wear earrings
+and lipstick) while it does not have any effect on other groups
+(e.g., celebrities who wear earrings but not lipstick). Recall that the
+robust accuracy of the core model is exactly equal to its accuracy
+since it does not use the spurious feature. Finally, in line with our
+theory in Proposition 4, the robust accuracy of the full model is
+always lower than the robust accuracy of the core model.
+Robust Self-Training. The forth row of the Table 7 shows the
+accuracy core+RST model as explained in Section 4. The core+RST
+ga
+y
+h
+om
+os
+ex
+u
+al
+b
+lin
+d
+b
+la
+ck
+w
+h
+it
+e
+m
+u
+sl
+im
+m
+al
+e
+st
+ra
+ig
+h
+t
+ol
+d
+je
+w
+is
+h
+fe
+m
+al
+e
+ch
+in
+es
+e
+yo
+u
+n
+g
+am
+er
+ic
+an
+in
+d
+ia
+n
+ch
+ri
+st
+ia
+n
+eu
+ro
+p
+ea
+n
+0.0
+0.5
+1.0
+1.5
+#positive
+#negative
+TPR
+TNR (full model)
+TPR
+TNR (core model)
+Figure 2: The identity terms used as spurious features. The
+Red line indicates the ratio of positive comments contain-
+ing the identity terms over the negative comments con-
+taining the identity term. The difference between the ra-
+tio of TPR/TNR of the core and full model can be small
+(straight, young) or large (male, Chinese) independent of
+#positive/#negative ratio for the identity term.
+has a better average accuracy than the core model. The Core+RST
+does not use the spurious feature; therefore, its robust accuracy
+(unlike the full model) is exactly equal to its accuracy. In Section 4,
+we prove that the full model and the core+RST should have the
+same predictions; however, unlike our theory, we observe that the
+large gap among the accuracy of different groups in the full model is
+202
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Fereshte Khani and Percy Liang
+all no lipstick or earrings only earrings only lipstick both lipstick and earrings
+With hair color and necklace
+accuracy 83.9 ± 0.1 85.0 ± 0.5 37.0 ± 1.1 81.8 ± 0.7 94.2 ± 0.3
+robust accuracy 68.5 ± 0.4 60.9 ± 1.0 37.0 ± 1.1 81.8 ± 0.7 76.8 ± 0.8
+With only necklace
+accuracy 83.5±0.1 85.4±0.4 33.3±0.9 79.6±0.6 95.0±0.3
+robust accuracy 66.7±0.4 58.7±0.9 33.3±0.9 79.6±0.6 76.4±0.8
+Table 8: Two models trained on the CelebA dataset. Top model uses hair color and lipstick (a binary feature indicating if
+a person is wearing lipstick or not), bottom model only uses hair color. 1) the robust accuracy against hair color drop more
+rapidly for the bottommodel. 2) The group that has lowest accuracy for the bottommodel (only earrings) have a better accuracy
+when hair color is also used as an extra spurious feature.
+500 5K 50K
+number of training examples
+40
+50
+60
+70
+80
+90
+100
+ac
+cu
+ra
+cy
+full model (minority)
+full model (majority)
+core model (minority)
+core model (majority)
+Figure 3: In Double-MNIST dataset, as we increase the num-
+ber of training data the gap between the performance of core
+model and fullmodel shrinks. Themajority groups contains
+data poitns where the labels of two concatenated images are
+the same (90% of data), and minority group contains data
+points where the labels of the concatenated images are dif-
+ferent (10% of data).
+mitigated by the core+RST. We have not observed a large accuracy
+boost using unlabeled data in the Toxic-Comment-Detection dataset.
+After some error analysis we observed that as mentioned in Garg
+et al. [15], there are some examples that can be toxic with respect to
+some identity terms but not the others. Furthermore, we observed
+some biases in annotations in this dataset (e.g., ’username is gay’
+has labeled as toxic). As a result some accuracy drop of the core
+model is inherent and cannot be mitigated by unlabeled data.
+Effect of training data size. Figure 3 shows that the gap be-
+tween the accuracy of the core model and the full model decreases
+as the training data size increases. In particular, it shows the ac-
+curacy on two different groups in the Double-MNIST dataset: the
+majority (different labels) and minority (same labels). When we
+train a model on more training examples, we observe more data
+variation directions; therefore, the gap between the full and the
+core models decreases.
+Multiple spurious features. Finally, we study multiple spu-
+rious features. In the celebA dataset, we first use hair color and
+wearing earrings as a spurious feature. We then remove the hair
+color and only use wearing earrings as the spurious feature. In
+line with our theory in Section 3.3, Table 4 shows that: 1) The gap
+between robust accuracy against wearing earrings and standard
+accuracy increases when we remove hair color. 4) Celebrities who
+wear lipstick but not earrings have the lowest accuracy due to the
+use of earrings as a spurious feature. This group accuracy drops
+even lower after removing the hair color attribute.
+6 RELATEDWORK AND DISCUSSION
+This work is motivated by work in fairness in machine learning
+that aims to construct a model that is robust against changes in
+sensitive features. The techniques used in this work is similar to
+work in robust machine learning that tries to understand the trade-
+off between the robust accuracy against perturbed inputs and the
+standard accuracy. In the following, we discuss related work in
+these two fields.
+Fairness in Machine Learning. There are mainly two com-
+mon flavors of fairness notions in machine learning concerning a
+sensitive feature (e.g., nationality): (i) The statistical notions which
+measure how much a model loss is different among groups accord-
+ing to the sensitive features [1, 18, 22, 47]. These notions operate
+at the group level, and it does not provide any guarantees at the in-
+dividual level; (ii) Counterfactual notion of fairness which measure
+how much two “similar” individuals are incurred different losses
+because of their sensitive feature [7, 15, 21, 23, 25, 28].
+This work is related to the counterfactual notion of fairness since
+we study the models that are robust against sensitive (spurious)
+features. Note that there are many concerns and critics regarding
+counterfactual reasoningwhen sensitive features are immutable [13,
+19]. However, there are works that try to learn a new representation
+entirely uncorrelated to the sensitive feature in categorical data [29,
+30, 32, 51], in vision [8, 38, 46] and in natural language processing [5,
+41, 54, 55]. There is a common trend in all of these works: accuracy
+drops when we train the same model using the new representation.
+Khani and Liang [21] show that when the core features are
+noisy or incomplete, the model can obtain better accuracy by using
+sensitive features. As a result, removing sensitive features in these
+cases will lead to a drop in accuracy. Zhao and Gordon [53] show
+that if groups according to the sensitive attribute have different base
+rates (probability of y = 1 is different among different groups), it is
+impossible to learn the optimum classifier from a representation
+uncorrelated with the sensitive features. Dutta et al. [10] show how
+biased dataset lead to trade-off in representation learning. This work
+shows that under a very favorable condition, still removing spurious
+203
+Removing Spurious Features can Hurt Accuracy and Affect Groups Disproportionately FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+features changes the inductive bias of the model, which results in
+different performance on average and over different groups. We
+believe that as overparametrized models such as deep learning
+models becomes more prevalent, studying inductive biases and
+their effect on groups gain more importance.
+Robustness in Machine Learning. Since the initial demon-
+stration of adversarial examples (examples generated by changes
+in images that are not perceptible by humans but change the pre-
+diction of models) [16, 42], there have been many attempts on
+achieving a robust model against these perturbations [16, 31]. How-
+ever, making models robust to adversarially input perturbation
+comes with the cost of a drop in accuracy. There have been many
+explanations regarding this drop in accuracy [12, 35, 43, 44, 52]. The
+recent line of work on “double descent” [2, 3, 14, 33, 36] has shed
+some lights on this trade-off and show that unlike conventional
+under-parameterized regime in the new over-parameterized regime,
+more data and fewer parameters might result in a worse error.
+The closest work to us is Raghunathan et al. [39], where they
+show augmenting the training data with adversarially perturbed
+inputs can hurt the accuracy. In contrast to their work, we focused
+on removing a spurious feature with a known correlation with
+other features, instead of an arbitrary data perturbation set for data
+augmentation. As a result, we were enabled to analyze the drop
+in accuracy in a more interpretable way and show how removing
+the spurious feature affects different groups. There is also another
+difference between our work and work on robustness to input
+perturbation. In our work, by removing s , we have a robust model
+independent of the data distribution. However, robustness to input
+perturbation always depends on the distribution.
+7 CONCLUSION
+In this work, we first showed that overparameterized models are
+incentivized to use spurious features in order to fit the training data
+with a smaller norm. Then we demonstrated how removing these
+spurious features altered the model’s assumptions on unseen data
+variations direction. Theoretically and empirically, we showed that
+this change in inductive bias could hurt the overall accuracy and
+affect groups disproportionately. We then proved that robustness
+against spurious features (or error reduction by removing the spu-
+rious features) cannot be guaranteed under any condition of the
+target and spurious feature. Consequently, balanced datasets do not
+guarantee a robust model and practitioners should consider other
+features as well. Studying the effect of removing noisy spurious
+features is an interesting future direction.
+Reproducibility. All code, data and experiments for this paper
+are available on the CodaLab platform at https://worksheets.codalab.
+org/worksheets/0x6d343ebeabd14571a9549fbf68fd28a4.
+Acknowledgments. This work was supported by Open Philan-
+thropy Project Award. We would like to thank Michael Xie, Ananya
+Kumar, Rishi Bommasani, and the anonymous reviewers for useful
+feedback.
+REFERENCES
+[1] Alekh Agarwal, Alina Beygelzimer, Miroslav Dudik, John Langford, and Hanna
+Wallach. A reductions approach to fair classification. In International Conference
+on Machine Learning (ICML), pages 60–69, 2018.
+[2] Peter L. Bartlett, Philip M. Long, Gabor Lugosi, and Alexander Tsigler. Benign
+overfitting in linear regression. arXiv, 2019.
+[3] Mikhail Belkin, Daniel Hsu, and Ji Xu. Two models of double descent for weak
+features. arXiv, 2019.
+[4] Alex Beutel, Jilin Chen, Zhe Zhao, and Ed H Chi. Data decisions and theoretical
+implications when adversarially learning fair representations. arXiv preprint
+arXiv:1707.00075, 2017.
+[5] Tolga Bolukbasi, Kai-Wei Chang, James Y Zou, Venkatesh Saligrama, and Adam T
+Kalai. Man is to computer programmer as woman is to homemaker? debiasing
+word embeddings. InAdvances in Neural Information Processing Systems (NeurIPS),
+pages 4349–4357, 2016.
+[6] Yair Carmon, Aditi Raghunathan, Ludwig Schmidt, Percy Liang, and John C.
+Duchi. Unlabeled data improves adversarial robustness. In Advances in Neural
+Information Processing Systems (NeurIPS), 2019.
+[7] Silvia Chiappa. Path-specific counterfactual fairness. In Association for the
+Advancement of Artificial Intelligence (AAAI), volume 33, pages 7801–7808, 2019.
+[8] Elliot Creager, David Madras, Jörn-Henrik Jacobsen, Marissa A Weis, Kevin
+Swersky, Toniann Pitassi, and Richard Zemel. Flexibly fair representation learning
+by disentanglement. arXiv preprint arXiv:1906.02589, 2019.
+[9] Lucas Dixon, John Li, Jeffrey Sorensen, Nithum Thain, and Lucy Vasserman.
+Measuring and mitigating unintended bias in text classification. In Association
+for the Advancement of Artificial Intelligence (AAAI), pages 67–73, 2018.
+[10] Sanghamitra Dutta, Dennis Wei, Hazar Yueksel, Pin-Yu Chen, Sijia Liu, and
+Kush R. Varshney. Is there a trade-off between fairness and accuracy? a per-
+spective using mismatched hypothesis testing. In International Conference on
+Machine Learning (ICML), 2020.
+[11] Shireen Y Elhabian, Khaled M El-Sayed, and Sumaya H Ahmed. Moving object
+detection in spatial domain using background removal techniques-state-of-art.
+Recent patents on computer science, 1(1):32–54, 2008.
+[12] Alhussein Fawzi, Omar Fawzi, and Pascal Frossard. Analysis of classifiers’ ro-
+bustness to adversarial perturbations. Machine Learning, 107(3):481–508, 2018.
+[13] David A Freedman. Graphical models for causation, and the identification prob-
+lem. Evaluation Review, 28(4):267–293, 2004.
+[14] Shengjun Gan, Yuqin Sun, and Yongge Tian. Equivalence of predictors under
+real and over-parameterized linear models. Communications in Statistics-Theory
+and Methods, 46(11):5368–5383, 2017.
+[15] Sahaj Garg, Vincent Perot, Nicole Limtiaco, Ankur Taly, Ed H Chi, and Alex
+Beutel. Counterfactual fairness in text classification through robustness. In
+Association for the Advancement of Artificial Intelligence (AAAI), pages 219–226,
+2019.
+[16] Ian J Goodfellow, Jonathon Shlens, and Christian Szegedy. Explaining and harness-
+ing adversarial examples. In International Conference on Learning Representations
+(ICLR), 2015.
+[17] Suriya Gunasekar, Blake EWoodworth, Srinadh Bhojanapalli, BehnamNeyshabur,
+and Nati Srebro. Implicit regularization in matrix factorization. In Advances in
+Neural Information Processing Systems (NeurIPS), pages 6151–6159, 2017.
+[18] Moritz Hardt, Eric Price, and Nathan Srebo. Equality of opportunity in supervised
+learning. In Advances in Neural Information Processing Systems (NeurIPS), pages
+3315–3323, 2016.
+[19] Paul W Holland. Causation and race. ETS Research Report Series, 2003(1), 2003.
+[20] Andrew Ilyas, Shibani Santurkar, Dimitris Tsipras, Logan Engstrom, Brandon
+Tran, and AleksanderMadry. Adversarial examples are not bugs, they are features.
+arXiv preprint arXiv:1905.02175, 2019.
+[21] Fereshte Khani and Percy Liang. Feature noise induces loss discrepancy across
+groups. In International Conference on Machine Learning (ICML), 2020.
+[22] Fereshte Khani, Aditi Raghunathan, and Percy Liang. Maximum weighted loss
+discrepancy. arXiv preprint arXiv:1906.03518, 2019.
+[23] Niki Kilbertus, Mateo Rojas Carulla, Giambattista Parascandolo, Moritz Hardt,
+Dominik Janzing, and Bernhard Schölkopf. Avoiding discrimination through
+causal reasoning. In Advances in Neural Information Processing Systems (NeurIPS),
+pages 656–666, 2017.
+[24] Jon Kleinberg and Sendhil Mullainathan. Simplicity creates inequity: implications
+for fairness, stereotypes, and interpretability. In Proceedings of the 2019 ACM
+Conference on Economics and Computation, pages 807–808, 2019.
+[25] Matt J Kusner, Joshua R Loftus, Chris Russell, and Ricardo Silva. Counterfactual
+fairness. In Advances in Neural Information Processing Systems (NeurIPS), pages
+4069–4079, 2017.
+[26] Yann LeCun, Léon Bottou, Yoshua Bengio, and Patrick Haffner. Gradient-based
+learning applied to document recognition. Proceedings of the IEEE, 86(11):2278–
+2324, 1998.
+[27] Ziwei Liu, Ping Luo, Xiaogang Wang, and Xiaoou Tang. Deep learning face
+attributes in the wild. In Proceedings of the IEEE International Conference on
+Computer Vision, pages 3730–3738, 2015.
+[28] Joshua R Loftus, Chris Russell, Matt J Kusner, and Ricardo Silva. Causal reasoning
+for algorithmic fairness. arXiv preprint arXiv:1805.05859, 2018.
+[29] Christos Louizos, Kevin Swersky, Yujia Li, Max Welling, and Richard Zemel. The
+variational fair autoencoder. arXiv preprint arXiv:1511.00830, 2015.
+204
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Fereshte Khani and Percy Liang
+[30] David Madras, Elliot Creager, Toniann Pitassi, and Richard Zemel. Learning ad-
+versarially fair and transferable representations. arXiv preprint arXiv:1802.06309,
+2018.
+[31] Aleksander Madry, Aleksandar Makelov, Ludwig Schmidt, Dimitris Tsipras, and
+Adrian Vladu. Towards deep learning models resistant to adversarial attacks
+(published at ICLR 2018). arXiv, 2017.
+[32] Daniel McNamara, Cheng Soon Ong, and Robert C Williamson. Provably fair
+representations. arXiv preprint arXiv:1710.04394, 2017.
+[33] Song Mei and Andrea Montanari. The generalization error of random fea-
+tures regression: Precise asymptotics and double descent curve. arXiv preprint
+arXiv:1908.05355, 2019.
+[34] Amir Najafi, Shin ichi Maeda, Masanori Koyama, and Takeru Miyato. Robustness
+to adversarial perturbations in learning from incomplete data. In Advances in
+Neural Information Processing Systems (NeurIPS), 2019.
+[35] Preetum Nakkiran. Adversarial robustness may be at odds with simplicity. arXiv
+preprint arXiv:1901.00532, 2019.
+[36] Preetum Nakkiran, Gal Kaplun, Yamini Bansal, Tristan Yang, Boaz Barak, and
+Ilya Sutskever. Deep double descent: Where bigger models and more data hurt.
+arXiv preprint arXiv:1912.02292, 2019.
+[37] Samet Oymak and Mahdi Soltanolkotabi. Overparameterized nonlinear learning:
+Gradient descent takes the shortest path? In International Conference on Machine
+Learning (ICML), pages 4951–4960, 2019.
+[38] Novi Quadrianto, Viktoriia Sharmanska, and Oliver Thomas. Discovering fair
+representations in the data domain. In Computer Vision and Pattern Recognition
+(CVPR), pages 8227–8236, 2019.
+[39] Aditi Raghunathan, Sang Michael Xie, Fanny Yang, John C. Duchi, and Percy
+Liang. Understanding and mitigating the tradeoff between robustness and accu-
+racy. In International Conference on Machine Learning (ICML), 2020.
+[40] Marco Tulio Ribeiro, Sameer Singh, and Carlos Guestrin. "Why Should I Trust
+You?": Explaining the predictions of any classifier. In International Conference on
+Knowledge Discovery and Data Mining (KDD), 2016.
+[41] Tony Sun, Andrew Gaut, Shirlyn Tang, Yuxin Huang, Mai ElSherief, Jieyu Zhao,
+Diba Mirza, Elizabeth Belding, Kai-Wei Chang, and William Yang Wang. Mitigat-
+ing gender bias in natural language processing: Literature review. arXiv preprint
+arXiv:1906.08976, 2019.
+[42] Christian Szegedy,Wojciech Zaremba, Ilya Sutskever, Joan Bruna, Dumitru Erhan,
+Ian Goodfellow, and Rob Fergus. Intriguing properties of neural networks. In
+International Conference on Learning Representations (ICLR), 2014.
+[43] Dimitris Tsipras, Shibani Santurkar, Logan Engstrom, Alexander Turner, and
+Aleksander Madry. There is no free lunch in adversarial robustness (but there
+are unexpected benefits). arXiv preprint arXiv:1805.12152, 2018.
+[44] Dimitris Tsipras, Shibani Santurkar, Logan Engstrom, Alexander Turner, and
+Aleksander Madry. Robustness may be at odds with accuracy. In International
+Conference on Learning Representations (ICLR), 2019.
+[45] Jonathan Uesato, Jean-Baptiste Alayrac, Po-Sen Huang, Robert Stanforth, Alhus-
+sein Fawzi, and Pushmeet Kohli. Are labels required for improving adversarial
+robustness? In Advances in Neural Information Processing Systems (NeurIPS), 2019.
+[46] Tianlu Wang, Jieyu Zhao, Mark Yatskar, Kai-Wei Chang, and Vicente Ordonez.
+Balanced datasets are not enough: Estimating and mitigating gender bias in deep
+image representations. In International Conference on Computer Vision (ICCV),
+pages 5310–5319, 2019.
+[47] Blake Woodworth, Suriya Gunasekar, Mesrob I. Ohannessian, and Nathan Sre-
+bro. Learning non-discriminatory predictors. In Conference on Learning Theory
+(COLT), pages 1920–1953, 2017.
+[48] Kai Xiao, Logan Engstrom, Andrew Ilyas, and Aleksander Madry. Noise or
+signal: The role of image backgrounds in object recognition. arXiv preprint
+arXiv:2006.09994, 2020.
+[49] Dong Yin, Raphael Gontijo Lopes, Jonathon Shlens, Ekin D Cubuk, and Justin
+Gilmer. A fourier perspective on model robustness in computer vision. In
+Advances in Neural Information Processing Systems (NeurIPS), 2019.
+[50] Mikhail Yurochkin and Yuekai Sun. Sensei: Sensitive set invariance for enforcing
+individual fairness. arXiv preprint arXiv:2006.14168, 2020.
+[51] Richard Zemel, Yu Wu, Kevin Swersky, Toniann Pitassi, and Cynthia Dwork.
+Learning fair representations. In International Conference on Machine Learning
+(ICML), pages 325–333, 2013.
+[52] Hongyang Zhang, Yaodong Yu, Jiantao Jiao, Eric P Xing, Laurent El Ghaoui, and
+Michael I Jordan. Theoretically principled trade-off between robustness and
+accuracy. In International Conference on Machine Learning (ICML), 2019.
+[53] H. Zhao and Geoff Gordon. Inherent tradeoffs in learning fair representations.
+In Advances in Neural Information Processing Systems (NeurIPS), 2019.
+[54] Jieyu Zhao, Tianlu Wang, Mark Yatskar, Vicente Ordoñez, and Kai-Wei Chang.
+Gender bias in coreference resolution: Evaluation and debiasing methods. In
+North American Association for Computational Linguistics (NAACL), 2018.
+[55] Jieyu Zhao, Yichao Zhou, Zeyu Li, Wei Wang, and Kai-Wei Chang. Learning
+gender-neutral word embeddings. arXiv preprint arXiv:1809.01496, 2018.
+205

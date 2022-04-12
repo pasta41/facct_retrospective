@@ -1,0 +1,1325 @@
+Allocating Opportunities in a Dynamic Model of
+Intergenerational Mobility
+Hoda Heidari
+Carnegie Mellon University
+hheidari@cs.cmu.edu
+Jon Kleinberg
+Cornell University
+kleinberg@cs.cornell.edu
+ABSTRACT
+Opportunities such as higher education can promote intergenera-
+tional mobility, leading individuals to achieve levels of socioeco-
+nomic status above that of their parents. We develop a dynamic
+model for allocating such opportunities in a society that exhibits
+bottlenecks in mobility; the problem of optimal allocation re￿ects a
+trade-o￿ between the bene￿ts conferred by the opportunities in the
+current generation and the potential to elevate the socioeconomic
+status of recipients, shaping the composition of future generations
+in ways that can bene￿t further from the opportunities. We show
+how optimal allocations in our model arise as solutions to continu-
+ous optimization problems over multiple generations, and we ￿nd
+in general that these optimal solutions can favor recipients of low
+socioeconomic status over slightly higher-performing individuals
+of high socioeconomic status — a form of socioeconomic a￿rma-
+tive action that the society in our model discovers in the pursuit of
+purely payo￿-maximizing goals. We characterize how the structure
+of the model can lead to either temporary or persistent a￿rmative
+action, and we consider extensions of the model with more complex
+processes modulating the movement between di￿erent levels of
+socioeconomic status.
+CCS CONCEPTS
+• Applied computing→ Economics; • Computing methodolo-
+gies→ Planning and scheduling.
+KEYWORDS
+Intergenerational mobility, socioeconomic a￿rmative action, opti-
+mal allocation policy, continuous Markov Decision Processes (MDP)
+ACM Reference Format:
+Hoda Heidari and Jon Kleinberg. 2021. Allocating Opportunities in a Dy-
+namic Model of Intergenerational Mobility. In Conference on Fairness, Ac-
+countability, and Transparency (FAccT ’21), March 3–10, 2021, Virtual Event,
+Canada. ACM, New York, NY, USA, 19 pages. https://doi.org/10.1145/3442188. 
+3445867
+1 INTRODUCTION
+Intergenerational mobility — the extent to which an individual’s
+socioeconomic status di￿ers from the status of their prior genera-
+tions of family members — has emerged as a central notion in our
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+ACM ISBN 978-1-4503-8309-7/21/03.
+https://doi.org/10.1145/3442188.3445867
+understanding of inequality. A large amount of empirical work has
+gone into estimating the extent of mobility for di￿erent subsets
+of society; while many of the e￿ects are complex and challenging
+to measure, two broad and fairly robust principles emerge from
+this work. First, socioeconomic status is persistent across genera-
+tions: an individual’s socioeconomic status is strongly dependent
+on parental status. As Lee and Solon [2009] write in the opening to
+their survey of this topic, “Over the past two decades, a large body
+of research has documented that the intergenerational transmission
+of economic status in the United States is much stronger than earlier
+sociological and economic analyses had suggested”. Second, certain
+types of opportunities can serve as strong catalysts for socioeco-
+nomic mobility; a canonical example is higher education, which
+has the potential to raise an individual’s socioeconomic status (and,
+by the previous principle, that of their current or future children as
+well). As Chetty et al. [2014] write, “The fact that the college atten-
+dance is a good proxy for income mobility is intuitive given the strong
+association between higher education and subsequent earnings”.
+An important question from a social planning perspective is thus
+the choice of policy for allocating opportunities to people of di￿er-
+ent levels of socioeconomic status. (Again, we can think of access
+to higher education as a running example in this discussion.) Many
+goals can motivate the choice of policy, including the reduction of
+socioeconomic inequality and the prioritization of opportunities
+to those most in need. Such goals are often viewed as operating
+in tension with the aim of maximizing the achievable payo￿ from
+the available opportunities, which would seem to suggest targeting
+the opportunities based only on the anticipated performance of the
+recipient, not their socioeconomic status. In this view, society is
+implicitly being asked to choose between these goals; this consid-
+eration forms a central ingredient in the informal discourse and
+debate around the allocation of opportunity. But through all of this,
+a challenging question remains: to what extent is the tension be-
+tween these goals genuine, and to what extent can they be viewed
+as at least partially in alignment?
+A large body of work in economics compares various alloca-
+tion policies in terms of the above seemingly-competing criteria —
+typically in simpli￿ed settings in which only two generations are
+considered. The literature includes seminal work by Nobel Laureate
+Garry Becker with Nigel Tomes [Becker and Tomes 1986] and by
+Glenn Loury [Loury 1981]. In multigenerational settings, however,
+deriving the optimal policy becomes exceedingly challenging, and
+it has been highlighted as a class of open questions in this literature.
+For example, in his work on models of college admissions and inter-
+generational mobility, Durlauf [2008] notes: “ A college admissions
+rule has intergenerational e￿ects because it not only in￿uences the
+human capital of the next generation of adults, but also a￿ects the
+initial human capital of the generation after next. [...] E￿ciency in
+15
+This work is licensed under a Creative Commons Attribution International 4.0 License.
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Hoda Heidari and Jon Kleinberg
+student allocation [in this case] is far more complicated than before.
+I am unaware of any simple way of describing e￿ciency conditions
+for college assignment rules analogous to [the above setting].” In this
+work, we address this challenge and the associated open questions
+concerning the behavior of multigenerational models. A key in-
+gredient in our progress on these questions is the development of
+methods for working with a class of Markov Decision Processes
+that operate over continuous states and continuous actions. Our
+analysis of multigenerational models enables us to investigate the
+apparent tension between e￿ciency and fairness considerations in
+allocating opportunities.
+Allocating Opportunities in a Payo￿-Maximizing Society.
+We work with a simple mathematical model representing a purely
+payo￿-maximizing society, operating over multiple generations. As
+we discuss brie￿y in Section 1 and at more length in Appendix A,
+our model is grounded in the types of models proposed in economic
+theory work on these problems. The society must decide how to
+allocate opportunities in each generation across a population het-
+erogeneous in its socioeconomic status. The payo￿ to the society
+is the total performance of everyone who receives the opportuni-
+ties, summed (with discounting) over all generations. Although the
+set-up of the model is highly streamlined, the analysis of the model
+becomes quite subtle since society must solve a continuous-valued
+dynamic programming problem over multiple generations.
+What we ￿nd from the model is that the optimal solution will in
+general tend to o￿er opportunities to individuals of lower socioeco-
+nomic status over comparable individuals of higher socioeconomic
+status, even when these competing individuals are predicted to
+have a slightly better performance from receiving the opportunity.
+This is not arising because the optimal solution has any a priori
+interest in reducing socioeconomic inequality (although such goals
+are important in their own right [Forde-Mazrui 2004]); rather it is
+strictly trying to maximize payo￿ over multiple generations. But
+given two individuals of equal predicted performance, the one with
+lower socioeconomic status confers an added bene￿t to the payo￿
+function: their success would grow the size of the socioeconomically
+advantaged class, resulting in higher payo￿s in future generations.
+Because the di￿erence in payo￿ contributions between these two
+individuals is strictly positive, the same decision would be optimal
+even if the individual of lower socioeconomic status had a slightly
+lower predicted performance from receiving the opportunity. The
+optimal solution should still favor the candidate with lower status
+in this case.
+In other words, the society in this model discovers a form of
+socioeconomic a￿rmative action in allocating opportunities, based
+purely on payo￿-maximizing motives. The model thus o￿ers a view
+of a system in which reducing inequality is compatible with direct
+payo￿ maximization. In this sense, our results belong to a genre of
+analyses (popularized by Page [Page 2008] and others) asserting that
+policies and interventions that we think of as motivated by equity
+concerns, can also be motivated by purely performance-maximizing
+considerations: even if society only cares about performance, not
+equity, it should still (at least in the underlying models) undertake
+these policies. In addition to providing a purely utilitarian motiva-
+tion for socioeconomic a￿rmative action, our model provides novel
+insights regarding the shape and extent of e￿ective a￿rmative ac-
+tion policies by specifying the way in which criteria for receiving
+the opportunity should be adjusted based on socioeconomic status
+to maximize society’s performance across multiple generations.
+We now give a rough overview of the model and results; a com-
+plete description of the model is provided in the following section.
+A Model for Allocating Opportunities. We consider a popu-
+lation that is partitioned into two groups of di￿erent socioeconomic
+status: D (disadvantaged), consisting of a  0 fraction of the popu-
+lation, and A (advantaged), consisting of a  1 = 1    0 fraction of
+the population. Each agent i (from either group) has an ability ai
+drawn uniformly at random from the interval [0, 1],
+Society has the ability to o￿er an opportunity to an   fraction
+of the population. Note that the parameter   speci￿es the inherent
+limitation on the amount of opportunities available. Since opportu-
+nities are limited, the society has to wrestle with the question of
+how to allocate them. An individual i in group D who is o￿ered
+the opportunity has a probability  ai of succeeding at it, for a pa-
+rameter 0 <   < 1. An individual i in group A who is o￿ered the
+opportunity has a probability  ai +   of succeeding at it, for the
+same   and an additional parameter 0 <    1     re￿ecting the
+advantage. We will refer to the above quantities as the success prob-
+abilities of the agents. Success probabilities re￿ect various levels of
+performance when agents are o￿ered the opportunity.
+Anyone in group D who is o￿ered the opportunity and succeeds
+at it moves up to group A. Each individual is then replaced by one
+o￿spring of the same socioeconomic status and the process con-
+tinues to the next generation. In the general form of the model,
+there is also some probability that an individual’s o￿spring does
+not perfectly inherit their socioeconomic status. The payo￿ to soci-
+ety is the number of individuals who succeed at the opportunity
+summed over all generations, with the generation t steps into future
+multiplied by   t for a discount factor 0 <   < 1.
+Summary of Results. In any given generation, society’s policy
+will consist of a threshold for group D and a (possibly di￿erent)
+threshold for group A: the opportunity is given to every individual
+whose success probability is above the threshold for their group. The
+optimal policy is given by a dynamic program over the continuous
+set of all possible choices for the population composition ( 0, 1)
+as state variables. We solve the most basic version of the model
+analytically. We computationally solve more complex versions of
+the model by discretizing the state space, then applying standard
+dynamic programming solutions for ￿nite decision processes.
+If the problem of allocating the opportunity only spanned a sin-
+gle generation, then the payo￿-maximizing policy would use the
+same threshold for both groups. But given the discounting sum
+over multiple generations, we ￿nd that society’s optimal policy can,
+in general, use a lower threshold for group D than for groupA. The
+di￿erence in thresholds is a form of socioeconomic a￿rmative ac-
+tion, and it arises due to the intuition discussed above: boosting the
+number of individuals from group D who receive the opportunity
+will increase the number of available candidates from group A in
+future generations, each of whom provides a (discounted) payo￿
+in future generations via their enhanced performance. Finding the
+correct trade-o￿ in allocating opportunity thus involves a delicate
+balance between immediate and future utility.
+16
+Allocating Opportunities in a Dynamic Model of Intergenerational Mobility FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+(a) (b) (c)
+Figure 1: Visualizing the triples (  ,  ,  ) for which the optimal policy uses persistent a￿rmative actions. (We set   = 1     for
+these plots.) Points that lie above the surfaces in panels (a) and (c), and below the surface in panel (b), correspond to parameter
+values yielding persistent a￿rmative action. (1a) When 1     
+  < 0, any   > 0 su￿ces for persistent a￿rmative action and
+eventually moving the entire population to group A. When 1     
+  > 0, there exists some   < 1 (and hence a ￿nite level of
+patience
+⇣
+ 
+1  
+⌘
+) that su￿ces for persistent a￿rmative action. (1b) When   is su￿ciently large, the optimal policy does not
+use persistent a￿rmative action; this is because for a large   , the extent of a￿rmative action required to pick up the best
+performing members of D is large—which in turn signi￿cantly reduces the immediate payo￿. For any given value of   , there
+exists a su￿ciently small   that guarantees persistent a￿rmative action. (1c) When   is small relative to   , the optimal policy
+does not use persistent a￿rmative action; this is because the cost of picking the best performing members of D is very high
+and a small A group su￿ces for ￿lling the available opportunities. Note that for some values of   , no matter how large   is,
+the optimal policy never employs persistent a￿rmative action.
+Whether socioeconomic a￿rmative action is employed by the op-
+timal solution — and the extent to which it is employed — depends
+on the fraction  0 of individuals from group D; in the most basic
+model, the amount of a￿rmative action decreases monotonically
+as  0 is reduced. The extent of a￿rmative action is also determined
+by the amount of opportunity available (  ), the dependence of suc-
+cess on ability and socioeconomic status (  and   ), and society’s
+patience in trading o￿ immediate payo￿ in return for payo￿ from
+future generations (  ). We characterize the optimal solution in this
+respect as a function of these parameters, ￿nding that for some
+regions of the parameter space, the society employs temporary af-
+￿rmative action, reducing the size of group D to a given level before
+equalizing thresholds in subsequent generations; in other parts
+of the parameter space, the society employs persistent a￿rmative
+action, in which the threshold for group D is strictly lower in every
+generation and the size of group D converges to 0 over time.
+Figure 1 provides some ways of describing the regions of param-
+eter space in which the optimal solution uses persistent a￿rmative
+action. As the partitions of the space there make apparent, the
+interactions among the key parameters is fairly subtle. First, persis-
+tent a￿rmative action is promoted by large values of   and small
+values of   , since these make it easier to include high-performing
+members of group D without a large di￿erence in thresholds; and
+it is promoted by larger values of   , indicating greater concern for
+the payo￿s in future generations. One might have suspected that
+persistent a￿rmative action would only be realized in the optimal
+solution in the limit as society’s patience (essentially  /(1   )) goes
+to in￿nity; but in fact, a su￿ciently large ￿nite amount of patience
+is su￿cient for the optimal policy to use persistent a￿rmative
+action.
+In our model, we include a probabilistic background process by
+which individuals can also move between groups A and D; this
+re￿ects the idea that there are many mechanisms operating simulta-
+neously for socioeconomic mobility, and we are studying only one
+of these mechanisms via the opportunity under consideration. The
+most basic version posits a single probability p that each individual
+independently loses their group membership and re-samples it from
+the current distribution of group sizes. We also consider a version
+of the model in which this probability of loss of group membership
+is di￿erent for groups A and D; in this case, we are only able to
+solve the model computationally, and these computational results
+reveal interesting non-monotonicities in the amount of a￿rmative
+action employed as a function of the relative size of group D ( 0).
+Utilitarianism, Prioritarianism, and the Desert Principle.
+Our simple mathematical model allows us to represent and distin-
+guish among several distinct worldviews toward allocation policies
+(see, e.g., [Arneson 2013] for further discussion of these views):
+(1) a utilitarian view, which generally favors slightly lower-ability
+members of A to comparable, but slightly higher ability members
+of D in pursuit of maximizing social utility and productivity (recall
+that membership in A confers a boost in success probability); (2) a
+prioritarian view, which evaluates a policy according to its impact
+on the well-being of the worse-o￿ members of society. Our model
+can capture the priority view through large discount factors (re-
+call that as the society’s patience increases, it e￿ectively increases
+the priority assigned to the disadvantaged group members), or by
+adjusting the welfare function; (3) a desert-principle view, which
+advocates for allocating opportunities based on some notion of
+deservingness. Deservingness in this view is often de￿ned in terms
+of the contributions people make to the social utility. Hence success
+17
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Hoda Heidari and Jon Kleinberg
+probability in our model is arguably the closest match to individ-
+ual desert. With that de￿nition for desert, desert-based principles
+would allocate opportunities myopically in each generation. As our
+analysis illustrates, such policies often fail to maximize the social
+utility in the long-run.
+Limitations and Interpretations. Our model is designed to
+incorporate the basic points we just mentioned in as simpli￿ed
+a fashion as possible; as such, it is important to note some of its
+key limitations. First, it is intended to model the e￿ect of a single
+opportunity, and it treats other forms of mobility probabilistically
+in the background. It also assumes that the fundamental param-
+eters (  ,  ,  ,  ) are constant over all generations as well as over
+individuals within one generation. It treats an individual’s group
+membership (A and D) and ability as a complete description of their
+performance, rather than including any dependence on the group
+membership of the individual’s parent. (That is, an individual in
+groupA performs the same in the model regardless of whether their
+parent belonged to group A or D.) All of these would be interesting
+restrictions to relax in an extension of the model. Second, much
+of the past theoretical work on intergenerational mobility focuses
+on an issue that we do not consider here: the strategic considera-
+tions faced by parents as they decide how much to consume in the
+present generation and how much to pass on to their children. Our
+interest instead has been in the optimization problem faced by a
+social planner in allocating opportunities, treating the behavior of
+the agents as ￿xed and simple. Here too, it would be interesting to
+explore models that address these issues in combination. Finally, be-
+cause our focus is on intergenerational mobility in a socioeconomic
+sense, we do not model discrimination based on race, ethnicity, or
+gender, and the role of race- or gender-based a￿rmative action
+in combatting these e￿ects. The model is instead concerned with
+socio-economic or class-based [Kahlenberg 1996; Malamud 1995]
+a￿rmative action. That said, the ingredients here could be com-
+bined with models of statistical or taste-based discrimination on
+these attributes to better understand their interaction (as outlined
+in Section 5).
+The simplicity of our model, however, does allow us to make
+a correspondingly fundamental point: that even a purely payo￿-
+maximizing society can discover a￿rmative action policies from
+￿rst principles as it seeks to optimize the allocation of opportuni-
+ties over multiple generations. Moreover, the optimal allocation
+policy is deeply connected to dynamic programming over the gen-
+erations; the society is essentially attempting to “steer” the balance
+of group A and group D over time, making sure not to turn things
+too abruptly (giving up present bene￿t) or too gradually (giving
+up future bene￿t). This idea that society is searching for a way
+to turn optimally toward a better outcome is not speci￿c to our
+model; it is an image that has arisen in qualitative discourse over
+several centuries. It can be seen in a quote popularized by Martin
+Luther King, that “the arc of the moral universe is long, but it bends
+toward justice” [Cohen 2006]. Interestingly, the original form of
+this quote, by the American minister Theodore Parker in 1853, has
+an even more abstractly mathematical ￿avor: “I do not pretend to
+understand the moral universe; the arc is a long one, my eye reaches
+but little ways. I cannot calculate the curve and complete the ￿gure
+by the experience of sight; I can divine it by conscience. And from
+what I see I am sure it bends towards justice” [Parker 1853]. It is
+a curiously apt image for the way in which our optimal solutions
+gradually turn through the state space to reshape the distribution
+of socioeconomic groups, and it can be seen as added motivation
+for the issues at the heart of the model.
+Related Work
+Here, we brie￿y mention several lines of scholarship that are closely
+related to our work. See Appendix A for a more in-depth discussion.
+Long-term Implications of Fair Machine Learning (ML)..
+Several recent articles study the long-term impact of ML-based
+decision-making and fairness interventions on society, including
+the enforcement of statistical parity in hiring [Hu and Chen 2018],
+and responses by individuals and populations to an ML-based deci-
+sion rule [Kannan et al. 2019; Liu et al. 2018; Mouzannar et al. 2019].
+Liu et al. [2018], for example, study the conditions under which
+the choices of a myopic pro￿t-maximizing institution (e.g., a bank
+lending money to individuals) work in the interest of the disad-
+vantaged group. [Dong et al. 2018; Hu et al. 2019; Milli et al. 2019]
+address strategic classi￿cation where the goal is to design classi￿ers
+robust to strategic manipulation. This body of research focuses
+on strategic responses by agents being evaluated; in contrast, we
+assume idealized prediction so as to focus on the perspective of a
+social planner who seeks optimal allocation of opportunities over
+time.
+Intergenerational Income Mobility. A substantial literature
+in economics studies how higher inequality results in lower income
+mobility across generations (see, e.g., [Becker and Tomes 1979;
+Corak 2013; Maoz and Moav 1999]). The precise measurements of
+inequality and mobility signi￿cantly in￿uence the strength of this
+e￿ect (see, e.g., [Piketty 2000; Solon 1992]). Theoretical models of
+income mobility have studied utility-maximizing parents deciding
+how much of their capital to consume and how much of it to invest
+in their o￿spring [Becker and Tomes 1979, 1986; Loury 1981; Solon
+1999]. We deliberately set aside parental strategic considerations
+and focus instead on deriving the optimal policy that maximizes
+the discounted payo￿ over generations.
+A￿rmative Action Policies. A rich body of work in econom-
+ics investigates statistical discrimination [Arrow 1973] and the
+role of a￿rmative action in redressing it [Fang and Moro 2011].
+Outcome-based policies including a￿rmative action targets have
+long been proposed and implemented as temporary remedies to
+eliminate group-level inequalities. Race-based a￿rmative action
+and socioeconomic a￿rmative action can be viewed as distinct
+categories of intervenions [Carnevale and Rose 2013; Kahlenberg
+1996], with the former addressing long-term e￿ects of racial bias
+and the latter facilitating access for economically disadvantaged
+individuals [Reardon et al. 2017]. While the relationship between
+them is complex and contested in the literature [Gaertner and Hart
+2013; Kane 1998; Reardon et al. 2006], they can co-exist without
+necessarily competing.
+A￿rmative Action in College Admissions and Compari-
+son with [Durlauf 2008]. Durlauf [2008] provides a model to
+compare the equality and e￿ciency of a￿rmative action policies
+with those of meritocratic policies in the context of admission rules
+to public universities. In his concluding remarks, Durlauf poses the
+key question our work sets out to answer: how domultigenerational
+considerations impact the optimal allocation policy? As we address
+18
+Allocating Opportunities in a Dynamic Model of Intergenerational Mobility FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+this open question that he poses, we follow his model in many
+respects, although we depart from it in a few key areas. 1 Similar
+to our work, Durlauf provides a condition under which e￿ciency
+and equality considerations are aligned, but he focuses on settings
+where a diverse body of students on college campuses improves the
+human capital development for all of them. Durlauf assumes the
+policymaker aims to maximize the level of human capital among
+the next generation of adult citizens. He restricts attention to two
+generations only, and instead of solving for the optimal policy, he
+compares the meritocratic policy with a￿rmative action in terms
+of the average human capital of the next generation. In contrast,
+we model the dynamics of human-capital development across mul-
+tiple generations and derive the optimal allocation policy. Moreover,
+groups in our model corresponds to socio-economic tiers, whereas
+Durlauf de￿nes them in terms of race.
+In both models, generations are represented as follows: in each
+time step, a new member is born into each family/dynasty, and
+he/she replaces the current member of the family in the next gener-
+ation. The initial human capital in Durlauf’s model corresponds to
+our notion of success probability. Adult human capital in his model
+is determined by college attendance, and it roughly maps to our
+notion of success (i.e., whether the individual succeeds if given the
+opportunity.) In both models, an admission rule maps a student’s
+human capital and group membership into a binary outcome indi-
+cating whether the student is given the opportunity. In both models,
+the admission rule may vary across time and generations; the level
+of state expenditures on education is assumed constant across gen-
+erations (  is ￿xed in our model); the only output of universities is
+human capital (our objective function is made up of the percentage
+of the population who succeed in each generation); and ￿nally, the
+initial human capital is accurately measured for every student (we
+assume ability and success probability are perfectly observable.)
+2 A DYNAMIC MODEL
+Agents, Circumstances, Abilities, & Generations
+We consider a model of a society that consists of a continuum of
+agents in two di￿erent sets of socioeconomic circumstances — a
+disadvantaged circumstance D and an advantaged circumstance
+A. These circumstances are (probabilistically) inherited from one
+generation to the next, but we can try to increase the number
+of agents in the advantaged circumstance in future generations
+by o￿ering opportunities to disadvantaged agents in the current
+generation. This comes with a trade-o￿, however, since a competing
+option is to o￿er these opportunities to advantaged agents in the
+current generation. Our goal is to model this trade-o￿. We say that
+an agent i has circumstance ci = 0 if they are disadvantaged (i 2 D),
+and circumstance ci = 1 if they are advantaged (i 2 A). Each agent
+i also has an ability ai , which is a real number in [0, 1].
+Time advances in discrete periods, beginning with period t = 0.
+We think of these as generations. Consider an agent i who has
+circumstance c initi at the beginning of time t . Depending on whether
+i receives the opportunity, his/her circumstancemay change to cposti .
+At the end of time step t , i produces a new agent i 0 in generation
+t + 1. This new agent i 0 has an ability ai0 drawn uniformly at
+1For a more detailed comparison, see Section A.4.
+random from [0, 1]. With some ￿xed probability (speci￿ed below)
+i 0 inherits the ex-post circumstance of i (so ci0 = c
+post
+i ), otherwise,
+it takes on a circumstance randomly selected from the background
+distribution of circumstances within the population in generation t .
+More speci￿cally, in a given period t , let   j (t) denote the fraction of
+agents who have circumstance j , for j = 0, 1. If cposti = 0, then with
+a ￿xed probability 1 pD , i 0 inherits circumstanceD, and with ￿xed
+probability pD , it receives a circumstance randomly selected from
+the background distribution ( 0(t), 1(t)). Similarly, If cposti = 1,
+then with a ￿xed probability 1 pA , i 0 inherits circumstanceA, and
+with probability pA, it receives a circumstance randomly selected
+from the background distribution ( 0(t), 1(t)).
+The movement probabilities, pA and pD , capture all processes—
+other than the opportunity we seek to allocate optimally—through
+which individuals can change their circumstance from their parental
+inheritance. For example, in the college admissions example, while
+our model focuses on how admission decisions can reshape circum-
+stances over generations, there are many other forces and processes
+that impact the evolution of circumstances within society (e.g., num-
+ber of jobs in the economy, training opportunities outside college,
+or pure luck). The movement probabilities summarize and capture
+all these alternative upward or downward movement possibilities.
+Opportunities and Payo￿s
+We consider the problem of performing an intervention in this
+society, which consists of o￿ering an opportunity to a subset of the
+population. We only have the resources to o￿er the opportunity
+to an   fraction of the population. An agent who is o￿ered the
+opportunity has some probability of succeeding at it, as a function
+of their ability and circumstances that we specify below. Succeeding
+at the opportunity confers two bene￿ts on society:
+(i) it produces an immediate payo￿/reward to the society in the
+form of productivity;
+(ii) if the agent is disadvantaged, it moves them (and subse-
+quently their future generations) into the advantaged group.
+The central problem to be solved in the model, as we will see below,
+is how to balance the immediate gains from (i) against the long-term
+gains from (ii) over multiple generations.
+In particular, if an agent of ability ai 2 [0, 1] and circumstance
+ci 2 {0, 1} is o￿ered the opportunity, their probability of succeeding
+at it is ai  + ci  , where   ,  > 0 and   +    1. Note that since
+ci 2 {0, 1}, this simply means that   gets added to the success
+probability of all agents whose circumstance is equal to 1.
+Our payo￿ (or reward) r (t) in period t is simply the fraction of
+the population that both receives the opportunity and succeeds at
+it. Our total payo￿ is a discounted sum of payo￿s over all periods,
+with discount factor 0 <   < 1; that is, the total payo￿ r is equal
+to
+Õ1
+t=0  
+t r (t). As noted earlier, agents with circumstance 0 who
+receive the opportunity and succeed at it will produce o￿spring who
+(are more likely to) have circumstance 1; this matters for the payo￿
+because the total payo￿ r =
+Õ1
+t=0  
+t r (t) depends on the fraction of
+agents with each type of circumstance in all time periods.
+Thresholds and Interventions
+The way we allocate the opportunity at time t is to set a threshold
+  j (t) for agents with circumstance j, for j 2 {0, 1}, and to o￿er
+19
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Hoda Heidari and Jon Kleinberg
+the opportunity to all agents i with circumstance j whose success
+probability, ai  + ci  , is at least   j (t). That is,
+ai  + ci      j .
+We will sometimes write the threshold   j and the population frac-
+tion with each circumstance   j without the explicit dependence
+“(t)” when we are considering a single ￿xed time period.
+Agents of circumstance 0make up a 0 fraction of the population,
+and a 1    0
+  fraction of them receive the opportunity, for a total
+fraction of the population equal to  0 ⇥ (1    0
+  ). Similarly, agents
+of circumstance 1 make up a  1 fraction of the population, and a
+1   1  
+  fraction of them receive the opportunity, for a total fraction
+of the population equal to  1 ⇥ (1    1  
+  ). The sum of these two
+fractions must add up to   — the portion of the population to whom
+we can o￿er the opportunity:
+80   0    and     1    +   :  0 ⇥
+✓
+1    0
+ 
+◆
++  1 ⇥
+✓
+1    1    
+ 
+◆
+=  
+, 80   0    and     1    +   :  0 0 +  1 1 =   (1     ) +  1  . (1)
+This also shows how our choice of thresholds is a one-dimensional
+problem in the single variable  0 (or equivalent in the single vari-
+able  1), since after setting one of the two thresholds, the other is
+determined by this equation. More precisely, we have that:(
+ 1 =
+  (1   )+(1  0)   0 0
+1  0
+8 0 < 1
+ 1 2 [  ,  +   ] for  0 = 1.
+(2)
+Note that if  0 = 1,  1 can take on any value in [  ,  +   ], the
+threshold will not a￿ect how opportunities are allocated. The same
+holds for  0 = 0 and any  0 2 [0,  ].
+Dynamics in a Single Period
+Recall that our payo￿ r (t) in period t is simply the fraction of the
+population that both receives the opportunity and succeeds at it.
+We can decompose this as follows.
+• Agents of circumstance 0 make up a  0 fraction of the popu-
+lation, and a 1    0
+  fraction of them receive the opportunity,
+for a total fraction of the population equal to  0
+⇣
+1    0
+ 
+⌘
+.
+Not all of these agents succeed at the opportunity; the av-
+erage success probability in this group is 1
+2 (  +  0), so the
+expected quantity that succeeds is
+ 0
+✓
+1    0
+ 
+◆ (  +  0)
+2
+=
+ 0
+2 
+⇣
+  2    20
+⌘
+.
+• Agents of circumstance 1make up a 1 fraction of the popula-
+tion, and a 1   1  
+  fraction of them receive the opportunity,
+for a total fraction of the population equal to  1
+⇣
+1    1  
+ 
+⌘
+.
+Again, not all of these agents succeed at the opportunity; the
+average success probability in this group is 1
+2 (  +   +  1), so
+the expected quantity that succeeds is
+ 1
+✓
+1    1    
+ 
+◆ (  +   +  1)
+2
+=
+ 1
+2 
+⇣
+(  +   )2    21
+⌘
+.
+The total payo￿ in period t is the sum of these two terms:
+r (t) =  0(t)
+2 
+⇣
+  2    0(t)2
+⌘
++
+ 1(t)
+2 
+⇣
+(  +   )2    1(t)2
+⌘
+. (3)
+Dynamics over Multiple Periods
+If we were just optimizing the payo￿ in this single time period, then
+we’d have a single-variable optimization problem in the variable
+ 0 (or equivalently in  1), with the objective function given by (3).
+But since there is also the set of discounted payo￿s in future time
+periods, we also need to look at the e￿ect of our decisions on the
+quantities  0(.) and  1(.) in future periods.
+If pA = pD = 0,  1(t + 1) grows relative to  i (t) depending on
+the fraction of the population that transitions from circumstance 0
+to circumstance 1 by succeeding at the opportunity. Thus we have
+ 0(t + 1) =  0(t)  
+ 0(t)
+2 
+⇣
+  2    0(t)2
+⌘
+. (4)
+More generally when pA or pD are non-zero, let’s de￿ne  post0 (t) =
+ 0(t)   0(t )
+2 
+ 
+  2    0(t)2
+ 
+. (For simplicity, we drop “(t)” and simply
+use  post0 in the remainder of this section). We have:
+ 0(t +1) =  
+post
+0 (1 pD )+ post0 pD 
+post
+0 +
+⇣
+1    
+post
+0
+⌘
+pA 
+post
+0 , (5)
+It is easy to see that:
+P￿￿￿￿￿￿￿￿￿￿ 1. IfpA = pD , then  0(t+1) =  0(t )  0(t )
+2 
+ 
+  2    0(t )2
+ 
+.
+P￿￿￿￿. Suppose pA = pD = p. Then we can re-write (5) as
+follows:
+ 0(t + 1) =  
+post
+0 (1   p) +  post0 p 
+post
+0 +
+⇣
+1    
+post
+0
+⌘
+p 
+post
+0
+=  
+post
+0 (1   p) +  post0 p
+⇣
+ 
+post
+0 +
+⇣
+1    
+post
+0
+⌘⌘
+=  
+post
+0 (1   p) +  post0 p
+=  
+post
+0 =  0(t)  
+ 0(t)
+2 
+⇣
+  2    0(t)2
+⌘
+where in the last line, we replace  post0 with its de￿nition. ⇤
+The above proposition shows that with respect to dynamics and
+optimal policy, settings in whichpA = pD , are essentially equivalent
+to settings in which pA = pD = 0.
+In summary, the full problem is to choose thresholds  0(t), 1(t)
+for each time period t so as to maximize the in￿nite sum r =Õ1
+t=0  
+t r (t). Each term r (t) depends not just on the chosen thresh-
+olds but also on the fractions of agents with each type of circum-
+stance  0(t), 1(t), which evolve according to the recurrence in
+Equation (5). Note that the intuitive trade-o￿ between  0 and  1
+shows up in the formulation of (3) and (4): lowering  0 and lowering
+ 1 have di￿erent e￿ects, both in period t and in future time periods.
+3 THEORETICAL ANALYSIS FOR pD   pA
+In this section, we focus on settings in which pD   pA and charac-
+terize the optimal policy to maximize the discounted payo￿ over
+generations. (We only provide the analysis for settings of pD = pA
+but the extension to pD > pA is straightforward). We cast the
+problem as deriving the in￿nite-time-horizon optimal policy in a
+continuous state- and action-space (Markov) decision process. We
+characterize the optimal threshold and value function for every
+state  0 2 [0, 1]. Importantly, we show that there exists a tipping
+point  ⇤0 that splits the state space into two distinct regions: states
+at which the optimal threshold uses strict a￿rmative action, and
+20
+Allocating Opportunities in a Dynamic Model of Intergenerational Mobility FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+Figure 2: The admissible thresholds for every state of the de-
+cision process,D. The x-axis speci￿es the state  0, and the y-
+axis highlights (in light red) the admissible thresholds,   0 ,
+at every state,  0.
+states at which the optimal policy consists of imposing equally high
+thresholds on both A and D groups.
+The Decision Process
+Given   ,  ,  , and   , we de￿ne a decision process D ,  ,  ,  =
+( , , S,R) (orD for short) with a continuous state space   = [0, 1],
+action space   = [0,  ], state transition S :   ⇥  !  , and reward
+function R :   ⇥   ! [0, 1]. Each state  0 2   corresponds to a
+particular fraction of disadvantaged individuals within the popula-
+tion. For instance, the states 0 (or 1) represents a society in which
+no one (or everyone) belongs to D.
+The set of thresholds admissible in each state  0 is denoted by
+  0 .   0 consist of all thresholds 0   0    that can satisfy the
+capacity constraint,   . In other words, for any 2  0  0 if we im-
+pose the threshold  0 2 [0,  ] on group D, we can ￿nd a threshold
+ 1 2 [0,  +   ] for group A such that exactly   fraction of the over-
+all population receives the opportunity. This capacity constraint
+translates into two conditions on   0 :
+(1) A threshold  0 2   0 should not give the opportunity to
+more than   fraction of the population. Formally, 8 0 2   0 :
+ 0
+⇣
+1    0
+ 
+⌘
+   , which is equivalent to:
+8 0 2   0 :  0    
+✓
+1    
+ 0
+◆
+. (6)
+(2) A threshold  0 2   0 should not waste opportunities, that
+is, it should give the opportunity to at least   fraction of the
+overall population. Formally, 8 0 2   0 :  0
+⇣
+1    0
+ 
+⌘
++ 1  
+  . Replacing  1 with 1  0 and rearranging terms, the above
+is equivalent to
+8 0 2   0 :  0    (1    )
+ 0
+. (7)
+Figure 2 illustrates the actions satisfying conditions (6) and (7) for
+every state  0 2 [0, 1].
+The state transition function, S :   ⇥   !  , speci￿es the state
+transitioned to for every (state, admissible threshold) pair. Formally,
+8 0 2  ,8 0 2   0 : S( 0, 0) =  0  
+ 0
+2 
+(  2    20 ). (8)
+The reward function, R :   ⇥   ! [0, 1], is de￿ned as follows:
+R( 0, 0) denotes the immediate reward/payo￿ of imposing thresh-
+old  0 at state  0. Formally,
+8 0 2  ,8 0 2   0 : R( 0, 0) =
+ 0
+2 
+(  2  20 )+
+ 1
+2 
+⇣
+(  +   )2    21
+⌘
+.
+Replacing  1 with 1    0 and  1 with the right hand side of (2), we
+obtain the following equivalent expression for R:
+R( 0,  0) =
+8>><
+>>:
+1
+2  (  2     2
+0 ) for  0 = 1, otherwise:
+ 0
+2  (  2     2
+0 ) +
+1  0
+2 
+✓
+(  +   )2  
+⇣
+  (1   )+(1  0)   0 0
+1  0
+⌘2◆
+(9)
+Characterization of the Optimal Policy
+Next, we illustrate and characterize the optimal policy for the deci-
+sion process D de￿ned above. (For further information and refer-
+ences on continuous-state decision processes, see Appendix A.5.)
+A deterministic policy   for a decision process D is a mapping
+  :   !   such that   ( 0) prescribes the threshold at state  0.
+The value V  ( 0) of a state  0 under policy   is the discounted
+reward of executing policy   on D starting with initial state  0.
+A policy   is optimal if its value function V  satis￿es Bellman
+Optimality—de￿ned recursively as follows:
+V  ( 0) = max
+ 0
+R( 0, 0) +  V  (S( 0, 0)). (10)
+We establish in Appendix C that for our decision process D, the
+value function satisfying the above functional equation is unique,
+continuous, and di￿erentiable. (We prove these facts utilizing tools
+from recursive analysis and dynamic programming [Cotter and
+Park 2006; Stokey 1989]). For simplicity, from this point on we refer
+to this unique optimal value function asV (.) and drop the subscript
+  .
+Let the correspondence  ⇤
+0 :   ! 2  denote all optimal policies
+for D. More precisely, for any 0   0  1, the set  ⇤
+0( 0) contains
+all optimal threshold values at  0. Figure 3a illustrates  ⇤
+0 for a
+sample setting of the parameters   ,  ,  ,  . (See Figure 5 in the
+Appendix for more instances.) Figure 6 in the Appendix illustrates
+the value function V . Note that the value function is consistently
+decreasing and concave.
+We say that the optimal policy,  ⇤
+0, uses a￿rmative action at a
+state  0 if at  0, it imposes a lower threshold on group D compared
+to A.
+D￿￿￿￿￿￿￿￿￿ 1 ((S￿￿￿￿￿) A￿￿￿￿￿￿￿￿￿￿ A￿￿￿￿￿). The optimal pol-
+icy uses (strict) a￿rmative action at state  0 if for all  0 2  ⇤
+0( 0)
+and all  1 2  ⇤
+1( 0),  0 <  1.
+If the inequality above is not strict (i.e.,  0   1), we say the
+optimal policy uses weak a￿rmative action. Figure 3b shows the
+extent of a￿rmative action for a sample setting of the parameters
+  ,  ,  ,  . (See Figure 7 in the Appendix for more instances).
+Our main result (Theorem 1) characterizes the states at which
+the optimal policy employs a￿rmative action. In particular, it estab-
+lishes the existence of a tipping point 0   ⇤0  1   that designate
+the region of a￿rmative action: At any state  0   ⇤0 , the optimal
+policy assigns similar high threshold to both the advantaged and
+disadvantaged groups. In contract, at any state  0   ⇤0 the optimal
+21
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Hoda Heidari and Jon Kleinberg
+(a) The optimal  0 at every state 0   0 
+1. The optimal threshold decreases with
+ 0. The dashed lines indicate the tipping
+points,  ⇤
+0 , below which   is the only opti-
+mal threshold, and above it   is not optimal.
+(b) The di￿erence between  0 and  1 at every
+state 0   0  1. The dashed lines specify
+the tipping points. Strict a￿rmative action
+is employed beyond  ⇤
+0 only and the extent
+of a￿rmative action is increasing in  0.
+(c) The state towhich the optimal policy con-
+verges given the initial state  0. The dashed
+lines specify the tipping point,  ⇤
+0 . Note that
+the optimal policy never shrinks the size of
+group D to a value less than  ⇤
+0 .
+Figure 3: Illustration of the (a) optimal policy, (b) extent of a￿rmative action, and (c) absorbing state.
+policy imposes a strictly lower threshold on group D compared to
+A.
+T￿￿￿￿￿￿ 1. Given   ,  ,  ,  and the decision process D, let
+ ⇤0 = max
+(
+0,min
+(
+1     , 1     
+2 
+ 
+1 +
+s
+1 +
+2  
+1    
+!))
+. (11)
+• For any state  0   ⇤0 , there exists  0 2  ⇤
+0( 0) and  1 2
+ ⇤
+1( 0) such that  0 =  1.
+• For any state  0 >  ⇤0 , for all  0 2  ⇤
+0( 0) and all  1 2  ⇤
+1( 0)
+such that  0 <  1.
+Weprove Theorem 1 by establishing a series of Lemmas. Lemma 1
+determines the largest state  ⇤0 2 [0, 1] below which the optimal
+policy consists of applying the high threshold of   to group D.
+Clearly, below such point, the optimal policy does not use a￿rma-
+tive action. Next, we investigate states larger than  ⇤0 . For every
+state  0 >  ⇤0 , Lemma 2 identi￿es the set of thresholds that exhibit
+a￿rmative action. Lemma 3 establishes that the optimal policy
+uses weak a￿rmative action beyond  ⇤0 . That is, it shows that for
+any state  0 >  ⇤0 , it is never optimal to impose a strictly higher
+threshold on D compared to A. Proposition 2 shows that beyond
+ ⇤0 , the optimal policy in fact uses strict a￿rmative action. That is,
+at every state  0 >  ⇤0 , the optimal policy imposes a strictly lower
+threshold on D compared to A.
+Lemma 1 determines the state  ⇤0 2 [0, 1] up to which   is an
+optimal threshold. Note that if   is an optimal threshold at a state
+ 0, the optimal policy does not use a￿rmative action at  0. To see
+this, note that when   is optimal, any action  0 >   is also optimal
+(they all pick a 0-fraction of group D and are, therefore, e￿ectively
+equivalent). (All omitted proof can be found in Appendix C.1.)
+L￿￿￿￿ 1 (T￿￿ T￿￿￿￿￿￿ P￿￿￿￿). For any state  0 <  ⇤0 ,   2
+ ⇤
+0( 0).
+The following Lemma characterizes the region of a￿rmative
+action in the state-action space.
+L￿￿￿￿ 2 (R￿￿￿￿￿ ￿￿ A￿￿￿￿￿￿￿￿￿￿ A￿￿￿￿￿). For a state  ⇤0 <
+ 0 < 1, the threshold  0 2  ⇤
+0( 0) uses a￿rmative action if and only
+if  0    (1    ) +   (1    0).
+P￿￿￿￿. Let   be the threshold that if applied to both D and A at
+ 0, allocates opportunities exactly. We have that
+ 0
+✓
+1    
+ 
+◆
++ (1    0)
+✓
+1        
+ 
+◆
+=  
+or equivalently,
+  =   (1    ) +   (1    0).
+Note that  0 <   if and only if  1 >  —otherwise the capacity
+constraints would not be maintained. Therefore, for any  0 <   ,
+ 1 >  0, which implies a￿rmative action. ⇤
+The following Lemma shows that beyond  ⇤0 , the optimal thresh-
+old for the disadvantaged is never higher than that for the advan-
+taged.
+L￿￿￿￿ 3 (W￿￿￿ A￿￿￿￿￿￿￿￿￿￿ A￿￿￿￿￿). Consider a state  0 >
+ ⇤0 . For all  0 2  ⇤
+0( 0) and all  1 2  ⇤
+1( 0),  0   1.
+P￿￿￿￿. Suppose not and there exists  0 2  ⇤
+0( 0) and  1 2
+ ⇤
+1( 0) such that  0 >  1. If we lower  0 down to   (1  )+  (1  0)
+and increase  1 up to   (1  )+  (1  0), we maintain the capacity
+constraints and at the same time achieve the following:
+(a) We improve the immediate reward of the current time step—
+because we replace advantaged agents with low success
+probabilities in the range of [ 1,  (1    ) +   (1    0)] with
+disadvantaged agents with higher success probabilities in
+[  (1    ) +   (1    0), 0].
+(b) We move to a state with a relatively smaller size of group D
+(simply because we gave the opportunity to more disadvan-
+taged agents). The value function is strictly decreasing in  0.
+Therefore, this new next state has a higher value compared
+to the previous one.
+The fact that we can improve the value contradicts the optimality
+of  0, 1. Therefore,  0 >  1 cannot hold ⇤
+The following Proposition establishes that beyond  ⇤0 , the opti-
+mal policy uses strict a￿rmative action. (The proofs establishing
+the proposition can be found in Appendix C.1.)
+22
+Allocating Opportunities in a Dynamic Model of Intergenerational Mobility FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+P￿￿￿￿￿￿￿￿￿￿ 2 (S￿￿￿￿￿ A￿￿￿￿￿￿￿￿￿￿ A￿￿￿￿￿). Consider a state
+ 0 >  ⇤0 , and let V
+0( 0) denote the derivative of the value function
+V evaluated at  0. If V 0( 0) < 0, then for all  0 2  ⇤
+0( 0) and all
+ 1 2  ⇤
+1( 0),  0 <  1.
+Insights from the Analysis. We end this section by making
+several observations about the optimal policy: First, note that the
+optimal policy never shrinks the size of D to a value less than  ⇤0 .
+For every initial state  0 2 [0, 1], Figure 8 shows the state one
+converges to when the optimal policy is simulated for 1000 steps on
+D. In other words, a￿rmative action is optimal from a utilitarian
+point of view as long as group D is su￿ciently large. Second, the
+precise derivation of  ⇤0 , as speci￿ed in (11), allows us to gain new
+insights into how the interaction between the parameters of our
+model can give rise to or avert a￿rmative action. Figure 1 depicts
+the status of persistent a￿rmative action (i.e.,  ⇤0  0) for   ,  , 
+in settings where   = 1     . (The derivation behind the plots
+can be found in Appendix C.2.) Notice that persistent a￿rmative
+action is promoted by large values of   and small values of   , since
+these make it easier to include high-performing members of group
+D without a large di￿erence in thresholds. Persistent a￿rmative
+action is also promoted by larger values of   , indicating greater
+concern for the rewards in future generations. Note, however, that
+a ￿nite level of patience often su￿ces for persistent a￿rmative
+action to be optimal. Finally, a frequent objection to a￿rmative
+action polices is their potential for reverse discrimination (see, e.g.,
+Hopwood v. Texas, 78 F.3d 932 (5th Cir. 1996)). Translating these
+concerns into the terminology of our model, one may object that “if
+the highest-ability member of D has ability below the lowest-ability
+member ofA, then any a￿rmative action in this scenario will violate
+the desert principle”. Note, however, that in our model, abilities for
+both A and D group members are uniform in the [0, 1] interval. So
+the optimal policy will never favor a lower-ability member of D to
+a higher ability member of A.
+4 COMPUTATIONAL ANALYSIS FOR pD < pA
+The focus of our theoretical analysis was on the settings in which
+pA  pD . Next, we computationally investigate the optimal policy
+for cases where pA > pD .
+Recall that when pA and pD are non-zero, the circumstance of an
+o￿spring is not deterministically speci￿ed by that of their parent.
+Instead, pA and pD specify the o￿spring’s probability of sponta-
+neous movement to the background distribution of circumstances
+in society, that is, ( 0, 1). When pA  pD , both the spontaneous
+movement dynamics and the allocation of opportunities work to-
+ward reducing the relative size of group D over time. This fact
+allowed us to utilize backward induction to characterize the opti-
+mal policy theoretically. When pA > pD , however, the spontaneous
+movement work in the opposite direction of opportunity alloca-
+tion: with no opportunity allocated, the spontaneous movement
+dynamics gradually shift the entire population to group D. In such
+settings, the role of the allocation policy consists of combatting the
+natural ￿ow of the population to D.
+Although in settings with pA > pD , it is signi￿cantly more
+challenging to characterize the optimal allocation policy, we can
+still approximately compute this policy via discretization followed
+by solution methods for ￿nite decision problems. More speci￿cally,
+we discretize the state- and action-space of the decision process,
+D, then compute the optimal policy of the resulting ￿nite decision
+process using methods such as policy iteration. In what follows,
+we report the result of our simulations when the state- and action-
+space are approximated by 1000 equidistant states and actions (i.e.,
+ ̃ = (0, 0.001, 0.002, · · · , 1) and  ̃ =   (0, 0.001, 0.002, · · · , 1)) and
+the reward and transition functions are approximated accordingly.
+(a) (b)
+Figure 4: (a) The optimal policy  0 at every state 0   0  1
+for variouspA values. (b) The absorbing state for every initial
+state 0   0  1. The optimal policy is non-monotone and
+exhibits sharp drops when better absorbing states become
+cost-e￿ective.
+Figure 4a shows how the optimal policy varies with pA for a
+￿xed value of pD . Compared to the optimal policy for settings of
+pA  pD , we observe two signi￿cant di￿erences here:
+• The optimal policy can be non-monotone in  0.
+• There exists a sharp drop in the optimal threshold at some
+intermediate state  0 2 [0, 1].
+Next, we provide some justi￿cations for both the intuitive and
+potentially counter-intuitive aspects of these phenomena.
+For every initial state  0 2 [0, 1], Figure 4b illustrates the state
+one converges to (i.e., the absorbing state) if the optimal policy is
+simulated for 1000 steps. Note that in all cases, the optimal policy
+successfully reduces the absorbing state to a more desirable value
+less than 1 (recall that with no intervention, we always converge
+to  0 = 1 through the spontaneous movements).
+As illustrated in Figure 4b, the sharp drop in the optimal thresh-
+old coincides with an abrupt change in the absorbing state. When
+the initial state is close to 1, the allocation policy must employ ex-
+tensive a￿rmative action to reduce and maintain a better absorbing
+state. This feat, however, comes at the cost of immediate reward.
+The optimal policy, therefore, settles for reaching and obtaining a
+slightly more desirable absorbing state (a value between 0.6 and
+0.8 in Figure 4b). For smaller initial states, the cost of employing
+extensive a￿rmative action goes down, and at some point, it be-
+comes viable to reach and maintain a much better absorbing state
+(a value between 0 to 0.3 in Figure 4b). The sharp drop in the opti-
+mal threshold happens precisely at the state where the bene￿t of
+extensive a￿rmative action outweighs its cost.
+In summary, when pA > pD , we need persistent (albeit non-
+monotone) a￿rmative action to reach and maintain more desirable
+absorbing states. The optimal extent of a￿rmative action crucially
+depends on the initial state of the population: If the disadvantaged
+23
+FAccT ’21, March 3–10, 2021, Virtual Event, Canada Hoda Heidari and Jon Kleinberg
+group is large to begin with, the optimal policy has to forgo ex-
+tensive a￿rmative action to maintain su￿cient short-term return.
+If the advantaged group initially has a su￿cient mass, extensive
+a￿rmative action becomes optimal, and in the long-run, manages
+to signi￿cantly increases the fraction of advantaged individuals in
+the population. These ￿ndings are in sharp contrast with settings
+of pA  pD . In those settings, a￿rmative action is optimal under
+the much more straightforward condition that the disadvantaged
+group exceeds a  ⇤0 fraction of the population, for a constant  ⇤0
+that we can specify precisely, and it ceases to be optimal as soon as
+society gains at least 1    ⇤0 mass in the advantaged group.
+5 DISCUSSION AND FUTURE DIRECTIONS
+In this paper, we developed and analyzed a model for allocating
+opportunities in a society with limited intergenerational mobility.
+These opportunities produce bene￿ts in the present generation,
+but they can also raise the socioeconomic status of the recipients
+and their descendants. This creates a trade-o￿: whether to max-
+imize the current value achievable from the opportunities or to
+increase the value achievable in future generations. We have shown
+how to resolve this trade-o￿ by solving a continuous optimization
+problem over multiple generations, and we have seen how optimal
+solutions to this problem can exhibit a form of socioeconomic af-
+￿rmative action, favoring individuals of low socioeconomic status
+over slightly higher-performing individuals of high socioeconomic
+status. Characterizing the conditions under which this type of af-
+￿rmative action occurs in the model provides insights into the
+interaction between the amount of opportunity available, the mag-
+nitude of the gap between di￿erent socioeconomic classes, and the
+“patience”’ of the society in evaluating the bene￿ts achievable from
+future generations.
+Insights and Implications. Our work provides a purely utili-
+tarian account of a society–with no intrinsic interest in reducing
+inequality– which nonetheless chooses to employ a￿rmative ac-
+tion along socioeconomic lines. In that sense, our work responds
+to concerns around a￿rmative action hurting social utility. In addi-
+tion, our analysis present new insights on the shape and extent of
+e￿ective socioeconomic a￿rmative action policies across multiple
+generations. Our ￿ndings o￿er several important insights to the
+Fair-ML literature: (a) If temporal dynamics are taken into account,
+there are important cases where fairness interventions can be fully
+aligned with performance-maximizing goals. (b) E￿ective fairness
+interventions should often adapt to population changes over time.
+(c) For a comprehensive assessment of fairness for an allocation pol-
+icy/algorithm, we may need to look beyond its immediate impact
+on its direct subjects. Our work, for instance, characterizes optimal
+allocations when decisions made for individuals today impact their
+future generations.
+Toward a Broader Class of Models Leading to A￿rmative
+Action. Our work’s main focus was on intergenerational dynamics
+and their impact on the e￿ectiveness of socioeconomic a￿rmative
+action policies. But we hope that our work also serves as a stepping
+stone toward a broader class of models characterizing conditions
+under which a￿rmative action comes out of optimal policy deriva-
+tions. In particular, a generalized version of our decision process
+can capture race-dependent dynamics of movement between vari-
+ous socioeconomic levels. Race-dependent dynamics are motivated
+by the observation that advantaged Black people are more likely
+to be downwardly mobile than their advantaged white counter-
+parts [Chetty et al. 2020]. A more general version of our decision
+process would consist of race-dependent   ’s and   ’s. Analyzing
+the resulting dynamics can shed light on the tradeo￿s between
+race/ethnicity-based and socioeconomic a￿rmative action policies.
+We leave this analysis as a crucial direction for future work.
+There are a number of interesting further research directions
+suggested by the results in the paper, and several of them address
+the limits of the model noted in the introduction. In particular, it
+would be interesting to consider extensions of the model in which
+basic parameters of the society varied over time rather than being
+￿xed and could only be estimated with delayed feedback (e.g., af-
+ter several years); the ability distributions were non-uniform; the
+dynamics would amplify the interaction between ability and so-
+cioeconomic advantage; or there were multiple opportunities being
+allocated concurrently. It would be interesting to incorporate strate-
+gic considerations as in other work on intergenerational mobility.
+And ￿nally, there is a natural opportunity to try integrating the
+models here with work on the nature of statistical discrimination
+and the design of interventions to alleviate it.
+On the Scope and Limitations ofMathematicalModels. Our
+work addresses one potential role that a￿rmative action policies
+can have on future generations and mitigating socioeconomic in-
+equality. Our work follows a long tradition in the mathematical
+social sciences, where a stylized model is proposed to capture cer-
+tain aspects of a complex societal issue; the model is then rigorously
+analyzed with the hope that the formal analysis provides new in-
+sights about alternative policy choices and their counterfactual
+e￿ects. These insights can in turn inform policymakers at a qual-
+itative level. We conclude this article by acknowledging that all
+mathematical models are by de￿nition highly simpli￿ed represen-
+tations of the phenomena at hand, and as such it is important to
+understand and interpret them keeping their limitations and scope
+of applicability in mind. We have grounded our work in a broad
+literature from economics so as to draw on the insights that earlier
+modelers have brought to this setting. But we emphasize that theo-
+retical models and their implications should never be taken as exact
+representations of the way complex societal processes operate and
+evolve. As such, it is important to not draw policy interpretations
+on the basis of such models alone.
+ACKNOWLEDGMENTS
+This work was supported in part by a Simons Investigator Award,
+a Vannevar Bush Faculty Fellowship, a MURI grant, AFOSR grant
+FA9550-19-1-0183, and grants from the ARO and the MacArthur
+Foundation. We are grateful to Lawrence E. Blume, Alexandra
+Chouldechova, Zachary C. Lipton, Rediet Abebe, Manish Raghavan,
+Kate Donahue, the AI, Policy, and Practice (AIPP) group at Cornell,
+and the FEAT reading group at Carnegie Mellon for invaluable dis-
+cussions. Finally, we would like to thank the anonymous reviewers
+of our work for their insightful and constructive feedback.
+24
+Allocating Opportunities in a Dynamic Model of Intergenerational Mobility FAccT ’21, March 3–10, 2021, Virtual Event, Canada
+REFERENCES
+Richard Arneson. 2013. Egalitarianism. In The Stanford Encyclopedia of Philosophy
+(summer 2013 ed.), Edward N. Zalta (Ed.). Metaphysics Research Lab, Stanford
+University.
+Kenneth Arrow. 1973. The theory of discrimination. Discrimination in labor markets 3,
+10 (1973), 3–33.
+Gary S. Becker and Nigel Tomes. 1979. An equilibrium theory of the distribution of
+income and intergenerational mobility. Journal of Political Economy 87, 6 (1979),
+1153–1189.
+Gary S. Becker and Nigel Tomes. 1986. Human capital and the rise and fall of families.
+Journal of labor economics 4, 3, Part 2 (1986), S1–S39.
+Sandra E. Black and Paul J. Devereux. 2010. Recent developments in intergenerational
+mobility. Technical Report. National Bureau of Economic Research.
+Anthony P. Carnevale and Stephen Rose. 2013. Socioeconomic status, race/ethnicity,
+and selective college admissions. (2013).
+Raj Chetty and Nathaniel Hendren. 2018. The impacts of neighborhoods on intergener-
+ational mobility I: Childhood exposure e￿ects. The Quarterly Journal of Economics
+133, 3 (2018), 1107–1162.
+Raj Chetty, Nathaniel Hendren, Maggie R. Jones, and Sonya R. Porter. 2020. Race and
+economic opportunity in the United States: An intergenerational perspective. The
+Quarterly Journal of Economics 135, 2 (2020), 711–783.
+Raj Chetty, Nathaniel Hendren, Patrick Kline, Emmanuel Saez, and Nicholas Turner.
+2014. Is the United States Still a Land of Opportunity? Recent Trends in Intergener-
+ational Mobility. American Economic Review 104, 5 (2014), 141–147.
+Kim-Sau Chung. 2000. Role models and arguments for a￿rmative action. American
+Economic Review 90, 3 (2000), 640–648.
+Stephen Coate and Glenn C. Loury. 1993. Will a￿rmative-action policies eliminate
+negative stereotypes? The American Economic Review (1993), 1220–1240.
+Joshua Cohen. 2006. The Arc of the Moral Universe. Philosophy and Public A￿airs
+(2006), 91–134.
+Miles Corak. 2013. Income inequality, equality of opportunity, and intergenerational
+mobility. Journal of Economic Perspectives 27, 3 (2013), 79–102.
+Kevin D. Cotter and Jee-Hyeong Park. 2006. Non-concave dynamic programming.
+Economics Letters 90, 1 (2006), 141–146.
+Jinshuo Dong, Aaron Roth, Zachary Schutzman, Bo Waggoner, and Zhiwei Steven Wu.
+2018. Strategic Classi￿cation from Revealed Preferences. In Proceedings of the 2018
+ACM Conference on Economics and Computation. ACM, 55–70.
+Steven N. Durlauf. 2008. A￿rmative action, meritocracy, and e￿ciency. Politics,
+Philosophy & Economics 7, 2 (2008), 131–158.
+Hanming Fang and Andrea Moro. 2011. Theories of statistical discrimination and
+a￿rmative action: A survey. In Handbook of social economics. Vol. 1. Elsevier,
+133–200.
+Kim Forde-Mazrui. 2004. Taking conservatives seriously: A moral justi￿cation for
+a￿rmative action and reparations. California Law Review 92 (2004), 683.
+Matthew N. Gaertner and Melissa Hart. 2013. Considering class: College access and
+diversity. Harvard Law & Policy Review 7 (2013), 367.
+Milos Hauskrecht and Branislav Kveton. 2004. Linear program approximations for
+factored continuous-state Markov decision processes. In Advances in Neural Infor-
+mation Processing Systems. 895–902.
+Lily Hu and Yiling Chen. 2018. A short-term intervention for long-term fairness in the
+labor market. In Proceedings of the 2018 World Wide Web Conference. 1389–1398.
+Lily Hu, Nicole Immorlica, and Jennifer Wortman Vaughan. 2019. The Disparate E￿ects
+of Strategic Manipulation. In Proceedings of the 2nd ACM Conference on Fairness,
+Accountability, and Transparency.
+Richard D. Kahlenberg. 1996. Class-based a￿rmative action. California Law Review 84
+(1996), 1037.
+Thomas J. Kane. 1998. Racial and ethnic preferences in college admissions. Ohio State
+Law Journal 59 (1998), 971.
+Sampath Kannan, Aaron Roth, and Juba Ziani. 2019. Downstream E￿ects of A￿rmative
+Action. In Proceedings of the 2nd ACM Conference on Fairness, Accountability, and
+Transparency.
+Chul-In Lee and Gary Solon. 2009. Trends in Intergenerational Income Mobility. The
+Review of Economics and Statistics 91, 4 (2009), 766–772.
+Lihong Li and Michael L. Littman. 2005. Lazy approximation for solving continuous
+￿nite-horizon MDPs. In AAAI, Vol. 5. 1175–1180.
+Lydia T. Liu, Sarah Dean, Esther Rolf, Max Simchowitz, andMoritz Hardt. 2018. Delayed
+impact of fair machine learning. In Proceedings of the 35th International Conference
+on Machine Learning.
+Glenn C. Loury. 1981. Intergenerational transfers and the distribution of earnings.
+Econometrica: Journal of the Econometric Society (1981), 843–867.
+Deborah C. Malamud. 1995. Class-based a￿rmative action: Lessons and caveats. Texas
+Law Review 74 (1995), 1847.
+Yishay D. Maoz and Omer Moav. 1999. Intergenerational mobility and the process of
+development. The Economic Journal 109, 458 (1999), 677–697.
+Janusz Marecki, Zvi Topol, Milind Tambe, et al. 2006. A fast analytical algorithm for
+MDPs with continuous state spaces. In AAMAS-06 Proceedings of 8th Workshop on
+Game Theoretic and Decision Theoretic Agents.
+Smitha Milli, John Miller, Anca D Dragan, and Moritz Hardt. 2019. The Social Cost
+of Strategic Classi￿cation. In Proceedings of the 2nd ACM Conference on Fairness,
+Accountability, and Transparency.
+Hussein Mouzannar, Mesrob I Ohannessian, and Nathan Srebro. 2019. From Fair
+Decision Making To Social Equality. In Proceedings of the Conference on Fairness,
+Accountability, and Transparency. ACM, 359–368.
+Scott E. Page. 2008. The Di￿erence: How the Power of Diversity Creates Better Groups,
+Firms, Schools, and Societies. Princeton University Press.
+Theodore Parker. 1853. Ten Sermons of Religion. Charles Francis and Company.
+Thomas Piketty. 2000. Theories of persistent inequality and intergenerational mobility.
+Handbook of income distribution 1 (2000), 429–476.
+Sean F. Reardon, Rachel Baker, Matt Kasman, Daniel Klasik, and Joseph B. Townsend.
+2017. Can socioeconomic status substitute for race in a￿rmative action college
+admissions policies? Evidence from a simulation model. (2017).
+Sean F. Reardon, John T. Yun, and Michal Kurlaender. 2006. Implications of income-
+based school assignment policies for racial school segregation. Educational Evalua-
+tion and Policy Analysis 28, 1 (2006), 49–75.
+Gary Solon. 1992. Intergenerational incomemobility in the United States. The American
+Economic Review (1992), 393–408.
+Gary Solon. 1999. Intergenerational mobility in the labor market. In Handbook of labor
+economics. Vol. 3. Elsevier, 1761–1800.
+Nancy L. Stokey. 1989. Recursive methods in economic dynamics. Harvard University
+Press.
+Florencia Torche. 2011. Is a college degree still the great equalizer? Intergenerational
+mobility across levels of schooling in the United States. Amer. J. Sociology 117, 3
+(2011), 763–807.
+25

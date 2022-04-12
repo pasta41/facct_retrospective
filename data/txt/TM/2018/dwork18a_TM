@@ -1,0 +1,127 @@
+
+When it is ethical and legal to use a sen-
+sitive attribute (such as gender or race) in
+machine learning systems, the question re-
+mains how to do so. We show that the
+näıve application of machine learning algo-
+rithms using sensitive attributes leads to
+an inherent tradeoff in accuracy between
+groups. We provide a simple and efficient
+decoupling technique, which can be added
+on top of any black-box machine learning
+algorithm, to learn different classifiers for
+different groups. Transfer learning is used
+to mitigate the problem of having too little
+data on any one group.
+1 INTRODUCTION
+As algorithms are increasingly used to make de-
+cisions of social consequence, the social values
+encoded in these decision-making procedures are
+the subject of increasing study, with fairness
+being a chief concern (Pedreschi et al., 2008;
+Zliobaite et al., 2011; Kamishima et al., 2011;
+Dwork et al., 2011; Friedler et al., 2016; Angwin
+et al., 2016; Chouldechova, 2017; Kleinberg et al.,
+2016; Hardt et al., 2016; Joseph et al., 2016; Kus-
+ner et al., 2017; Berk, 2009). Classification and
+regression algorithms are one particular locus of
+fairness concerns. Classifiers map individuals to
+outcomes: applicants to accept/reject/waitlist;
+adults to credit scores; web users to advertise-
+ments; felons to estimated recidivism risk. In-
+𝑥2
+𝑥1
+Figure 1: No linear classifiers can achieve greater
+than 50% accuracy on both groups.
+formally, the concern is whether individuals are
+treated “fairly,” however this is defined. Still
+speaking informally, there are many sources of
+unfairness, prominent among these being train-
+ing the classifier on historically biased data and
+a paucity of data for under-represented groups
+leading to poor performance on these groups,
+which in turn can lead to higher risk for those,
+such as lenders, making decisions based on clas-
+sification outcomes.
+Should ML systems use sensitive attributes,
+such as gender or race if available? The legal
+and ethical factors behind such a decision vary
+by time, country, jurisdiction, culture, and down-
+stream application. Still speaking informally, it
+is known that “ignoring” these attributes does
+not ensure fairness, both because they may be
+closely correlated with other features in the data
+and because they provide context for understand-
+c© 2018 C. Dwork, N. Immorlica, A.T. Kalai & M. Leiserson.
+Decoupled Classifiers for Group-Fair and Efficient Machine Learning
+ing the rest of the data, permitting a classifier
+to incorporate information about cultural differ-
+ences between groups (Dwork et al., 2011). Using
+sensitive attributes may increase accuracy for all
+groups and may avoid biases where a classifier
+favors members of a minority group that meet
+criteria optimized for a majority group, as illus-
+trated visually in Figure 4 of 8.
+In this paper, we consider how to use a sen-
+sitive attribute such as gender or race to maxi-
+mize fairness and accuracy, assuming that it is
+legal and ethical. A data scientist wishing to fit,
+say, a simple linear classifier, may use the raw
+data, upweight/oversample data from minority
+groups, or employ advanced approaches to fit-
+ting linear classifiers that aim to be accurate and
+fair. No matter what he does and what fairness
+criteria he uses, assuming no linear classifier is
+perfect, he may be faced with an inherent trade-
+off between accuracy on one group and accuracy
+on another. As an extreme illustrative example,
+consider the two group setting illustrated in Fig-
+ure 1, where feature x1 perfectly predicts the bi-
+nary outcome y ∈ {−1, 1}. For people in group 1
+(where x2 = 1), the majority group, y = sgn(x1),
+i.e., y = 1 when x1 > 0 and −1 otherwise. How-
+ever, for the minority group where x2 = 2, ex-
+actly the opposite holds: y = −sgn(x1). Now, if
+one performed classification without the sensitive
+attribute x2, the most accurate classifier predicts
+y = sgn(x1), so the majority group would be per-
+fectly classified and the minority group would be
+classified as inaccurately as possible. However,
+even using the group membership attribute x2,
+it is impossible to simultaneously achieve better
+than 50% (random) accuracy on both groups.
+This is due to limitations of a linear classifier
+sgn(w1x1 + w2x2 + b), since the same w1 is used
+across groups.
+In this paper we define and explore decoupled
+classification systems, in which a separate1 classi-
+fier is trained on each group. Training a classifier
+involves minimizing a loss function that penal-
+izes errors; examples include mean squared loss
+and absolute loss. In decoupled classification sys-
+1. In the case of linear classifiers, training separate clas-
+sifiers is equivalent to adding interaction terms be-
+tween the sensitive attributes and all other attributes.
+More generally, the separate classifiers can equiva-
+lently be thought of as a single classifier that branches
+on the group attribute. The decoupling technique is a
+simple way to add branching to any type of classifier.
+tems one first obtains, for each group separately,
+a collection of classifiers differing in the numbers
+of positive classifications returned for the mem-
+bers of the given group. Let this set of outputs
+for group k be denoted Ck, k = 1, . . . ,K. The
+output of the decoupled training step is an ele-
+ment of C1 × . . .×CK , that is, a single classifier
+for each group. The output is chosen to minimize
+a joint loss function that can penalize differences
+in classification statistics between groups. Thus
+the loss function can capture group fairness prop-
+erties relating the treatment of different groups,
+e.g., the false positive (respectively, false nega-
+tive) rates are the same across groups; the de-
+mographics of the group of individuals receiving
+positive (negative) classification are the same as
+the demographics of the underlying population;
+the positive predictive value is the same across
+groups.

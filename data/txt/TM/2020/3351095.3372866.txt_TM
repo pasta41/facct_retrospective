@@ -1,0 +1,150 @@
+
+Recommender systems often rely on models which are trained
+to maximize accuracy in predicting user preferences. When the
+systems are deployed, these models determine the availability of
+content and information to different users. The gap between these
+objectives gives rise to a potential for unintended consequences,
+contributing to phenomena such as filter bubbles and polarization.
+In this work, we consider directly the information availability prob-
+lem through the lens of user recourse. Using ideas of reachability,
+we propose a computationally efficient audit for top-N linear recom-
+mender models. Furthermore, we describe the relationship between
+model complexity and the effort necessary for users to exert control
+over their recommendations. We use this insight to provide a novel
+perspective on the user cold-start problem. Finally, we demonstrate
+these concepts with an empirical investigation of a state-of-the-art
+model trained on a widely used movie ratings dataset.
+ACM Reference Format:
+Sarah Dean, Sarah Rich, and Benjamin Recht. 2020. Recommendations and
+User Agency: The Reachability of Collaboratively-Filtered Information. In
+Conference on Fairness, Accountability, and Transparency (FAT* ’20), January
+27–30, 2020, Barcelona, Spain. ACM, New York, NY, USA, 10 pages. https:
+//doi.org/10.1145/3351095.3372866
+1 INTRODUCTION
+Recommendation systems influence the way information is pre-
+sented to individuals for a wide variety of domains including music,
+videos, dating, shopping, and advertising. On one hand, the near-
+ubiquitous practice of filtering content by predicted preferences
+makes the digital information overload possible for individuals
+to navigate. By exploiting the patterns in ratings or consumption
+across users, preference predictions are useful in surfacing rele-
+vant and interesting content. On the other hand, this personalized
+curation is a potential mechanism for social segmentation and po-
+larization. The exploited patterns across users may in fact encode
+undesirable biases which become self-reinforcing when used in
+feedback to make recommendations.
+Recent empirical work shows that personalization on the In-
+ternet has a limited effect on political polarization [15], and in
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+FAT* ’20, January 27–30, 2020, Barcelona, Spain
+© 2020 Association for Computing Machinery.
+ACM ISBN 978-1-4503-6936-7/20/02. . . $15.00
+https://doi.org/10.1145/3351095.3372866
+fact it can increase the diversity of content consumed by individ-
+uals [31]. However, these observations follow by comparison to
+non-personalized baselines of cable news or well known publishers.
+In a digital world where all content is algorithmically sorted by de-
+fault, how do we articulate the tradeoffs involved? In the past year,
+YouTube has come under fire for promoting disturbing children’s
+content and working as an engine of radicalization [7, 32, 46]. This
+comes a push on algorithm development towards reaching 1 billion
+hours of watchtime per day; over 70% of views now come from the
+recommended videos [42].
+The Youtube controversy is an illustrative example of potential
+pitfalls when putting large scale machine learning-based systems
+in feedback with people, and highlights the importance of creating
+analytical tools to anticipate and prevent undesirable behavior. Such
+tools should seek to quantify the degree to which a recommender
+system will meet the information needs of its users or of society
+as a whole, where these “information needs” must be carefully
+defined to include notions like relevance, coverage, and diversity.
+An important approach involves the empirical evaluation of these
+metrics by simulating recommendations made by models once
+they are trained [13]. In this work we develop a complementary
+approach which differs in twomajor ways: First, we directly analyze
+the predictive model, making it possible to understand underlying
+mechanisms. Second, our evaluation considers a range of possible
+user behaviors rather than a static snapshot.
+Drawing conclusions about the likely effects of recommenda-
+tions involves treating humans as a component within the system,
+and the validity of these conclusions hinges on modeling human be-
+havior. We propose an alternative evaluation that favors the agency
+of individuals over the limited perspective offered by behavioral
+predictions. Our main focus is on questions of possibility: to what
+extent can someone be pigeonholed by their viewing history? What
+videos may they never see, even after a drastic change in viewing
+behavior? And how might a recommender system encode biases in
+a way that effectively limits the available library of content?
+This perspective brings user agency into the center, prioritizing
+the the ability for models to be as adaptable as they are accurate,
+able to accommodate arbitrary changes in the interests of individu-
+als. Studies find positive effects of allowing users to exert greater
+control in recommendation systems [21, 51]. While there are many
+system-level or post-hoc approaches to incorporating user feed-
+back, we focus directly on the machine learning model that powers
+recommendations.
+Contributions. In this paper, we propose a definition of user re-
+course and item availability for recommender systems. This perspec-
+tive extends the notion of recourse proposed by Ustun et al. [47] to
+multiclass classification settings and specializes to concerns most
+relevant for information retrieval systems. We focus our analysis
+on top-N recommendations made using linear predictions, a broad
+class including matrix factorization models. In Section 3 we show
+how properties of latent user and item representations interact to
+limit or ensure recourse and availability. This yields a novel perspec-
+tive on user cold-start problems, where a user with no rating history
+is introduced to a system. In Section 4, we propose a computation-
+ally efficient model audit. Finally, in Section 5, we demonstrate how
+the proposed analysis can be used as a tool to interpret how learned
+models will interact with users when deployed.
+1.1 Related Work
+Recommendation models that incorporate user feedback for online
+updates have been considered from several different angles. The
+computational perspective focuses on ensuring that model updates
+are efficient and fast [22]. The statistical perspective articulates
+the sampling bias induced by recommendation [5], while practical
+perspectives identify ways to discard user interactions that are not
+informative for model updates [8]. Another body of work focuses
+on the learning problem, seeking to improve the predictive accu-
+racy of models by exploiting the sequential nature of information.
+This includes strategies like Thompson sampling [24], upper con-
+fidence bound approximations for contextual bandits [6, 28], and
+reinforcement learning [27, 50].
+This body of work, and indeed much work on recommender
+systems, focuses on the accuracy of the model. This encodes an
+implicit assumption that the primary information needs of users or
+society are described by predictive performance. Alternative mea-
+sures proposed in the literature include concepts related to diversity
+or novelty of recommendations [9]. Directly incorporating these
+objectives into a recommender system might include further predic-
+tive models of users, e.g. to determine whether they are “challenge
+averse” or “diversity seeking” [45]. Further alternative criteria arise
+from concerns of fairness and bias, and recent work has sought to
+empirically quantify parity metrics on recommendations [13, 14]. In
+this work, we focus more directly on agency rather than predictive
+models or observations.
+Most similar to our work is a handful of papers focusing on deci-
+sion systems through the lens of the agency of individuals. We are
+most directly inspired by the work of Ustun et al. [47] on actionable
+recourse for binary decisions, where users seek to change negative
+classification through modifications to their features. This work
+has connections to concepts in explainability and transparency via
+the idea of counterfactual explanations [40, 48], which provide state-
+ments of the form: if a user had features X , then they would have
+been assigned alternate outcome Y . Work in strategic manipulation
+studies nearly the same problem with the goal of creating a decision
+system that is robust to malicious changes in features [19, 30].
+Applying these ideas to recommender systems is complex be-
+cause while they can be viewed as classifiers or decision systems,
+there are as many outcomes as pieces of content. Computing precise
+action sets for recourse for every user-item pair is unrealistic; we
+don’t expect a user to even become aware of the majority of items.
+Instead, we consider the “reachability” of items by users, drawing
+philosophically from the fields of formal verification and dynamical
+system analysis [3, 34].
