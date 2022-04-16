@@ -1,3 +1,3 @@
 # Repository for the Four Years of FAccT Project
 
-README: TODO, describe organization and dependencies. Have a README in each experiment subfolder
+This is the code repository for the paper "Four Years of FAccT: A Reflexive, Mixed-Methods Analysis of Research Contributions, Shortcomings, and Future Prospects," published at the 2022 ACM Conference on Fairness, Accountability and Transparency (FAccT '22, Seoul, Korea). The code presented here corresponds to the experiments run in Section 3.2, "Unsupervised Methods to Identify Themes." The ``data`` directory contains the corpus of FAccT papers from 2018--2021 used for analysis in the project. The ``src`` directory contains the code for generating the topic model and citation networks discussed in the paper. Please refer to the subdirectories in ``src`` for experiment-specific reproducibility information.
